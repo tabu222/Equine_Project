@@ -2,7 +2,7 @@
 
 Documentation for the frontend team. Backend: Django REST, database `sql/horse_v2.sql`.
 
-**Current checkout supports Flow 1 only.** Sections 5–7 and 10 describe the larger system, not available routes in this checkout. Intake records and amendments are restored from existing Git history. Non-initial examinations, Training Lock, vaccinations, training and care/inventory are unavailable; do not show those actions as working features.
+**Current checkout supports Flow 1, Flow 2 and Flow 3.** Section 7 and the Flow 4 parts of 10 describe the larger system, not available routes in this checkout: diet plans, care tasks and inventory are unavailable; do not show those actions as working features.
 
 ### Verified Flow 1 frontend mapping
 
@@ -130,14 +130,14 @@ Login returns `Roles` and `Permissions`. The frontend uses `Permissions` to hide
 |---|---|---|
 | `CLUB_MANAGER` | `CLUB_MANAGE`, `RBAC_MANAGE`, `AUDIT_VIEW`, `HORSE_VIEW`, `HORSE_REGISTER_REVIEW`, `HORSE_ARCHIVE`, `PROFILE_EDIT_APPROVE`, `INVENTORY_MANAGE` | Approve horse profiles, stalls, accounts, inventory, assign care tasks |
 | `HEAD_TRAINER` | `HORSE_VIEW`, `HORSE_ASSESS`, `TRAINER_ASSIGN`, `TRAINING_PLAN_APPROVE`, `TRAINING_SESSION_ASSIGN`, `TRAINING_SESSION_SUPERVISE`, `HEALTH_REPORT`, `DIET_MANAGE`, `INVENTORY_REQUEST` | Assess horses, assign trainers, approve training plans, schedule training sessions, create diet plans, assign tasks to Grooms |
-| `TRAINER` | `HORSE_VIEW`, `TRAINING_PLAN_MANAGE`, `TRAINING_SESSION_SUPERVISE`, `TRAINING_REVIEW`, `HEALTH_REPORT` | Write training plans, supervise (including as Substitute), review training sessions |
+| `TRAINER` | `HORSE_VIEW`, `TRAINING_PLAN_MANAGE`, `TRAINING_SESSION_ASSIGN`, `TRAINING_SESSION_SUPERVISE`, `TRAINING_REVIEW`, `HEALTH_REPORT` | Write training plans, schedule sessions **for the horses they are in charge of**, supervise (including as Substitute), review training sessions, close plan stages |
 | `WORK_RIDER` | `HORSE_VIEW`, `TRAINING_RESULT_UPDATE`, `HEALTH_REPORT` | Start training sessions, record results |
 | `VETERINARIAN` | `HORSE_VIEW`, `MEDICAL_MANAGE`, `MEDICAL_SIGN`, `TRAINING_LOCK_MANAGE`, `DIET_MANAGE` | Examinations, signing records, Training Lock, treatments, vaccinations, approving diet plans |
 | `GROOM` | `HORSE_VIEW`, `CARE_MANAGE`, `HEALTH_REPORT`, `INVENTORY_REQUEST` | Care tasks, reporting incidents, requesting inventory items |
-| `HORSE_OWNER` | `HORSE_REGISTER`, `PROFILE_EDIT_REQUEST`, `OWNER_VIEW` | Register horses, request profile changes, view own horses |
+| `HORSE_OWNER` | `HORSE_REGISTER`, `PROFILE_EDIT_REQUEST`, `OWNER_VIEW` | Register horses, request profile changes, view own horses and their training results (section 5.7) |
 
 Data scope: staff only see data **within their own club**; horse owners only see **their own horses**
-(only the health summary, not detailed training / medical records).
+(health summary and training results reviewed by the trainer – section 5.7; not medical records or internal notes).
 
 ## 4. Flow 1 – Horse intake
 
@@ -151,7 +151,7 @@ Data scope: staff only see data **within their own club**; horse owners only see
 | POST | `/auth/google` | no login required | Sign in with Google: `{"Credential": "<Google ID token>"}` → existing email: `{access, refresh, User}`; unknown email: `{"SignupRequired": true, "Email", "FullName"}`. Send again with `"Phone", "Address", "ClubID"` (and optional `"FullName"`) to create a **horse owner** account → **201** `{access, refresh, User}`. Needs `GOOGLE_CLIENT_ID` in `.env` (otherwise 409 `GOOGLE_LOGIN_DISABLED`) |
 | POST | `/auth/refresh` | everyone | `{"refresh"}` → `{access}` |
 | GET | `/auth/me` | logged in | → `User` with `Roles`, `Permissions` |
-| GET | `/users?RoleCode=HORSE_OWNER` | Manager, Head Trainer | users in the club (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments) |
+| GET | `/users?RoleCode=HORSE_OWNER` | Manager, Head Trainer, Trainer | users in the club (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments). A Trainer only gets `WORK_RIDER` / `TRAINER` / `HEAD_TRAINER` (other `RoleCode` → 403) |
 | POST | `/users` | Manager | `{"FullName", "Email", "Phone", "Address", "RoleCode"? (default HORSE_OWNER), "Password"?}`; `Phone` = 10 digits starting with 0 or `+84` + 9 digits |
 | GET | `/users/{UserID}` | self / Manager of the same club | |
 | GET | `/clubs` | no login required | Active clubs (picked on the sign-up form and when an Owner registers a horse) |
@@ -367,27 +367,72 @@ Archiving a horse (`POST /horses/{id}/archive`) now also: ends the trainer assig
 
 ```
 Head Trainer assesses the horse ──> assigns 1 responsible Trainer ──> Trainer drafts the training plan ──> Head Trainer approves
-──> Head Trainer schedules training sessions (Work Rider, Substitute Trainer if needed) ──> Work Rider starts, records the result
-──> (Substitute records an observation) ──> responsible Trainer reviews ──> if adjustment is needed, create a new training plan version
+──> responsible Trainer schedules training sessions (Work Rider, Substitute Trainer if needed; Head Trainer can do it for any horse)
+──> Work Rider starts, records the result ──> (Substitute records an observation) ──> responsible Trainer reviews
+──> if adjustment is needed, create a new training plan version
+──> at the end of each stage the Trainer closes the stage ──> the horse owner receives the stage summary (5.7)
 ```
 
 Only `Approved` horses can enter training. All Flow 2 APIs require the `HORSE_VIEW` permission to view (club staff).
 
-### 5.1 Specializations, Trainers
+### 5.1 Specializations, Trainers, trainer profile
 
 | Method | URL | Used by | Notes |
 |---|---|---|---|
 | GET | `/specializations` | everyone | `Flat Racing`, `Steeplechase / Hurdle Racing`, `Harness Racing`, `Endurance / Long-distance Racing`, `Other` |
-| GET | `/trainers?SpecializationID=` | Head Trainer, Manager | trainers in the club, their specializations, number of horses currently assigned |
+| GET | `/trainers?SpecializationID=` | Head Trainer, Manager | trainers in the club: specializations, **profile** (see table below) and number of horses currently assigned |
+| GET | `/trainers?HorseID=` | Head Trainer, Manager | **trainer suggestions for a horse** (see below): suitable trainers first |
+| GET | `/trainers/{UserID}` | Head Trainer, Manager, the trainer themself | same fields + `ActiveHorses`, `Credentials`, `RecentRaceResults` (last 10) |
+| PATCH | `/trainers/{UserID}/profile` | Head Trainer, Manager | `{"CareerStartDate"?, "TrainerRating"?}` |
+| GET / POST | `/trainers/{UserID}/credentials` | view: as above · add: Head Trainer, Manager | degrees, certificates, licences, awards |
+| DELETE | `/trainer-credentials/{CredentialID}` | Head Trainer, Manager | |
+| GET / POST | `/trainers/{UserID}/race-results?From=&To=` | view: as above · add: Head Trainer, Manager | each time a horse prepared by the trainer ran a race |
+| DELETE | `/trainer-race-results/{RaceResultID}` | Head Trainer, Manager | remove a wrong entry |
 | POST | `/trainers/{UserID}/specializations` | Head Trainer, Manager | `{"SpecializationID": 1}` – assign a specialization to a trainer |
 | DELETE | `/trainers/{UserID}/specializations/{SpecializationID}` | Head Trainer, Manager | cannot be deleted if already used in a trainer assignment (`IN_USE`) |
 
 ```json
-[{"UserID": 4, "FullName": "Demo Trainer", "Email": "trainer@equi.local", "Phone": null,
-  "Specializations": [{"SpecializationID": 1, "SpecializationName": "Flat Racing"}], "ActiveHorseCount": 2}]
+[{"UserID": 4, "FullName": "Phạm Quốc Bảo", "Email": "trainer@equi.local", "Phone": "0938452116",
+  "Specializations": [{"SpecializationID": 1, "SpecializationName": "Flat Racing"}],
+  "CareerStartDate": "2013-06-01", "YearsOfExperience": 13, "ExperienceLevel": "Expert", "ExperienceLevelName": "Chuyên gia",
+  "Seniority": 12, "SenioritySince": "2014-03-10", "QualificationCount": 2, "AwardCount": 2,
+  "CareerStarts": 240, "CareerWins": 58, "CareerWinRate": 24.2, "RecentStarts": 40, "RecentWins": 9,
+  "WinRate": 22.5, "PlaceRate": 45.0, "WinRateNote": null, "TrainerRating": 4.6, "ActiveHorseCount": 2, "HasProfile": true}]
 ```
 
+Every number is **computed** from what is recorded, nothing is typed in by hand:
+
+| Field | How it is computed |
+|---|---|
+| `YearsOfExperience` | full years since `CareerStartDate` (the day the trainer started the profession) – grows by itself every year |
+| `ExperienceLevel` | from `YearsOfExperience`: 0–2 `Junior`, 3–5 `Intermediate`, 6–10 `Senior`, more than 10 `Expert` (`ExperienceLevelName` = Vietnamese name) |
+| `Seniority` | **proven** professional seniority: full years since the earliest `Degree` / `Certificate` / `License` (`SenioritySince`); `null` if none recorded. `QualificationCount`, `AwardCount` = number of those papers / awards |
+| `WinRate` | like the "strike rate" used in racing: wins / starts in the **last 12 months** (`RecentWins` / `RecentStarts`), %. `null` with `WinRateNote` when there are fewer than **10** starts in 12 months (too few to be meaningful) |
+| `PlaceRate` | finishes in the top 3 / starts in the last 12 months (same 10-start rule) |
+| `CareerStarts`, `CareerWins`, `CareerWinRate` | the whole career (all race results) |
+| `TrainerRating` | 0–5 (1 decimal) given by the Head Trainer / Manager, `null` = not rated |
+| `HasProfile` | `false` = profile not entered yet |
+
+Example on screen: *Phạm Quốc Bảo – Flat Racing – Kinh nghiệm: 13 năm – Cấp độ: Expert – Đang phụ trách: 2 ngựa*.
+
+Credential body: `{"CredentialType": "Degree" | "Certificate" | "License" | "Award", "Title", "IssuedBy"?, "IssuedDate",
+"ExpiryDate"?, "FileUrl"? (link to the scanned paper), "Note"?}`. An award does not count towards `Seniority`.
+
+Race result body: `{"RaceDate", "RaceName", "RaceClass"? ("Group 1", "Group 2", "Group 3", "Listed", "Handicap",
+"Maiden", "Other"), "HorseID"? (horse of the club) or "HorseName" (horse from outside), "FinishPosition", "FieldSize", "Note"?}`;
+`FinishPosition` must be between 1 and `FieldSize` (at least 2 horses), the date cannot be in the future.
+
+**Trainer suggestions** `GET /trainers?HorseID=5` use the horse's latest `Recommended` assessment (5.2):
+
+- the trainer must have the recommended specialization;
+- minimum level by `QualityScore` (a better horse aiming at bigger races needs a more experienced trainer):
+  `≥ 85` → `Senior` or higher, `≥ 70` → `Intermediate` or higher, lower / not scored → any level;
+- each row gets `IsSuggested`, `MatchesSpecialization`, `MatchesLevel`, `RequiredLevel` and `SuggestionReason`
+  (Vietnamese sentence to show); order: suggested first, then higher level, fewer active horses, higher rating.
+
 The trainer must have a specialization (`TrainerSpecialization`) matching the specialization of the assignment (a foreign key constraint in SQL).
+The level is only a suggestion: `POST /trainer-assignments` still accepts a lower-level trainer but returns
+`LevelWarning` (see 5.3).
 
 ### 5.2 Horse assessment
 
@@ -417,13 +462,16 @@ Each horse has only **1** `Active` responsible trainer (`ALREADY_ASSIGNED` if on
  "AssessmentID": 1, "StartDate": "2026-10-10", "EndDate": null, "Status": "Active", "AssignmentNote": null}
 ```
 
+`POST /trainer-assignments` also returns `TrainerExperienceLevel`, `RequiredLevel` and `LevelWarning`
+(`null`, or a sentence when the horse should go to a more experienced trainer – the assignment is still created).
+
 ### 5.4 Preferred work riders (familiar with the horse)
 
 | Method | URL | Used by | Notes |
 |---|---|---|---|
 | GET | `/horses/{HorseID}/work-rider-preferences?all=1` | staff | by default returns only preferences still in effect |
-| POST | `/horses/{HorseID}/work-rider-preferences` | Head Trainer | `{"WorkRiderID", "Priority"? (1 = highest priority), "Note"?}` |
-| POST | `/work-rider-preferences/{PreferenceID}/end` | Head Trainer | |
+| POST | `/horses/{HorseID}/work-rider-preferences` | responsible Trainer, Head Trainer | `{"WorkRiderID", "Priority"? (1 = highest priority), "Note"?}` |
+| POST | `/work-rider-preferences/{PreferenceID}/end` | responsible Trainer, Head Trainer | |
 
 Only used as suggestions when scheduling training sessions; each session still selects its own Work Rider.
 
@@ -451,6 +499,13 @@ Active ──revise──> new Draft version; when the new version is approved, 
 | POST | `/training-plans/{id}/complete` | responsible Trainer, Head Trainer | remaining `Assigned` sessions are cancelled |
 | POST | `/training-plans/{id}/cancel` | responsible Trainer, Head Trainer | `{"Reason"?}` |
 | POST | `/training-plans/{id}/revise` | responsible Trainer | copies an `Active`/`Completed` training plan into a new `Draft` version for adjustment |
+| POST | `/training-plan-stages/{TrainingPlanStageID}/close` | responsible Trainer, Head Trainer | `{"SummaryNote"?}` close a stage → stage summary sent to the horse owner (bell + email). Returns the stage summary (5.7) |
+
+Closing a stage: the training plan must be `Active` / `Completed`, the stage must have started (`NOT_STARTED`), not be closed yet
+(`ALREADY_CLOSED`) and have no `Assigned` / `In Progress` sessions left (`SESSIONS_PENDING`: finish, cancel or mark them missed).
+When the stage end date has passed and it is still open, the Trainer and Head Trainer see `STAGE_TO_CLOSE` in notifications.
+Completing a training plan closes its started stages automatically and sends the plan summary to the owner.
+Each stage in `Stages` also returns `ClosedAt`, `ClosedByID`, `ClosedByName`, `SummaryNote`.
 
 Body `POST /training-plans`:
 
@@ -492,22 +547,27 @@ Specific error codes: `NOT_PLAN_OWNER` (not the currently assigned trainer), `NO
 
 ```
 Assigned ──start (Work Rider, on the session day)──> In Progress ──result (Work Rider)──> Completed
-Assigned / In Progress ──stop (supervising trainer, Head Trainer) / cancel (Head Trainer)──> Cancelled
-Assigned / In Progress ──missed (Head Trainer, from the session day onward)──> Missed
+Assigned / In Progress ──stop (supervising trainer, responsible Trainer, Head Trainer) / cancel──> Cancelled
+Assigned / In Progress ──missed (from the session day onward)──> Missed
 ```
+
+Who schedules: the **responsible Trainer** for the horses they are in charge of, the **Head Trainer** for every horse
+(exceptions: trainer absent, urgent rider change). Another Trainer gets `403`. `AssignedByHeadTrainerID` stores whoever
+scheduled the session (column name kept for compatibility). `stop` = the horse has a problem (the owner is alerted);
+`cancel` = ordinary cancellation (weather, schedule change).
 
 | Method | URL | Used by | Notes |
 |---|---|---|---|
 | GET | `/training-sessions?Date=&From=&To=&HorseID=&TrainingPlanID=&WorkRiderID=&Status=&mine=1` | staff | `mine=1`: Work Rider → sessions they ride; Trainer → sessions they supervise (responsible or Substitute) |
 | GET | `/training-sessions/{id}` | staff | |
-| POST | `/training-sessions` | Head Trainer | schedule a training session (the training plan must be `Active`) |
-| PATCH | `/training-sessions/{id}` | Head Trainer | when `Assigned`: change Work Rider, Substitute, date/time, intensity... |
+| POST | `/training-sessions` | responsible Trainer, Head Trainer | schedule a training session (the training plan must be `Active`) |
+| PATCH | `/training-sessions/{id}` | responsible Trainer, Head Trainer | when `Assigned`: change Work Rider, Substitute, date/time, intensity... |
 | POST | `/training-sessions/{id}/start` | the session's Work Rider | on the session day |
 | POST | `/training-sessions/{id}/result` | the session's Work Rider | record the result → `Completed` |
 | POST | `/training-sessions/{id}/substitute-observation` | the session's Substitute Trainer | `{"SubstituteObservation"}` (required for substitute-supervised sessions) |
-| POST | `/training-sessions/{id}/stop` | supervising trainer, Head Trainer | `{"Reason", "ReportHealth"?, "Severity"?, "Description"?}` |
-| POST | `/training-sessions/{id}/cancel` | Head Trainer | `{"Reason"?}` |
-| POST | `/training-sessions/{id}/missed` | Head Trainer | `{"Reason"?}` |
+| POST | `/training-sessions/{id}/stop` | supervising trainer, responsible Trainer, Head Trainer | `{"Reason", "ReportHealth"?, "Severity"?, "Description"?}`; the owner gets an urgent alert + email |
+| POST | `/training-sessions/{id}/cancel` | responsible Trainer, Head Trainer | `{"Reason"?}` |
+| POST | `/training-sessions/{id}/missed` | responsible Trainer, Head Trainer | `{"Reason"?}` |
 | POST | `/training-sessions/{id}/review` | responsible Trainer | review a `Completed` session (once per session) |
 | GET | `/training-reviews?AdjustmentRequired=1&HorseID=&Days=14` | staff | Head Trainer tracks training plan adjustment requests |
 | GET | `/training-dashboard?HorseID=` | staff | overview screen before scheduling (same as the `vw_HorseTrainingDashboard` view) |
@@ -583,6 +643,71 @@ Specific error codes: `PLAN_NOT_ACTIVE`, `RIDER_SLOT_TAKEN`, `NOT_SESSION_RIDER`
   "LatestTrainingDate": "2026-10-12", "LatestPerformanceScore": 78.0, "LatestActualDistanceKm": 3.4,
   "LatestAvgSpeedKmh": 28.5, "LatestAvgHeartRate": 150, "LatestRecoveryMinutes": 12}]
 ```
+
+### 5.7 Horse owner: training results
+
+The owner (`OWNER_VIEW`) only sees **their own horses**, only training plans that were approved, and:
+- `Completed` sessions **after the responsible Trainer reviewed them** (overview + detail);
+- `Cancelled` / `Missed` sessions that are due, with the reason (no numbers);
+- never: sessions not yet done / in progress / not reviewed, the Substitute Trainer's observation.
+
+Summaries follow the **stages of the training plan** (not weeks / months). A running stage shows numbers "as of today" (`AsOf`);
+when the Trainer closes it (5.5) the owner receives the stage summary; when the plan ends, the plan summary.
+Result numbers in summaries only count reviewed sessions (what the owner can see).
+
+| Method | URL | Notes |
+|---|---|---|
+| GET | `/owner/horses/{HorseID}/training-plans` | approved training plans (newest first) with the overall `Summary` |
+| GET | `/owner/training-plans/{TrainingPlanID}` | plan summary + `Stages` (each with `Summary`, `ComparedToPreviousStage`, `SummaryNote`) |
+| GET | `/owner/horses/{HorseID}/training-sessions?From=&To=&TrainingPlanID=&TrainingPlanStageID=` | session overview list (newest first) |
+| GET | `/owner/training-sessions/{TrainingSessionID}` | session detail; `404` if the session is not reviewed yet |
+
+Session overview (list) – detail adds the fields after `Reason`:
+
+```json
+{"TrainingSessionID": 1, "SessionDate": "2026-10-17", "StartTime": "06:00:00", "TrainingType": "Canter",
+ "TrainingPlanID": 1, "TrainingPlanStageID": 1, "StageName": "Làm quen", "Status": "Completed",
+ "DurationMinutes": 47, "DistanceKm": 5.2, "PerformanceScore": 82.0, "Evaluation": "Excellent",
+ "IsStopped": false, "Reason": null,
+ "HorseID": 3, "HorseName": "Hắc Long", "TrainerName": "Phạm Quốc Bảo", "WorkRiderName": "Võ Thanh Tùng",
+ "Surface": "Turf", "Location": "Track no. 2", "DurationPlannedMinutes": 45, "DistancePlannedKm": 5.0, "TargetSpeedKmh": 40.0,
+ "AvgSpeedKmh": 41.3, "MaxSpeedKmh": 55.0, "AvgHeartRate": 152, "MaxHeartRate": 205, "RecoveryMinutes": 11,
+ "RiderObservation": "Ngựa hơi mệt km cuối", "VideoUrl": "https://...", "TrainerComment": "Thích nghi tốt",
+ "AdjustmentRequired": false, "AdjustmentNote": null, "ReviewedBy": "Phạm Quốc Bảo", "ReviewDate": "2026-10-17T09:15:00"}
+```
+
+`IsStopped: true` = stopped because the horse had a problem; `Status` is then `Cancelled` and `Reason` explains why.
+
+`GET /owner/training-plans/{id}`:
+
+```json
+{"HorseID": 3, "HorseName": "Hắc Long", "HorseCode": "EQ-003",
+ "TrainingPlanID": 1, "Goal": "Chuẩn bị giải tháng 12", "StartDate": "2026-10-17", "EndDate": "2026-11-26", "Status": "Active",
+ "TrainerName": "Phạm Quốc Bảo", "SpecializationName": "Flat Racing", "ApprovedAt": "2026-10-17T08:00:00",
+ "ProgressPercent": 12.5, "StageCount": 2, "CurrentStageName": "Làm quen",
+ "Summary": {"From": "2026-10-17", "To": "2026-10-22", "PlannedSessions": 6, "CompletedSessions": 4, "ReviewedSessions": 4,
+             "AwaitingReviewSessions": 0, "CancelledSessions": 1, "MissedSessions": 0, "UpcomingSessions": 1,
+             "TotalDistanceKm": 20.4, "DistanceTargetKm": 50.0, "DistanceProgressPercent": 40.8, "TotalDurationMinutes": 180,
+             "AvgDistancePerSessionKm": 5.1, "AvgSpeedKmh": 40.6, "MaxSpeedKmh": 55.0, "AvgPerformanceScore": 80.5,
+             "AvgHeartRate": 151.0, "AvgRecoveryMinutes": 11.5,
+             "Evaluations": {"Excellent": 1, "Good": 3, "Average": 0, "Needs Improvement": 0},
+             "Health": {"TrainingLockCount": 0, "HealthReportCount": 0, "UrgentHealthReportCount": 0, "IsLockedNow": false,
+                        "Text": "Bình thường"}},
+ "Stages": [{"TrainingPlanStageID": 1, "StageOrder": 1, "StageName": "Làm quen", "Goal": null,
+             "StartDate": "2026-10-17", "EndDate": "2026-10-30", "Intensity": "Low",
+             "StageState": "InProgress", "IsOverdue": false, "AsOf": "2026-10-22",
+             "ClosedAt": null, "ClosedByName": null, "SummaryNote": null,
+             "Summary": {"...": "same fields as above"},
+             "ComparedToPreviousStage": null}]}
+```
+
+- `StageState`: `NotStarted` (`Summary` = null), `InProgress` (numbers as of `AsOf`), `Closed`.
+- `ComparedToPreviousStage`: differences of `AvgSpeedKmh`, `AvgPerformanceScore`, `AvgDistancePerSessionKm`, `AvgRecoveryMinutes`
+  against the previous stage (positive = higher).
+- `Health` is `null` until Flow 3 is installed.
+
+Emails to the owner (only important events): plan approved, stage closed (stage summary), plan completed (plan summary),
+session stopped (urgent); with Flow 3 also Training Lock created (urgent) / released.
 
 ## 6. Flow 3 – Medical
 
@@ -793,11 +918,11 @@ Sorting: `Priority = High` first, newest first. `EntityName` + `EntityID` tell w
 |---|---|
 | Club Manager | `HORSE_TO_VERIFY`, `HORSE_TO_APPROVE`, `PROFILE_CHANGE`, `INVENTORY_REQUEST`, `LOW_STOCK` |
 | Vet | `HEALTH_REPORT`, `INITIAL_EXAM`, `VACCINATION_DUE`, `MEDICAL_SCHEDULE`, `DRAFT_RECORD`, `DIET_TO_REVIEW` |
-| Head Trainer | `HEALTH_REPORT` (all horses in the club), `PLAN_TO_APPROVE`, `ADJUSTMENT_REQUIRED`, `DIET_RETURNED` |
-| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW` |
+| Head Trainer | `HEALTH_REPORT` (all horses in the club), `PLAN_TO_APPROVE`, `ADJUSTMENT_REQUIRED`, `STAGE_TO_CLOSE`, `DIET_RETURNED` |
+| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW`, `STAGE_TO_CLOSE` |
 | Work Rider | `RIDE_TODAY` |
 | Groom | `CARE_TASK` |
-| Horse Owner | `HORSE_REJECTED`, `PROFILE_CHANGE_DONE` |
+| Horse Owner | `HORSE_REJECTED`, `PROFILE_CHANGE_DONE`, `OWNER_SESSIONS_REVIEWED` (new reviewed sessions, grouped per horse), `OWNER_STAGE_SUMMARY`, `OWNER_PLAN_SUMMARY`, `OWNER_PLAN_APPROVED`, `OWNER_SESSION_STOPPED` (High); Flow 3: `OWNER_TRAINING_LOCKED` (High), `OWNER_TRAINING_UNLOCKED` |
 
 ## 9. Frontend changes (Flow 1)
 
@@ -951,9 +1076,10 @@ Suggested screens by role:
 | Head Trainer | Horse overview (training lock, trainer, latest session) | `GET /training-dashboard` |
 | Head Trainer | Horse assessment, trainer assignment | `POST /horses/{id}/assessments`, `GET /trainers`, `POST /trainer-assignments`, `POST /trainer-assignments/{id}/end` |
 | Head Trainer | Approve training plans | `GET /training-plans?Status=Pending Approval`, `POST /training-plans/{id}/approve`, `.../return` |
-| Head Trainer | Training schedule (schedule sessions, pick Work Rider / Substitute) | `GET /training-sessions?From=&To=`, `POST /training-sessions`, `PATCH /training-sessions/{id}`, `GET /users?RoleCode=WORK_RIDER` |
+| Head Trainer | Training schedule (all horses; exceptions) | `GET /training-sessions?From=&To=`, `POST /training-sessions`, `PATCH /training-sessions/{id}`, `GET /users?RoleCode=WORK_RIDER` |
 | Head Trainer | Diet plans, assign Groom tasks | `POST /horses/{id}/diet-plans`, `POST /care-tasks` |
 | Trainer | Assigned horses, write training plans | `GET /trainer-assignments?mine=1`, `POST /training-plans`, `.../stages`, `.../submit`, `.../revise` |
+| Trainer | Schedule sessions for own horses, close stages | `POST /training-sessions`, `PATCH /training-sessions/{id}`, `.../cancel`, `GET /users?RoleCode=WORK_RIDER`, `POST /training-plan-stages/{id}/close` |
 | Trainer | Today's supervised sessions, session review | `GET /training-sessions?mine=1&Date=`, `.../stop`, `.../substitute-observation`, `.../review` |
 | Work Rider | Today's rides, record results | `GET /training-sessions?mine=1&Date=`, `.../start`, `.../result` |
 | Vet | Health report queue | `GET /health-reports?open=1`, `.../take`, `.../resolve` |
@@ -961,6 +1087,7 @@ Suggested screens by role:
 | Vet | Vaccinations, medical schedule, approve diet plans | `GET /vaccinations?DueWithinDays=14`, `POST /diet-plans/{id}/approve` |
 | Groom | Today's tasks, diet plan, report incidents, request inventory | `GET /care-tasks?mine=1&Date=`, `GET /horses/{id}/current-diet`, `POST /horses/{id}/health-reports`, `POST /inventory-requests` |
 | Manager | Inventory, approve requests | `GET /inventory-items`, `POST /inventory-items/{id}/stock`, `POST /inventory-requests/{id}/approve` |
+| Horse Owner | Training tab of a horse: plan + stage summaries, session list, session detail | `GET /owner/horses/{id}/training-plans`, `GET /owner/training-plans/{id}`, `GET /owner/horses/{id}/training-sessions`, `GET /owner/training-sessions/{id}` |
 | All roles | Notification bell | `GET /notifications` |
 
 ## 11. Profile update proposals (2026-10-16)

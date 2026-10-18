@@ -490,6 +490,9 @@ export async function withdrawProfileProposal(requestId: string): Promise<Profil
 }
 
 export interface ExaminationInput {
+  examType?: string;
+  healthReportId?: string;
+  trainingSessionId?: string;
   examDate: string;
   weightKg?: number;
   heightCm?: number;
@@ -501,6 +504,8 @@ export interface ExaminationInput {
   trainingEligibility: string;
   restrictionNote: string;
   followUpDate: string;
+  injuryLocation?: string;
+  note?: string;
 }
 
 export interface MedicalRecord extends ExaminationInput {
@@ -527,6 +532,9 @@ export interface PendingInitialExam {
 function mapMedicalRecord(value: unknown): MedicalRecord {
   if (!value || typeof value !== 'object') throw new ApiError('API trả phiếu khám không đúng định dạng.');
   const record = value as ApiRecord;
+  if (record.RecordStatus !== 'Draft' && record.RecordStatus !== 'Signed') {
+    throw new ApiError('Chưa xác định được trạng thái phiếu khám. Vui lòng tải lại.');
+  }
   return {
     id: requiredId(record, 'MedicalRecordID'),
     horseId: requiredId(record, 'HorseID'),
@@ -538,8 +546,8 @@ function mapMedicalRecord(value: unknown): MedicalRecord {
       : String(record.RegistrationRequestID),
     examType: typeof record.ExamType === 'string' ? record.ExamType : '',
     examDate: typeof record.ExamDate === 'string' ? record.ExamDate : '',
-    weightKg: typeof record.WeightKg === 'number' ? record.WeightKg : undefined,
-    heightCm: typeof record.HeightCm === 'number' ? record.HeightCm : undefined,
+    weightKg: record.WeightKg == null || !Number.isFinite(Number(record.WeightKg)) ? undefined : Number(record.WeightKg),
+    heightCm: record.HeightCm == null || !Number.isFinite(Number(record.HeightCm)) ? undefined : Number(record.HeightCm),
     symptoms: typeof record.Symptoms === 'string' ? record.Symptoms : '',
     diagnosis: typeof record.Diagnosis === 'string' ? record.Diagnosis : '',
     treatmentPlan: typeof record.TreatmentPlan === 'string' ? record.TreatmentPlan : '',
@@ -548,6 +556,8 @@ function mapMedicalRecord(value: unknown): MedicalRecord {
     trainingEligibility: typeof record.TrainingEligibility === 'string' ? record.TrainingEligibility : '',
     restrictionNote: typeof record.RestrictionNote === 'string' ? record.RestrictionNote : '',
     followUpDate: typeof record.FollowUpDate === 'string' ? record.FollowUpDate : '',
+    injuryLocation: typeof record.InjuryLocation === 'string' ? record.InjuryLocation : '',
+    note: typeof record.Note === 'string' ? record.Note : '',
     recordStatus: record.RecordStatus === 'Signed' ? 'Signed' : 'Draft',
     signedAt: typeof record.SignedAt === 'string' ? record.SignedAt : undefined,
   };
@@ -556,7 +566,7 @@ function mapMedicalRecord(value: unknown): MedicalRecord {
 export async function getPendingInitialExams(): Promise<PendingInitialExam[]> {
   const records = listResponse<ApiRecord>(await apiGet<unknown>('/vet/pending-initial-exams'));
   return records.map((record) => ({
-    horse: { ...normalizeHorse(record), initialExamSigned: false },
+    horse: { ...normalizeHorse({ ...record, RegistrationStatus: 'PendingExam' }), initialExamSigned: false },
     requestId: requiredId(record, 'RegistrationRequestID'),
     requestDate: typeof record.RequestDate === 'string' ? record.RequestDate : '',
     waitingHours: typeof record.WaitingHours === 'number' && Number.isFinite(record.WaitingHours)
@@ -573,7 +583,9 @@ export async function getMedicalRecords(horseId: string): Promise<MedicalRecord[
 
 function examinationPayload(input: ExaminationInput): ApiRecord {
   return {
-    ExamType: 'Initial Exam',
+    ExamType: input.examType || 'Initial Exam',
+    ...(input.healthReportId ? { HealthReportID: Number(input.healthReportId) } : {}),
+    ...(input.trainingSessionId ? { TrainingSessionID: Number(input.trainingSessionId) } : {}),
     ...(input.examDate ? { ExamDate: input.examDate } : {}),
     WeightKg: input.weightKg ?? null,
     HeightCm: input.heightCm ?? null,
@@ -585,6 +597,8 @@ function examinationPayload(input: ExaminationInput): ApiRecord {
     ...(input.trainingEligibility ? { TrainingEligibility: input.trainingEligibility } : {}),
     ...(input.restrictionNote !== undefined ? { RestrictionNote: input.restrictionNote } : {}),
     FollowUpDate: input.followUpDate || null,
+    ...(input.injuryLocation !== undefined ? { InjuryLocation: input.injuryLocation } : {}),
+    ...(input.note !== undefined ? { Note: input.note } : {}),
   };
 }
 
