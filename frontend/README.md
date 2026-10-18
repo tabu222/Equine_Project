@@ -2,6 +2,12 @@
 
 Frontend React + Vite cho dự án Equi. Vite chạy mặc định tại `http://localhost:5173` và proxy request `/api` sang Django REST backend tại `http://127.0.0.1:8000`.
 
+## Cập nhật Veterinarian 18/10/2026
+
+Đăng nhập Vet và mở `/vet/overview`. Giữ hàng chờ khám đầu vào; nối thêm báo cáo sức khỏe, phiếu khám sau tiếp nhận, thuốc trên nháp, khóa/hạn chế tập và tạo/hủy lịch y tế vào BE hiện tại. Xem [đối chiếu chức năng, contract và yêu cầu BE còn thiếu](../backend/docs/VET_BACKEND_REQUIREMENTS.md). Hoàn thành lịch, nhắc tự động và chấn thương 3D chưa đủ điều kiện triển khai; giao diện không báo lưu thành công cho các phần này.
+
+Kiểm tra: `npm.cmd run typecheck`, `npm.cmd run test:api`, `npm.cmd run lint`, `npm.cmd run build`. Browser thật với SQLite tạm: chạy fixture BE và Vite cổng 5174 theo tài liệu trên, rồi `node tests/vet.browser.mjs`. Không dùng dữ liệu SQL Server thật cho fixture.
+
 ## Yêu cầu
 
 - Node.js `^20.19.0` hoặc `>=22.12.0` (Node.js 24 cũng phù hợp)
