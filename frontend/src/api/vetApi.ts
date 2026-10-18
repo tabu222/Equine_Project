@@ -1,8 +1,14 @@
-import { ApiError, apiBaseUrl, apiGet, apiPost } from './apiClient.ts';
+import { ApiError, apiBaseUrl, apiGet, apiPost, apiPatch } from './apiClient.ts';
 import { normalizeHorse, getMedicalRecords, type MedicalRecord } from './horseApi.ts';
 import type { Horse } from '../types';
 
 type Row = Record<string, unknown>;
+
+// All resources below are implemented in apps/medical/urls.py. Authorization and club scope stay on BE.
+export const getVetResource = getCompleteVetList;
+export async function saveVetResource(path: string, body: Row, update = false): Promise<Row> {
+  return update ? apiPatch<Row>(path, body) : apiPost<Row>(path, body);
+}
 
 // Follow every page before presenting herd totals. Never follow an arbitrary next URL with JWT.
 export async function getCompleteVetList(path: string): Promise<Row[]> {

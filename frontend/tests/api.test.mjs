@@ -56,6 +56,34 @@ test('Vet herd counts require every page and reject incomplete or foreign-club d
   await assert.rejects(vet.getVetHerd('2'), /phạm vi/)
 })
 
+test('Vet medical writes preserve non-intake types and report links without inventing defaults', async () => {
+  client.saveSession('access', 'refresh')
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) })
+    return json({ MedicalRecordID: 7, HorseID: 3, VetID: 1, RecordStatus: 'Draft', ExamType: 'Follow-up' })
+  }
+  await horses.saveExaminationDraft('3', { examType: 'Follow-up', healthReportId: '9', trainingSessionId: '12', examDate: '2026-10-18T08:10:15', symptoms: '', diagnosis: '', treatmentPlan: '', conclusion: '', healthStatus: '', trainingEligibility: '', restrictionNote: '', followUpDate: '' })
+  assert.equal(calls[0].url, '/api/horses/3/medical-records')
+  assert.equal(calls[0].body.ExamType, 'Follow-up')
+  assert.equal(calls[0].body.HealthReportID, 9)
+  assert.equal(calls[0].body.TrainingSessionID, 12)
+  assert.equal('HealthStatus' in calls[0].body, false)
+  assert.equal('TrainingEligibility' in calls[0].body, false)
+  await vet.saveVetResource('/horses/3/training-locks', { Reason: 'Vet entered reason', LockLevel: 'Restricted', MaxIntensity: 15 })
+  assert.equal(calls[1].url, '/api/horses/3/training-locks')
+  assert.equal(calls[1].body.MaxIntensity, 15)
+})
+
+test('Medical calendar keeps vaccination and schedule identities and never manufactures recurrence', () => {
+  const rows = domain.medicalEvents([{ VaccinationID: 1, VaccinationDate: '2026-10-19', NextDueDate: '2027-10-19', Status: 'Completed', VaccineName: 'Vet entered vaccine' }], [{ MedicalScheduleID: 1, ScheduledDate: '2026-10-18', ScheduleType: 'Farrier', Status: 'Scheduled' }])
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].key, 's-1')
+  assert.equal(rows[1].key, 'v-1')
+  assert.equal(rows[1].NextDueDate, '2027-10-19')
+  assert.equal(rows.filter(r => r.day === '2027-10-19').length, 0)
+})
+
 test('Vet pagination refuses off-origin, off-resource and looping next links before sending JWT', async () => {
   client.saveSession('access', 'refresh')
   for (const next of ['https://untrusted.test/api/horses?page=2', '/api/users?page=2', '/api/horses']) {

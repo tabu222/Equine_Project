@@ -5,6 +5,11 @@ export const healthLabels = {
 }
 export const recordHealthLabels = { Healthy: 'Khỏe mạnh', Monitor: 'Cần theo dõi', Injured: 'Chấn thương', Recovering: 'Đang hồi phục', Isolated: 'Cách ly' }
 export const trainingLabels = { Eligible: 'Đủ điều kiện tập', Restricted: 'Hạn chế tập', 'Not Eligible': 'Không được tập' }
+export const scheduleTypes = { Deworming: 'Tẩy giun', Farrier: 'Chăm sóc móng', 'Routine Examination': 'Khám định kỳ' }
+export function medicalEvents(vaccinations, schedules) {
+  return [...vaccinations.map(v => ({ ...v, key: `v-${v.VaccinationID}`, kind: 'vaccination', day: v.VaccinationDate, label: `Tiêm phòng · ${v.VaccineName}` })),
+    ...schedules.map(s => ({ ...s, key: `s-${s.MedicalScheduleID}`, kind: 'schedule', day: s.ScheduledDate, label: scheduleTypes[s.ScheduleType] || s.ScheduleType }))].sort((a, b) => a.day.localeCompare(b.day))
+}
 export const clubTimezone = 'Asia/Ho_Chi_Minh'
 export function vetDateTime(value) {
   if (!value) return 'Chưa cập nhật'

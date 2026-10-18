@@ -7,6 +7,7 @@ import type { Horse, User } from '../../types';
 import { ApiError } from '../../api/apiClient.ts';
 import { clubDateTimeInput, healthLabels, recordHealthLabels, trainingLabels, vetError } from './vetDomain.js';
 import { formatHorseCode } from '../../components/horse/horseDisplay.js';
+import { TrainingLocks } from './VetOperations.jsx';
 
 interface VetExaminationFormProps {
   horse: Horse;
@@ -18,6 +19,7 @@ interface VetExaminationFormProps {
   onAfterSign: () => Promise<void>;
   onConflict: () => Promise<void>;
   conflictNotice?: string;
+  healthReportId?: string;
 }
 
 const profileStatusLabels: Partial<Record<Horse['profileStatus'], string>> = {
@@ -47,8 +49,10 @@ function initialInput(draft?: MedicalRecord): ExaminationInput {
   };
 }
 
-function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDraft, onSign, onAfterSign, onConflict, conflictNotice }: VetExaminationFormProps) {
-  const [form, setForm] = useState<ExaminationInput>(() => initialInput(draft));
+function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDraft, onSign, onAfterSign, onConflict, conflictNotice, healthReportId }: VetExaminationFormProps) {
+  const isInitial = (signedRecord?.examType || draft?.examType || (horse.profileStatus === 'APPROVED' ? 'Routine Exam' : 'Initial Exam')) === 'Initial Exam';
+  const title = isInitial ? 'Khám đầu vào' : 'Khám và điều trị';
+  const [form, setForm] = useState<ExaminationInput>(() => ({ ...initialInput(draft), examType: draft?.examType || (isInitial ? 'Initial Exam' : ''), healthReportId }));
   const [draftId, setDraftId] = useState(draft?.id);
   const [justSignedRecord, setJustSignedRecord] = useState<MedicalRecord>();
   const [saving, setSaving] = useState(false);
@@ -66,13 +70,13 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
   }
 
   if (currentSignedRecord) {
-    const managerStatus = horse.profileStatus === 'PENDING_EXAM'
+    const managerStatus = !isInitial ? 'Phiếu khám đã chốt. Có thể xem kết quả và đính chính trong hồ sơ y tế.' : horse.profileStatus === 'PENDING_EXAM'
       ? 'Đã chốt phiếu khám, chờ Manager xử lý.'
       : `Phiếu đã chốt. Trạng thái hồ sơ hiện tại: ${profileStatusLabels[horse.profileStatus] || horse.profileStatus}.`;
     return <main className="page-content narrow-content">
       <div className="breadcrumb"><Link to="/vet/horses-needing-exam">Hàng đợi khám</Link><span aria-hidden="true">/</span><span>Phiếu khám đã chốt</span></div>
       <section className="panel">
-        <p className="eyebrow">BÁC SĨ THÚ Y · KHÁM ĐẦU VÀO</p>
+        <p className="eyebrow">BÁC SĨ THÚ Y · {title.toLocaleUpperCase()}</p>
         <h1>{horse.name}</h1>
         <p className="success-message" role="status">{managerStatus}</p>
         {conflictNotice && <p className="error-message" role="alert">{conflictNotice}</p>}
@@ -89,7 +93,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
     </main>;
   }
 
-  if (horse.profileStatus !== 'PENDING_EXAM' || horse.initialExamSigned !== false) {
+  if (isInitial && (horse.profileStatus !== 'PENDING_EXAM' || horse.initialExamSigned !== false)) {
     return <main className="page-content"><section className="panel">
       <h1>{horse.profileStatus === 'PENDING_EXAM' ? 'Chưa xác định được phiếu khám hiện tại' : 'Hồ sơ không còn chờ khám đầu vào'}</h1>
       <p>{horse.profileStatus !== 'PENDING_EXAM'
@@ -116,6 +120,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
 
   async function handleSaveDraft() {
     if (submitting.current || blocked) return;
+    if (!isInitial && !form.examType) { setError('Cần chọn loại khám trước khi lưu phiếu.'); return; }
     if (form.trainingEligibility === 'Restricted' && !form.restrictionNote.trim()) {
       setError('Cần ghi rõ hạn chế tập trước khi lưu.'); return;
     }
@@ -153,7 +158,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
       const savedDraft = await saveDraft();
       const signed = await onSign(savedDraft.id);
       setJustSignedRecord(signed);
-      setMessage('Đã chốt phiếu khám, chờ Manager xử lý.');
+      setMessage(isInitial ? 'Đã chốt phiếu khám, chờ Manager xử lý.' : 'Đã chốt phiếu khám.');
     } catch (signError) {
       await handleFailure(signError);
       submitting.current = false;
@@ -197,26 +202,27 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
 
   return (
     <main className="page-content narrow-content">
-      <div className="breadcrumb"><Link to={profilePath}>Hồ sơ ngựa</Link><span aria-hidden="true">/</span><span>Khám đầu vào</span></div>
+      <div className="breadcrumb"><Link to={profilePath}>Hồ sơ ngựa</Link><span aria-hidden="true">/</span><span>{title}</span></div>
       <header className="page-heading">
-        <div><p className="eyebrow">BÁC SĨ THÚ Y · KHÁM ĐẦU VÀO</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'} · Bác sĩ: {currentUser.fullName}</p></div>
+        <div><p className="eyebrow">BÁC SĨ THÚ Y · {title.toLocaleUpperCase()}</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'} · Bác sĩ: {currentUser.fullName}</p></div>
       </header>
       <section className="horse-context-card">
         <div><h2>{horse.name}</h2><p>Trạng thái hồ sơ: {profileStatusLabels[horse.profileStatus] || 'Chưa xác định'}</p></div>
         <StatusBadge status={horse.healthStatus} label={healthLabels[horse.healthStatus]} type="health" />
       </section>
       {draft && <p className="profile-copy">Đang tiếp tục phiếu nháp #{draft.id} do bạn lập.</p>}
-      {!draft && !draftId && <p className="profile-copy">Chưa ghi nhận nhận khám. Lưu phiếu nháp để ghi nhận bác sĩ đang xử lý.</p>}
+      {!draft && !draftId && <p className="profile-copy">Lưu phiếu nháp để ghi nhận nội dung khám và bác sĩ lập phiếu.</p>}
       {conflictNotice && <p className="error-message" role="alert">{conflictNotice}</p>}
       {error && <div className="alert-banner" role="alert" style={{ marginTop: 16, background: '#fff4f4', color: '#7a1d1d', border: '1px solid #f7c2c2', borderRadius: 8, padding: '10px 12px' }}>{error}</div>}
       {message && <p className="success-message" role="status">{message}</p>}
+      {!isInitial && <TrainingLocks horse={horse} currentUser={currentUser} compact />}
+      {healthReportId && <p>Báo cáo sức khỏe liên quan: #{healthReportId}</p>}
       <section className="panel form-panel post-exam-form-panel">
-        <h2>Phiếu khám đầu vào</h2>
-        <p>Chốt phiếu xác nhận kết luận trong hệ thống, chưa phải chữ ký số. Manager quyết định tiếp nhận.</p>
-        <p>Khóa tập khẩn cấp chưa khả dụng. Kết luận điều kiện tập chưa xác nhận đã áp dụng khóa tập.</p>
-        <button className="button vet-emergency" type="button" disabled>Khóa tập khẩn cấp</button>
+        <h2>Phiếu {title.toLocaleLowerCase()}</h2>
+        <p>Chốt phiếu xác nhận kết luận trong hệ thống, chưa phải chữ ký số. {isInitial ? 'Manager quyết định tiếp nhận.' : 'Kết luận cấm tập sẽ tạo khóa toàn phần. Hạn chế cường độ cần áp dụng khóa tập riêng.'}</p>
         <form onSubmit={handleSign}>
           <fieldset disabled={saving || blocked} className="vet-form-fields">
+          {!isInitial && <label className="form-field"><span>Loại khám</span><select required disabled={!!draftId} value={form.examType} onChange={e => updateField('examType', e.target.value)}><option value="">Chọn loại khám</option><option value="Routine Exam">Khám định kỳ</option><option value="Injury Exam">Khám chấn thương</option><option value="Follow-up">Tái khám</option><option value="Emergency">Cấp cứu</option></select></label>}
           <label className="form-field"><span>Thời điểm khám (giờ CLB UTC+07:00)</span><input type="datetime-local" step="1" required value={form.examDate} onChange={(event) => updateField('examDate', event.target.value)} /></label>
           <div className="horse-form-grid">
             <label className="form-field"><span>Cân nặng (kg)</span><input type="number" min="0.1" step="0.1" value={form.weightKg ?? ''} onChange={(event) => updateField('weightKg', event.target.value ? Number(event.target.value) : undefined)} /></label>

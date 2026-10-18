@@ -1060,6 +1060,10 @@ function VetHorseRoute({
   examination = false,
 }) {
   const { horseId } = useParams()
+  const { search: examSearch } = useLocation()
+  const examParams = new URLSearchParams(examSearch)
+  const requestedRecordId = examParams.get('record')
+  const healthReportId = examParams.get('report') || undefined
   const [conflictNotice, setConflictNotice] = useState('')
 
   const [horse, setHorse] =
@@ -1227,16 +1231,24 @@ function VetHorseRoute({
       : undefined
 
   if (examination) {
+    const approvedExam = horse.profileStatus === 'APPROVED' && examParams.get('intake') !== '1'
+    const requestedRecord = records.find(r => r.id === requestedRecordId)
+    if (requestedRecordId && (!requestedRecord || requestedRecord.horseId !== horse.id)) {
+      return <main className="page-content"><section className="panel" role="alert"><p>Không tìm thấy phiếu khám của ngựa này.</p><Link to={`/vet/horses/${horse.id}`}>Quay về hồ sơ</Link></section></main>
+    }
+    const examDraft = requestedRecord?.recordStatus === 'Draft' ? requestedRecord : approvedExam ? undefined : draft
+    const examSigned = requestedRecord?.recordStatus === 'Signed' ? requestedRecord : approvedExam ? undefined : signedRecord
     return (
       <VetExaminationForm
-        key={`${horse.id}:${activeRequest?.id || ''}:${draft?.id || ''}`}
+        key={`${horse.id}:${activeRequest?.id || ''}:${examDraft?.id || ''}:${examSigned?.id || ''}:${healthReportId || ''}`}
         horse={horse}
         currentUser={
           currentUser
         }
-        draft={draft}
+        draft={examDraft}
+        healthReportId={healthReportId}
         signedRecord={
-          signedRecord
+          examSigned
         }
         onSaveDraft={saveExaminationDraft}
         onConflict={async () => {
@@ -2124,7 +2136,7 @@ function AppContent() {
 
             {['overview', 'herd', 'intake-results', 'stalls', 'reports', 'calendar'].map(mode => <Route key={mode}
               path={`/vet/${mode}`} element={role === 'vet'
-                ? <VetWorkspace currentUser={currentUser} mode={mode} initialExams={initialExams} />
+                ? <VetWorkspace currentUser={currentUser} mode={mode} initialExams={initialExams} intakeError={loadError} />
                 : <Navigate to={home} replace />} />)}
 
             <Route

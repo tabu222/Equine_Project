@@ -54,6 +54,20 @@
 .vet-amendments form { max-width: 850px; }
 .vet-workspace :focus-visible { outline: 3px solid #418361; outline-offset: 3px; }
 .vet-form-fields { border: 0; padding: 0; margin: 18px 0 0; min-width: 0; }
+.vet-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0; }
+.vet-toolbar .form-field { margin: 0; min-width: 180px; }
+.vet-operation-form { max-width: 760px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.vet-operation-form fieldset { display: grid; gap: 12px; }
+.vet-event, .vet-report { padding: 18px; border: 1px solid var(--border); border-radius: 12px; margin: 12px 0; overflow-wrap: anywhere; }
+.vet-event { display: flex; flex-wrap: wrap; gap: 18px; align-items: start; }
+.vet-event > div { flex: 1 1 220px; }
+.vet-event time { font-weight: 700; color: var(--green-primary); }
+.vet-calendar-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+.vet-calendar-days .vet-event { margin: 0; }
+.vet-report-urgent { border-left: 4px solid #a13d35; }
+.vet-preserve { white-space: pre-wrap; }
+.vet-lock-panel { scroll-margin-top: 20px; }
+.vet-lock-panel > .vet-toolbar { margin-bottom: 0; }
 .vet-wait-long td { background: #fff5ed; }
 .vet-wait-long td:first-child { border-left: 3px solid #b55b32; }
 @media (max-width: 1100px) { .vet-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -490,6 +490,9 @@ export async function withdrawProfileProposal(requestId: string): Promise<Profil
 }
 
 export interface ExaminationInput {
+  examType?: string;
+  healthReportId?: string;
+  trainingSessionId?: string;
   examDate: string;
   weightKg?: number;
   heightCm?: number;
@@ -580,7 +583,9 @@ export async function getMedicalRecords(horseId: string): Promise<MedicalRecord[
 
 function examinationPayload(input: ExaminationInput): ApiRecord {
   return {
-    ExamType: 'Initial Exam',
+    ExamType: input.examType || 'Initial Exam',
+    ...(input.healthReportId ? { HealthReportID: Number(input.healthReportId) } : {}),
+    ...(input.trainingSessionId ? { TrainingSessionID: Number(input.trainingSessionId) } : {}),
     ...(input.examDate ? { ExamDate: input.examDate } : {}),
     WeightKg: input.weightKg ?? null,
     HeightCm: input.heightCm ?? null,
