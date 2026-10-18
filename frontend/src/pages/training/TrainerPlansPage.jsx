@@ -1,55 +1,141 @@
 import {
-  useCallback,
   useEffect,
+  useMemo,
   useState,
 } from 'react'
 
 import {
-  addTrainingPlanStage,
-  cancelTrainingPlan,
-  completeTrainingPlan,
-  createTrainingPlan,
-  deleteTrainingPlanStage,
+  Link,
+} from 'react-router-dom'
+
+import {
   getTrainerAssignments,
   getTrainingPlans,
-  reviseTrainingPlan,
-  submitTrainingPlan,
-  updateTrainingPlan,
-  updateTrainingPlanStage,
 } from '../../api/trainingApi.ts'
 
-const emptyStage = () => ({
-  TrainingPlanStageID: null,
-  StageName: '',
-  Goal: '',
-  StartDate: '',
-  EndDate: '',
-  Intensity: 'Low',
-  TrainingLoad: '',
-  DistanceTargetKm: '',
-  Surface: '',
-  Note: '',
-})
+const STATUS_LABELS = {
+  Draft: 'Bản nháp',
+  'Pending Approval': 'Chờ duyệt',
+  Active: 'Đang áp dụng',
+  Completed: 'Hoàn thành',
+  Cancelled: 'Đã hủy',
+}
 
-const emptyForm = () => ({
-  HorseID: '',
-  Goal: '',
-  StartDate: '',
-  EndDate: '',
-  OverallIntensity:
-    'Moderate',
-  Note: '',
-  Stages: [
-    emptyStage(),
-  ],
-})
+function show(
+  value,
+  fallback = '—',
+) {
+  return value === null ||
+    value === undefined ||
+    value === ''
+    ? fallback
+    : value
+}
 
-function optionalNumber(
+function formatDate(
   value,
 ) {
-  return value === ''
-    ? null
-    : Number(value)
+  if (!value) {
+    return '—'
+  }
+
+  const raw =
+    String(value)
+
+  const date =
+    raw.includes('T')
+      ? new Date(raw)
+      : new Date(
+          `${raw}T00:00:00`,
+        )
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return raw
+  }
+
+  return new Intl.DateTimeFormat(
+    'vi-VN',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    },
+  ).format(date)
+}
+
+function statusTone(
+  status,
+) {
+  switch (status) {
+    case 'Draft':
+      return 'is-draft'
+
+    case 'Pending Approval':
+      return 'is-pending'
+
+    case 'Active':
+      return 'is-active'
+
+    case 'Completed':
+      return 'is-completed'
+
+    case 'Cancelled':
+      return 'is-cancelled'
+
+    default:
+      return ''
+  }
+}
+
+function getErrorMessage(
+  error,
+  fallback,
+) {
+  if (
+    error instanceof Error &&
+    error.message
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
+async function fetchPageData() {
+  const [
+    assignments,
+    plans,
+  ] =
+    await Promise.all([
+      getTrainerAssignments({
+        mine: true,
+        Status: 'Active',
+      }),
+
+      getTrainingPlans({
+        mine: true,
+      }),
+    ])
+
+  return {
+    assignments:
+      Array.isArray(
+        assignments,
+      )
+        ? assignments
+        : [],
+
+    plans:
+      Array.isArray(
+        plans,
+      )
+        ? plans
+        : [],
+  }
 }
 
 export default function TrainerPlansPage() {
@@ -58,1280 +144,708 @@ export default function TrainerPlansPage() {
     setAssignments,
   ] = useState([])
 
-  const [plans, setPlans] =
-    useState([])
-
-  const [form, setForm] =
-    useState(emptyForm)
+  const [
+    plans,
+    setPlans,
+  ] = useState([])
 
   const [
-    editingPlanId,
-    setEditingPlanId,
-  ] = useState(null)
+    loading,
+    setLoading,
+  ] = useState(true)
 
-  const [loading, setLoading] =
-    useState(true)
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false)
 
-  const [busy, setBusy] =
-    useState(false)
+  const [
+    error,
+    setError,
+  ] = useState('')
 
-  const [error, setError] =
-    useState('')
+  const [
+    search,
+    setSearch,
+  ] = useState('')
 
-  const [message, setMessage] =
-    useState('')
-
-  const load =
-    useCallback(
-      async () => {
-        setLoading(true)
-        setError('')
-
-        try {
-          const [
-            assignmentRows,
-            planRows,
-          ] =
-            await Promise.all([
-              getTrainerAssignments({
-                mine: true,
-                Status:
-                  'Active',
-              }),
-
-              getTrainingPlans({
-                mine: true,
-              }),
-            ])
-
-          setAssignments(
-            assignmentRows,
-          )
-
-          setPlans(
-            planRows,
-          )
-        } catch (loadError) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : 'Không thể tải dữ liệu giáo án.',
-          )
-        } finally {
-          setLoading(false)
-        }
-      },
-      [],
-    )
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState('all')
 
   useEffect(() => {
-    void load()
-  }, [load])
+    let active = true
 
-  function changeStage(
-    index,
-    key,
-    value,
-  ) {
-    setForm(
-      (current) => ({
-        ...current,
-
-        Stages:
-          current.Stages.map(
-            (
-              stage,
-              stageIndex,
-            ) =>
-              stageIndex ===
-              index
-                ? {
-                    ...stage,
-                    [key]:
-                      value,
-                  }
-                : stage,
-          ),
-      }),
-    )
-  }
-
-  function addStageRow() {
-    setForm(
-      (current) => ({
-        ...current,
-
-        Stages: [
-          ...current.Stages,
-          emptyStage(),
-        ],
-      }),
-    )
-  }
-
-  async function removeStageRow(
-    index,
-  ) {
-    const stage =
-      form.Stages[index]
-
-    if (
-      stage
-        ?.TrainingPlanStageID
-    ) {
-      setBusy(true)
-      setError('')
-
-      try {
-        await deleteTrainingPlanStage(
-          stage.TrainingPlanStageID,
-        )
-      } catch (removeError) {
-        setError(
-          removeError instanceof Error
-            ? removeError.message
-            : 'Không thể xóa giai đoạn.',
-        )
-
-        setBusy(false)
-
-        return
-      }
-
-      setBusy(false)
-    }
-
-    setForm(
-      (current) => ({
-        ...current,
-
-        Stages:
-          current.Stages.filter(
-            (
-              _,
-              stageIndex,
-            ) =>
-              stageIndex !==
-              index,
-          ),
-      }),
-    )
-  }
-
-  function editPlan(
-    plan,
-  ) {
-    if (
-      plan.Status !==
-      'Draft'
-    ) {
-      return
-    }
-
-    setEditingPlanId(
-      plan.TrainingPlanID,
-    )
-
-    setForm({
-      HorseID:
-        String(
-          plan.HorseID,
-        ),
-
-      Goal:
-        plan.Goal || '',
-
-      StartDate:
-        plan.StartDate,
-
-      EndDate:
-        plan.EndDate || '',
-
-      OverallIntensity:
-        plan.OverallIntensity ||
-        'Moderate',
-
-      Note:
-        plan.Note || '',
-
-      Stages:
-        plan.Stages.length
-          ? plan.Stages.map(
-              (stage) => ({
-                TrainingPlanStageID:
-                  stage.TrainingPlanStageID,
-
-                StageName:
-                  stage.StageName,
-
-                Goal:
-                  stage.Goal ||
-                  '',
-
-                StartDate:
-                  stage.StartDate,
-
-                EndDate:
-                  stage.EndDate ||
-                  '',
-
-                Intensity:
-                  stage.Intensity ||
-                  'Low',
-
-                TrainingLoad:
-                  stage.TrainingLoad ??
-                  '',
-
-                DistanceTargetKm:
-                  stage.DistanceTargetKm ??
-                  '',
-
-                Surface:
-                  stage.Surface ||
-                  '',
-
-                Note:
-                  stage.Note ||
-                  '',
-              }),
-            )
-          : [
-              emptyStage(),
-            ],
-    })
-
-    setMessage('')
-    setError('')
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    })
-  }
-
-  function resetEditor() {
-    setEditingPlanId(
-      null,
-    )
-
-    setForm(
-      emptyForm(),
-    )
-  }
-
-  async function savePlan(
-    event,
-  ) {
-    event.preventDefault()
-
-    if (
-      !form.HorseID ||
-      form.Stages.length ===
-        0
-    ) {
-      return
-    }
-
-    setBusy(true)
-    setError('')
-    setMessage('')
-
-    try {
-      if (editingPlanId) {
-        await updateTrainingPlan(
-          editingPlanId,
-          {
-            Goal:
-              form.Goal
-                .trim() ||
-              null,
-
-            StartDate:
-              form.StartDate,
-
-            EndDate:
-              form.EndDate ||
-              null,
-
-            OverallIntensity:
-              form.OverallIntensity,
-
-            Note:
-              form.Note
-                .trim() ||
-              null,
-          },
-        )
-
-        for (
-          const [
-            index,
-            stage,
-          ] of
-          form.Stages.entries()
-        ) {
-          const payload = {
-            StageName:
-              stage.StageName,
-
-            StageOrder:
-              index + 1,
-
-            Goal:
-              stage.Goal
-                .trim() ||
-              null,
-
-            StartDate:
-              stage.StartDate,
-
-            EndDate:
-              stage.EndDate ||
-              null,
-
-            Intensity:
-              stage.Intensity,
-
-            TrainingLoad:
-              optionalNumber(
-                stage.TrainingLoad,
-              ),
-
-            DistanceTargetKm:
-              optionalNumber(
-                stage.DistanceTargetKm,
-              ),
-
-            Surface:
-              stage.Surface
-                .trim() ||
-              null,
-
-            Note:
-              stage.Note
-                .trim() ||
-              null,
-          }
-
-          if (
-            stage
-              .TrainingPlanStageID
-          ) {
-            await updateTrainingPlanStage(
-              stage.TrainingPlanStageID,
-              payload,
-            )
-          } else {
-            await addTrainingPlanStage(
-              editingPlanId,
-              payload,
-            )
-          }
+    fetchPageData()
+      .then((data) => {
+        if (!active) {
+          return
         }
 
-        setMessage(
-          'Đã cập nhật giáo án Draft.',
+        setAssignments(
+          data.assignments,
         )
-      } else {
-        await createTrainingPlan({
-          HorseID:
-            Number(
-              form.HorseID,
-            ),
 
-          Goal:
-            form.Goal
-              .trim() ||
-            null,
-
-          StartDate:
-            form.StartDate,
-
-          EndDate:
-            form.EndDate ||
-            null,
-
-          OverallIntensity:
-            form.OverallIntensity,
-
-          Note:
-            form.Note
-              .trim() ||
-            null,
-
-          Stages:
-            form.Stages.map(
-              (
-                stage,
-                index,
-              ) => ({
-                StageName:
-                  stage.StageName,
-
-                StageOrder:
-                  index + 1,
-
-                Goal:
-                  stage.Goal
-                    .trim() ||
-                  null,
-
-                StartDate:
-                  stage.StartDate,
-
-                EndDate:
-                  stage.EndDate ||
-                  null,
-
-                Intensity:
-                  stage.Intensity,
-
-                TrainingLoad:
-                  optionalNumber(
-                    stage.TrainingLoad,
-                  ),
-
-                DistanceTargetKm:
-                  optionalNumber(
-                    stage.DistanceTargetKm,
-                  ),
-
-                Surface:
-                  stage.Surface
-                    .trim() ||
-                  null,
-
-                Note:
-                  stage.Note
-                    .trim() ||
-                  null,
-              }),
-            ),
-        })
-
-        setMessage(
-          'Đã tạo giáo án Draft.',
+        setPlans(
+          data.plans,
         )
-      }
 
-      resetEditor()
+        setError('')
+      })
+      .catch(
+        (loadError) => {
+          if (!active) {
+            return
+          }
 
-      await load()
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : 'Không thể lưu giáo án.',
+          setError(
+            getErrorMessage(
+              loadError,
+              'Không thể tải giáo án của Trainer.',
+            ),
+          )
+        },
       )
-    } finally {
-      setBusy(false)
-    }
-  }
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
 
-  async function runAction(
-    action,
-    successMessage,
-  ) {
-    setBusy(true)
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const plansByHorse =
+    useMemo(() => {
+      const map =
+        new Map()
+
+      plans.forEach(
+        (plan) => {
+          const key =
+            String(
+              plan.HorseID,
+            )
+
+          const current =
+            map.get(key) ||
+            []
+
+          current.push(
+            plan,
+          )
+
+          map.set(
+            key,
+            current,
+          )
+        },
+      )
+
+      return map
+    }, [plans])
+
+  const assignmentCards =
+    useMemo(
+      () =>
+        assignments.map(
+          (assignment) => {
+            const horsePlans =
+              plansByHorse.get(
+                String(
+                  assignment.HorseID,
+                ),
+              ) || []
+
+            const openPlan =
+              horsePlans.find(
+                (plan) =>
+                  [
+                    'Draft',
+                    'Pending Approval',
+                    'Active',
+                  ].includes(
+                    plan.Status,
+                  ),
+              ) || null
+
+            return {
+              ...assignment,
+              HorsePlans:
+                horsePlans,
+              OpenPlan:
+                openPlan,
+            }
+          },
+        ),
+      [
+        assignments,
+        plansByHorse,
+      ],
+    )
+
+  const filteredPlans =
+    useMemo(() => {
+      const keyword =
+        search
+          .trim()
+          .toLowerCase()
+
+      return plans.filter(
+        (plan) => {
+          const matchesSearch =
+            !keyword ||
+            String(
+              plan.HorseName ||
+                '',
+            )
+              .toLowerCase()
+              .includes(
+                keyword,
+              ) ||
+            String(
+              plan.TrainingPlanID,
+            ).includes(
+              keyword,
+            ) ||
+            String(
+              plan.Goal || '',
+            )
+              .toLowerCase()
+              .includes(
+                keyword,
+              )
+
+          const matchesStatus =
+            statusFilter ===
+              'all' ||
+            plan.Status ===
+              statusFilter
+
+          return (
+            matchesSearch &&
+            matchesStatus
+          )
+        },
+      )
+    }, [
+      plans,
+      search,
+      statusFilter,
+    ])
+
+  const summary =
+    useMemo(
+      () => ({
+        horses:
+          assignments.length,
+
+        draft:
+          plans.filter(
+            (plan) =>
+              plan.Status ===
+              'Draft',
+          ).length,
+
+        pending:
+          plans.filter(
+            (plan) =>
+              plan.Status ===
+              'Pending Approval',
+          ).length,
+
+        active:
+          plans.filter(
+            (plan) =>
+              plan.Status ===
+              'Active',
+          ).length,
+      }),
+      [
+        assignments,
+        plans,
+      ],
+    )
+
+  async function refresh() {
+    setRefreshing(true)
     setError('')
-    setMessage('')
 
     try {
-      await action()
+      const data =
+        await fetchPageData()
 
-      setMessage(
-        successMessage,
+      setAssignments(
+        data.assignments,
       )
 
-      await load()
-    } catch (actionError) {
+      setPlans(
+        data.plans,
+      )
+    } catch (loadError) {
       setError(
-        actionError instanceof Error
-          ? actionError.message
-          : 'Không thể thực hiện thao tác.',
+        getErrorMessage(
+          loadError,
+          'Không thể làm mới dữ liệu.',
+        ),
       )
     } finally {
-      setBusy(false)
+      setRefreshing(false)
     }
   }
 
   if (loading) {
     return (
-      <main className="page-content">
-        <section className="panel">
-          Đang tải...
+      <main className="page-content trainer-plans-list-page">
+        <section
+          className="panel training-plan-loading"
+          role="status"
+        >
+          <div className="training-plan-loading-bar" />
+
+          <div>
+            <strong>
+              Đang tải giáo án
+            </strong>
+
+            <span>
+              Đang lấy ngựa được phân công
+              và lịch sử Training Plan.
+            </span>
+          </div>
         </section>
       </main>
     )
   }
 
   return (
-    <main className="page-content">
-      <div className="page-heading">
-        <h1>
-          Ngựa và giáo án của tôi
-        </h1>
+    <main className="page-content trainer-plans-list-page">
+      <div className="breadcrumb">
+        <span>
+          Huấn luyện
+        </span>
+
+        <span>
+          /
+        </span>
+
+        <strong>
+          Ngựa & giáo án
+        </strong>
+      </div>
+
+      <div className="page-heading training-plan-page-heading">
+        <div>
+          <p className="eyebrow">
+            TRAINER
+          </p>
+
+          <h1>
+            Ngựa & giáo án của tôi
+          </h1>
+
+          <p>
+            Theo dõi các ngựa đang phụ
+            trách và mở Training Plan ở
+            trang riêng.
+          </p>
+        </div>
+
+        <button
+          className="button button-secondary"
+          type="button"
+          disabled={refreshing}
+          onClick={() =>
+            void refresh()
+          }
+        >
+          {refreshing
+            ? 'Đang làm mới...'
+            : 'Làm mới'}
+        </button>
       </div>
 
       {error && (
-        <div className="alert-banner">
+        <div
+          className="alert-banner"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
-      {message && (
-        <p className="success-message">
-          {message}
-        </p>
-      )}
+      <section className="training-plan-summary-grid">
+        <article>
+          <span>
+            Ngựa đang phụ trách
+          </span>
 
-      <section className="panel">
-        <h2>
-          {editingPlanId
-            ? `Sửa giáo án #${editingPlanId}`
-            : 'Tạo giáo án'}
-        </h2>
+          <strong>
+            {summary.horses}
+          </strong>
+        </article>
 
-        {assignments.length ===
+        <article>
+          <span>
+            Bản nháp
+          </span>
+
+          <strong>
+            {summary.draft}
+          </strong>
+        </article>
+
+        <article>
+          <span>
+            Chờ duyệt
+          </span>
+
+          <strong>
+            {summary.pending}
+          </strong>
+        </article>
+
+        <article>
+          <span>
+            Đang áp dụng
+          </span>
+
+          <strong>
+            {summary.active}
+          </strong>
+        </article>
+      </section>
+
+      <section className="panel training-plan-horse-section">
+        <div className="training-plan-section-heading">
+          <div>
+            <span className="training-plan-kicker">
+              ACTIVE ASSIGNMENTS
+            </span>
+
+            <h2>
+              Ngựa đang phụ trách
+            </h2>
+
+            <p>
+              Chỉ các ngựa thuộc Active
+              Assignment của Trainer hiện
+              tại.
+            </p>
+          </div>
+        </div>
+
+        {assignmentCards.length ===
         0 ? (
-          <p>
-            Chưa có ngựa được Head
-            Trainer phân công.
-          </p>
-        ) : (
-          <form
-            onSubmit={
-              savePlan
-            }
-          >
-            <label className="form-field">
-              <span>
-                Ngựa được phân công
-              </span>
-
-              <select
-                required
-                disabled={
-                  Boolean(
-                    editingPlanId,
-                  )
-                }
-                value={
-                  form.HorseID
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      HorseID:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              >
-                <option value="">
-                  Chọn ngựa
-                </option>
-
-                {assignments.map(
-                  (assignment) => (
-                    <option
-                      key={
-                        assignment.TrainerHorseAssignmentID
-                      }
-                      value={
-                        assignment.HorseID
-                      }
-                    >
-                      {
-                        assignment.HorseName
-                      }
-                      {' · '}
-                      {
-                        assignment.SpecializationName
-                      }
-                    </option>
-                  ),
-                )}
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>
-                Mục tiêu giáo án
-              </span>
-
-              <textarea
-                rows="3"
-                value={
-                  form.Goal
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      Goal:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>
-                Ngày bắt đầu
-              </span>
-
-              <input
-                required
-                type="date"
-                value={
-                  form.StartDate
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      StartDate:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>
-                Ngày kết thúc
-              </span>
-
-              <input
-                type="date"
-                value={
-                  form.EndDate
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      EndDate:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>
-                Cường độ tổng thể
-              </span>
-
-              <select
-                value={
-                  form.OverallIntensity
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      OverallIntensity:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              >
-                <option value="Low">
-                  Low
-                </option>
-
-                <option value="Moderate">
-                  Moderate
-                </option>
-
-                <option value="High">
-                  High
-                </option>
-
-                <option value="Very High">
-                  Very High
-                </option>
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>
-                Ghi chú
-              </span>
-
-              <textarea
-                rows="3"
-                value={
-                  form.Note
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setForm(
-                    (current) => ({
-                      ...current,
-
-                      Note:
-                        event.target
-                          .value,
-                    }),
-                  )
-                }
-              />
-            </label>
-
+          <div className="empty-state">
             <h3>
-              Các giai đoạn
+              Chưa có ngựa được phân công
             </h3>
 
-            {form.Stages.map(
-              (
-                stage,
-                index,
-              ) => (
-                <section
-                  className="panel"
-                  key={
-                    stage.TrainingPlanStageID ||
-                    `new-${index}`
-                  }
-                >
-                  <h3>
-                    Giai đoạn{' '}
-                    {index + 1}
-                  </h3>
+            <p>
+              Head Trainer cần phân ngựa
+              trước khi Trainer có thể tạo
+              giáo án.
+            </p>
+          </div>
+        ) : (
+          <div className="training-plan-horse-grid">
+            {assignmentCards.map(
+              (assignment) => {
+                const plan =
+                  assignment.OpenPlan
 
-                  <label className="form-field">
-                    <span>
-                      Tên giai đoạn
-                    </span>
+                return (
+                  <article
+                    className="training-plan-horse-card"
+                    key={
+                      assignment.TrainerHorseAssignmentID
+                    }
+                  >
+                    <div className="training-plan-horse-card-head">
+                      <div>
+                        <span className="training-plan-horse-code">
+                          Phân công #
+                          {
+                            assignment.TrainerHorseAssignmentID
+                          }
+                        </span>
 
-                    <input
-                      required
-                      value={
-                        stage.StageName
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'StageName',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
+                        <h3>
+                          {
+                            assignment.HorseName
+                          }
+                        </h3>
 
-                  <label className="form-field">
-                    <span>
-                      Mục tiêu
-                    </span>
+                        <p>
+                          {
+                            assignment.SpecializationName
+                          }
+                        </p>
+                      </div>
 
-                    <input
-                      value={
-                        stage.Goal
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'Goal',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
+                      <span className="status-badge training-plan-assignment-status">
+                        Đang phụ trách
+                      </span>
+                    </div>
 
-                  <label className="form-field">
-                    <span>
-                      Ngày bắt đầu
-                    </span>
+                    <div className="training-plan-horse-info">
+                      <div>
+                        <span>
+                          Bắt đầu phụ trách
+                        </span>
 
-                    <input
-                      required
-                      type="date"
-                      value={
-                        stage.StartDate
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'StartDate',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
+                        <strong>
+                          {formatDate(
+                            assignment.StartDate,
+                          )}
+                        </strong>
+                      </div>
 
-                  <label className="form-field">
-                    <span>
-                      Ngày kết thúc
-                    </span>
+                      <div>
+                        <span>
+                          Tổng giáo án
+                        </span>
 
-                    <input
-                      type="date"
-                      value={
-                        stage.EndDate
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'EndDate',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
+                        <strong>
+                          {
+                            assignment
+                              .HorsePlans
+                              .length
+                          }
+                        </strong>
+                      </div>
+                    </div>
 
-                  <label className="form-field">
-                    <span>
-                      Cường độ
-                    </span>
+                    {plan ? (
+                      <div className="training-plan-current-plan">
+                        <div>
+                          <span>
+                            Giáo án hiện tại
+                          </span>
 
-                    <select
-                      value={
-                        stage.Intensity
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'Intensity',
-                          event.target
-                            .value,
-                        )
-                      }
-                    >
-                      <option value="Low">
-                        Low
-                      </option>
+                          <strong>
+                            #
+                            {
+                              plan.TrainingPlanID
+                            }
+                          </strong>
+                        </div>
 
-                      <option value="Moderate">
-                        Moderate
-                      </option>
+                        <span
+                          className={`status-badge training-plan-status ${statusTone(
+                            plan.Status,
+                          )}`}
+                        >
+                          {STATUS_LABELS[
+                            plan.Status
+                          ] ||
+                            plan.Status}
+                        </span>
 
-                      <option value="High">
-                        High
-                      </option>
+                        <p>
+                          {show(
+                            plan.Goal,
+                            'Chưa nhập mục tiêu giáo án',
+                          )}
+                        </p>
 
-                      <option value="Very High">
-                        Very High
-                      </option>
-                    </select>
-                  </label>
+                        <Link
+                          className="button"
+                          to={`/training/plans/${plan.TrainingPlanID}`}
+                        >
+                          Xem giáo án
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="training-plan-no-plan">
+                        <strong>
+                          Chưa có giáo án đang mở
+                        </strong>
 
-                  <label className="form-field">
-                    <span>
-                      Training Load
-                    </span>
+                        <p>
+                          Tạo Training Plan mới
+                          cho ngựa này.
+                        </p>
 
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={
-                        stage.TrainingLoad
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'TrainingLoad',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="form-field">
-                    <span>
-                      Khoảng cách mục tiêu
-                      (km)
-                    </span>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={
-                        stage.DistanceTargetKm
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'DistanceTargetKm',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="form-field">
-                    <span>
-                      Mặt sân
-                    </span>
-
-                    <input
-                      value={
-                        stage.Surface
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'Surface',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label className="form-field">
-                    <span>
-                      Ghi chú giai đoạn
-                    </span>
-
-                    <textarea
-                      rows="2"
-                      value={
-                        stage.Note
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        changeStage(
-                          index,
-                          'Note',
-                          event.target
-                            .value,
-                        )
-                      }
-                    />
-                  </label>
-
-                  {form.Stages.length >
-                    1 && (
-                    <button
-                      className="button button-secondary"
-                      type="button"
-                      disabled={
-                        busy
-                      }
-                      onClick={() =>
-                        void removeStageRow(
-                          index,
-                        )
-                      }
-                    >
-                      Xóa giai đoạn
-                    </button>
-                  )}
-                </section>
-              ),
+                        <Link
+                          className="button"
+                          to={`/training/plans/new?horseId=${assignment.HorseID}`}
+                        >
+                          Tạo giáo án
+                        </Link>
+                      </div>
+                    )}
+                  </article>
+                )
+              },
             )}
-
-            <div className="profile-actions">
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={
-                  addStageRow
-                }
-              >
-                + Thêm giai đoạn
-              </button>
-
-              <button
-                className="button"
-                type="submit"
-                disabled={busy}
-              >
-                {busy
-                  ? 'Đang lưu...'
-                  : editingPlanId
-                    ? 'Lưu chỉnh sửa'
-                    : 'Tạo Draft'}
-              </button>
-
-              {editingPlanId && (
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={
-                    resetEditor
-                  }
-                >
-                  Hủy sửa
-                </button>
-              )}
-            </div>
-          </form>
+          </div>
         )}
       </section>
 
-      <section className="panel">
-        <h2>
-          Danh sách giáo án
-        </h2>
+      <section className="panel training-plan-history-section">
+        <div className="training-plan-section-heading">
+          <div>
+            <span className="training-plan-kicker">
+              PLAN HISTORY
+            </span>
 
-        {plans.length === 0 ? (
-          <p>
-            Chưa có giáo án.
-          </p>
+            <h2>
+              Tất cả giáo án
+            </h2>
+
+            <p>
+              Bao gồm Draft, chờ duyệt,
+              Active, Completed và Cancelled.
+            </p>
+          </div>
+        </div>
+
+        <div className="training-plan-filter-row">
+          <label className="form-field">
+            <span>
+              Tìm giáo án
+            </span>
+
+            <input
+              type="search"
+              value={search}
+              placeholder="Tên ngựa, mã plan, mục tiêu..."
+              onChange={(event) =>
+                setSearch(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
+
+          <label className="form-field">
+            <span>
+              Trạng thái
+            </span>
+
+            <select
+              value={
+                statusFilter
+              }
+              onChange={(event) =>
+                setStatusFilter(
+                  event.target.value,
+                )
+              }
+            >
+              <option value="all">
+                Tất cả
+              </option>
+
+              <option value="Draft">
+                Bản nháp
+              </option>
+
+              <option value="Pending Approval">
+                Chờ duyệt
+              </option>
+
+              <option value="Active">
+                Đang áp dụng
+              </option>
+
+              <option value="Completed">
+                Hoàn thành
+              </option>
+
+              <option value="Cancelled">
+                Đã hủy
+              </option>
+            </select>
+          </label>
+        </div>
+
+        {filteredPlans.length ===
+        0 ? (
+          <div className="empty-state">
+            <h3>
+              Không có giáo án phù hợp
+            </h3>
+
+            <p>
+              Thử thay đổi từ khóa hoặc
+              trạng thái lọc.
+            </p>
+          </div>
         ) : (
-          <div className="request-list">
-            {plans.map(
+          <div className="training-plan-history-list">
+            {filteredPlans.map(
               (plan) => (
                 <article
-                  className="request-item"
+                  className="training-plan-history-item"
                   key={
                     plan.TrainingPlanID
                   }
                 >
-                  <div>
-                    <strong>
-                      #
+                  <div className="training-plan-history-main">
+                    <div className="training-plan-title-line">
+                      <h3>
+                        {
+                          plan.HorseName
+                        }
+                      </h3>
+
+                      <span
+                        className={`status-badge training-plan-status ${statusTone(
+                          plan.Status,
+                        )}`}
+                      >
+                        {STATUS_LABELS[
+                          plan.Status
+                        ] ||
+                          plan.Status}
+                      </span>
+                    </div>
+
+                    <p>
+                      Giáo án #
                       {
                         plan.TrainingPlanID
                       }
                       {' · '}
-                      {
-                        plan.HorseName
-                      }
-                    </strong>
-
-                    <p>
-                      Trạng thái:{' '}
-                      {
-                        plan.Status
-                      }
-                    </p>
-
-                    <p>
-                      Thời gian:{' '}
-                      {
-                        plan.StartDate
-                      }
+                      {formatDate(
+                        plan.StartDate,
+                      )}
                       {' → '}
-                      {
-                        plan.EndDate ||
-                        'Không giới hạn'
-                      }
+                      {plan.EndDate
+                        ? formatDate(
+                            plan.EndDate,
+                          )
+                        : 'Không giới hạn'}
                     </p>
 
-                    <p>
-                      Cường độ:{' '}
-                      {
-                        plan.OverallIntensity ||
-                        '—'
-                      }
-                    </p>
-
-                    <p>
-                      Mục tiêu:{' '}
-                      {
-                        plan.Goal ||
-                        '—'
-                      }
-                    </p>
-
-                    {plan.ReviewNote && (
-                      <p>
-                        Phản hồi Head
-                        Trainer:{' '}
-                        {
-                          plan.ReviewNote
-                        }
-                      </p>
-                    )}
-
-                    <p>
-                      Số giai đoạn:{' '}
-                      {
-                        plan.Stages.length
-                      }
-                    </p>
+                    <strong>
+                      {show(
+                        plan.Goal,
+                        'Chưa có mục tiêu',
+                      )}
+                    </strong>
                   </div>
 
-                  <div className="profile-actions">
-                    {plan.Status ===
-                      'Draft' && (
-                      <>
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          onClick={() =>
-                            editPlan(
-                              plan,
-                            )
-                          }
-                        >
-                          Sửa
-                        </button>
+                  <div className="training-plan-history-meta">
+                    <span>
+                      {
+                        plan.Stages.length
+                      }{' '}
+                      giai đoạn
+                    </span>
 
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={
-                            busy
-                          }
-                          onClick={() =>
-                            void runAction(
-                              () =>
-                                submitTrainingPlan(
-                                  plan.TrainingPlanID,
-                                ),
-
-                              'Đã gửi giáo án cho Head Trainer duyệt.',
-                            )
-                          }
-                        >
-                          Gửi duyệt
-                        </button>
-                      </>
-                    )}
-
-                    {plan.Status ===
-                      'Active' && (
-                      <>
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          disabled={
-                            busy
-                          }
-                          onClick={() =>
-                            void runAction(
-                              () =>
-                                reviseTrainingPlan(
-                                  plan.TrainingPlanID,
-                                ),
-
-                              'Đã tạo bản Draft để điều chỉnh giáo án.',
-                            )
-                          }
-                        >
-                          Tạo bản điều chỉnh
-                        </button>
-
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={
-                            busy
-                          }
-                          onClick={() =>
-                            void runAction(
-                              () =>
-                                completeTrainingPlan(
-                                  plan.TrainingPlanID,
-                                ),
-
-                              'Đã hoàn tất giáo án.',
-                            )
-                          }
-                        >
-                          Hoàn tất
-                        </button>
-                      </>
-                    )}
-
-                    {plan.Status ===
-                      'Completed' && (
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        disabled={
-                          busy
-                        }
-                        onClick={() =>
-                          void runAction(
-                            () =>
-                              reviseTrainingPlan(
-                                plan.TrainingPlanID,
-                              ),
-
-                            'Đã tạo bản Draft để điều chỉnh giáo án.',
-                          )
-                        }
-                      >
-                        Tạo bản điều chỉnh
-                      </button>
-                    )}
-
-                    {[
-                      'Draft',
-                      'Pending Approval',
-                      'Active',
-                    ].includes(
-                      plan.Status,
-                    ) && (
-                      <button
-                        className="button button-secondary"
-                        type="button"
-                        disabled={
-                          busy
-                        }
-                        onClick={() =>
-                          void runAction(
-                            () =>
-                              cancelTrainingPlan(
-                                plan.TrainingPlanID,
-                                'Trainer hủy giáo án',
-                              ),
-
-                            'Đã hủy giáo án.',
-                          )
-                        }
-                      >
-                        Hủy giáo án
-                      </button>
-                    )}
+                    <Link
+                      className="button button-secondary"
+                      to={`/training/plans/${plan.TrainingPlanID}`}
+                    >
+                      Xem chi tiết
+                    </Link>
                   </div>
                 </article>
               ),

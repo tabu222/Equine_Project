@@ -5,13 +5,18 @@ import {
   apiPost,
 } from './apiClient.ts'
 
+type QueryValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+
 function buildQuery(
-  params: Record<
-    string,
-    string | number | boolean | null | undefined
-  >,
+  params: Record<string, QueryValue>,
 ) {
-  const query = new URLSearchParams()
+  const query =
+    new URLSearchParams()
 
   Object.entries(params).forEach(
     ([key, value]) => {
@@ -34,10 +39,17 @@ function buildQuery(
     },
   )
 
-  const result = query.toString()
+  const result =
+    query.toString()
 
-  return result ? `?${result}` : ''
+  return result
+    ? `?${result}`
+    : ''
 }
+
+/* =========================================================
+ * COMMON TYPES
+ * ======================================================= */
 
 export type TrainingIntensity =
   | 'Low'
@@ -57,8 +69,28 @@ export type ExperienceLevel =
   | 'Senior'
   | 'Expert'
 
+export type TrainingEvaluation =
+  | 'Excellent'
+  | 'Good'
+  | 'Average'
+  | 'Needs Improvement'
+
+export type TrainingPlanStatus =
+  | 'Draft'
+  | 'Pending Approval'
+  | 'Active'
+  | 'Completed'
+  | 'Cancelled'
+
+export type TrainingSessionStatus =
+  | 'Assigned'
+  | 'In Progress'
+  | 'Completed'
+  | 'Cancelled'
+  | 'Missed'
+
 /* =========================================================
- * SPECIALIZATION / TRAINER
+ * SPECIALIZATION
  * ======================================================= */
 
 export interface Specialization {
@@ -68,6 +100,16 @@ export interface Specialization {
   Description: string | null
   Status: 'Active' | 'Inactive'
 }
+
+export function getSpecializations() {
+  return apiGet<Specialization[]>(
+    '/specializations',
+  )
+}
+
+/* =========================================================
+ * TRAINER PROFILE
+ * ======================================================= */
 
 export interface TrainerSpecialization {
   SpecializationID: number
@@ -85,25 +127,65 @@ export interface TrainerCredential {
     | 'Award'
 
   Title: string
+
   IssuedBy: string | null
+
   IssuedDate: string
+
   ExpiryDate: string | null
+
   FileUrl: string | null
+
   Note: string | null
 
   CreatedBy: number
+
   CreatedByName: string
+
   CreatedAt: string
+}
+
+export interface TrainerCredentialInput {
+  CredentialType:
+    | 'Degree'
+    | 'Certificate'
+    | 'License'
+    | 'Award'
+
+  Title: string
+
+  IssuedBy?:
+    | string
+    | null
+
+  IssuedDate: string
+
+  ExpiryDate?:
+    | string
+    | null
+
+  FileUrl?:
+    | string
+    | null
+
+  Note?:
+    | string
+    | null
 }
 
 export interface TrainerRaceResult {
   RaceResultID: number
+
   TrainerID: number
 
-  HorseID: number | null
+  HorseID:
+    | number
+    | null
+
   HorseName: string
 
   RaceDate: string
+
   RaceName: string
 
   RaceClass:
@@ -116,51 +198,109 @@ export interface TrainerRaceResult {
     | 'Other'
 
   FinishPosition: number
+
   FieldSize: number
 
   Note: string | null
 
   CreatedBy: number
+
   CreatedAt: string
+}
+
+export interface TrainerRaceResultInput {
+  HorseID?:
+    | number
+    | null
+
+  HorseName?:
+    | string
+    | null
+
+  RaceDate: string
+
+  RaceName: string
+
+  RaceClass?:
+    | 'Group 1'
+    | 'Group 2'
+    | 'Group 3'
+    | 'Listed'
+    | 'Handicap'
+    | 'Maiden'
+    | 'Other'
+
+  FinishPosition: number
+
+  FieldSize: number
+
+  Note?:
+    | string
+    | null
 }
 
 export interface TrainerSummary {
   UserID: number
+
   FullName: string
+
   Email: string
+
   Phone: string | null
 
-  Specializations: TrainerSpecialization[]
+  Specializations:
+    TrainerSpecialization[]
 
-  CareerStartDate: string | null
+  CareerStartDate:
+    | string
+    | null
 
   YearsOfExperience: number
 
-  ExperienceLevel: ExperienceLevel
+  ExperienceLevel:
+    ExperienceLevel
 
   ExperienceLevelName: string
 
-  Seniority: number | null
+  Seniority:
+    | number
+    | null
 
-  SenioritySince: string | null
+  SenioritySince:
+    | string
+    | null
 
   QualificationCount: number
 
   AwardCount: number
 
   CareerStarts: number
+
   CareerWins: number
-  CareerWinRate: number | null
+
+  CareerWinRate:
+    | number
+    | null
 
   RecentStarts: number
+
   RecentWins: number
 
-  WinRate: number | null
-  PlaceRate: number | null
+  WinRate:
+    | number
+    | null
 
-  WinRateNote: string | null
+  PlaceRate:
+    | number
+    | null
 
-  TrainerRating: number | null
+  WinRateNote:
+    | string
+    | null
+
+  TrainerRating:
+    | number
+    | null
 
   ActiveHorseCount: number
 
@@ -176,47 +316,197 @@ export interface TrainerSummary {
     | ExperienceLevel
     | null
 
-  SuggestionReason?: string
+  SuggestionReason?:
+    | string
+    | null
 }
 
 export interface TrainerDetail
   extends TrainerSummary {
   ActiveHorses: Array<{
     TrainerHorseAssignmentID: number
+
     HorseID: number
+
     HorseName: string
-    HorseCode: string | null
+
+    HorseCode:
+      | string
+      | null
+
     SpecializationName: string
+
     StartDate: string
   }>
 
-  Credentials: TrainerCredential[]
+  Credentials:
+    TrainerCredential[]
 
-  RecentRaceResults: TrainerRaceResult[]
+  RecentRaceResults:
+    TrainerRaceResult[]
 }
 
-export function getSpecializations() {
-  return apiGet<Specialization[]>(
-    '/specializations',
-  )
+export interface TrainerProfileInput {
+  CareerStartDate?:
+    | string
+    | null
+
+  TrainerRating?:
+    | number
+    | null
 }
 
 export function getTrainers(
   params: {
     SpecializationID?: number
-    HorseID?: number | string
+
+    HorseID?:
+      | number
+      | string
   } = {},
 ) {
-  return apiGet<TrainerSummary[]>(
-    `/trainers${buildQuery(params)}`,
+  return apiGet<
+    TrainerSummary[]
+  >(
+    `/trainers${buildQuery(
+      params,
+    )}`,
   )
 }
 
 export function getTrainer(
-  trainerId: number | string,
+  trainerId:
+    | number
+    | string,
 ) {
   return apiGet<TrainerDetail>(
     `/trainers/${trainerId}`,
+  )
+}
+
+export function updateTrainerProfile(
+  trainerId:
+    | number
+    | string,
+
+  payload:
+    TrainerProfileInput,
+) {
+  return apiPatch<TrainerSummary>(
+    `/trainers/${trainerId}/profile`,
+    payload,
+  )
+}
+
+export function getTrainerCredentials(
+  trainerId:
+    | number
+    | string,
+) {
+  return apiGet<
+    TrainerCredential[]
+  >(
+    `/trainers/${trainerId}/credentials`,
+  )
+}
+
+export function createTrainerCredential(
+  trainerId:
+    | number
+    | string,
+
+  payload:
+    TrainerCredentialInput,
+) {
+  return apiPost<TrainerCredential>(
+    `/trainers/${trainerId}/credentials`,
+    payload,
+  )
+}
+
+export function deleteTrainerCredential(
+  credentialId:
+    | number
+    | string,
+) {
+  return apiDelete<void>(
+    `/trainer-credentials/${credentialId}`,
+  )
+}
+
+export function getTrainerRaceResults(
+  trainerId:
+    | number
+    | string,
+
+  params: {
+    From?: string
+    To?: string
+  } = {},
+) {
+  return apiGet<
+    TrainerRaceResult[]
+  >(
+    `/trainers/${trainerId}/race-results${buildQuery(
+      params,
+    )}`,
+  )
+}
+
+export function createTrainerRaceResult(
+  trainerId:
+    | number
+    | string,
+
+  payload:
+    TrainerRaceResultInput,
+) {
+  return apiPost<TrainerRaceResult>(
+    `/trainers/${trainerId}/race-results`,
+    payload,
+  )
+}
+
+export function deleteTrainerRaceResult(
+  raceResultId:
+    | number
+    | string,
+) {
+  return apiDelete<void>(
+    `/trainer-race-results/${raceResultId}`,
+  )
+}
+
+export function addTrainerSpecialization(
+  trainerId:
+    | number
+    | string,
+
+  specializationId: number,
+) {
+  return apiPost<{
+    TrainerID: number
+    SpecializationID: number
+  }>(
+    `/trainers/${trainerId}/specializations`,
+    {
+      SpecializationID:
+        specializationId,
+    },
+  )
+}
+
+export function removeTrainerSpecialization(
+  trainerId:
+    | number
+    | string,
+
+  specializationId:
+    | number
+    | string,
+) {
+  return apiDelete<void>(
+    `/trainers/${trainerId}/specializations/${specializationId}`,
   )
 }
 
@@ -239,13 +529,17 @@ export interface HorseAssessment {
 
   AssessmentDate: string
 
-  QualityScore: number | null
+  QualityScore:
+    | number
+    | null
 
   FitnessLevel:
     | FitnessLevel
     | null
 
-  AssessmentNote: string | null
+  AssessmentNote:
+    | string
+    | null
 
   DecisionStatus:
     | 'Recommended'
@@ -274,16 +568,24 @@ export interface HorseAssessmentInput {
 }
 
 export function getHorseAssessments(
-  horseId: number | string,
+  horseId:
+    | number
+    | string,
 ) {
-  return apiGet<HorseAssessment[]>(
+  return apiGet<
+    HorseAssessment[]
+  >(
     `/horses/${horseId}/assessments`,
   )
 }
 
 export function createHorseAssessment(
-  horseId: number | string,
-  payload: HorseAssessmentInput,
+  horseId:
+    | number
+    | string,
+
+  payload:
+    HorseAssessmentInput,
 ) {
   return apiPost<HorseAssessment>(
     `/horses/${horseId}/assessments`,
@@ -299,48 +601,89 @@ export interface TrainerAssignment {
   TrainerHorseAssignmentID: number
 
   HorseID: number
+
   HorseName: string
 
   TrainerID: number
+
   TrainerName: string
 
   SpecializationID: number
+
   SpecializationName: string
 
   AssignedByHeadTrainerID: number
+
   AssignedByName: string
 
-  AssessmentID: number | null
+  AssessmentID:
+    | number
+    | null
 
   StartDate: string
 
-  EndDate: string | null
+  EndDate:
+    | string
+    | null
 
   Status:
     | 'Active'
     | 'Ended'
 
-  AssignmentNote: string | null
+  AssignmentNote:
+    | string
+    | null
 
   TrainerExperienceLevel?:
-    | ExperienceLevel
+    ExperienceLevel
 
   RequiredLevel?:
     | ExperienceLevel
     | null
 
-  LevelWarning?: string | null
+  LevelWarning?:
+    | string
+    | null
+}
+
+export interface AssignTrainerInput {
+  HorseID: number
+
+  TrainerID: number
+
+  SpecializationID: number
+
+  AssessmentID?:
+    | number
+    | null
+
+  StartDate?:
+    | string
+    | null
+
+  AssignmentNote?:
+    | string
+    | null
 }
 
 export function getTrainerAssignments(
   params: {
-    HorseID?: number | string
-    TrainerID?: number | string
+    HorseID?:
+      | number
+      | string
+
+    TrainerID?:
+      | number
+      | string
+
     Status?: string
+
     mine?: boolean
   } = {},
 ) {
-  return apiGet<TrainerAssignment[]>(
+  return apiGet<
+    TrainerAssignment[]
+  >(
     `/trainer-assignments${buildQuery(
       params,
     )}`,
@@ -348,25 +691,8 @@ export function getTrainerAssignments(
 }
 
 export function assignTrainer(
-  payload: {
-    HorseID: number
-
-    TrainerID: number
-
-    SpecializationID: number
-
-    AssessmentID?:
-      | number
-      | null
-
-    StartDate?:
-      | string
-      | null
-
-    AssignmentNote?:
-      | string
-      | null
-  },
+  payload:
+    AssignTrainerInput,
 ) {
   return apiPost<TrainerAssignment>(
     '/trainer-assignments',
@@ -375,11 +701,14 @@ export function assignTrainer(
 }
 
 export function endTrainerAssignment(
-  id: number,
+  assignmentId:
+    | number
+    | string,
+
   reason?: string,
 ) {
   return apiPost<TrainerAssignment>(
-    `/trainer-assignments/${id}/end`,
+    `/trainer-assignments/${assignmentId}/end`,
     {
       Reason:
         reason || undefined,
@@ -404,35 +733,53 @@ export interface WorkRiderPreference {
 
   StartDate: string
 
-  EndDate: string | null
+  EndDate:
+    | string
+    | null
 
   Priority: number
 
   IsPreferred: boolean
 
-  Note: string | null
+  Note:
+    | string
+    | null
 }
 
 export function getWorkRiderPreferences(
-  horseId: number | string,
+  horseId:
+    | number
+    | string,
+
   all = false,
 ) {
   return apiGet<
     WorkRiderPreference[]
   >(
     `/horses/${horseId}/work-rider-preferences${buildQuery(
-      { all },
+      {
+        all,
+      },
     )}`,
   )
 }
 
 export function addWorkRiderPreference(
-  horseId: number | string,
+  horseId:
+    | number
+    | string,
+
   payload: {
     WorkRiderID: number
     Priority?: number
-    StartDate?: string | null
-    Note?: string | null
+
+    StartDate?:
+      | string
+      | null
+
+    Note?:
+      | string
+      | null
   },
 ) {
   return apiPost<WorkRiderPreference>(
@@ -442,7 +789,9 @@ export function addWorkRiderPreference(
 }
 
 export function endWorkRiderPreference(
-  preferenceId: number,
+  preferenceId:
+    | number
+    | string,
 ) {
   return apiPost<WorkRiderPreference>(
     `/work-rider-preferences/${preferenceId}/end`,
@@ -463,23 +812,51 @@ export interface TrainingPlanStage {
 
   StageOrder: number
 
-  Goal: string | null
+  Goal:
+    | string
+    | null
 
   StartDate: string
 
-  EndDate: string | null
+  EndDate:
+    | string
+    | null
 
   Intensity:
     | TrainingIntensity
     | null
 
-  TrainingLoad: number | null
+  TrainingLoad:
+    | number
+    | null
 
-  DistanceTargetKm: number | null
+  DistanceTargetKm:
+    | number
+    | null
 
-  Surface: string | null
+  Surface:
+    | string
+    | null
 
-  Note: string | null
+  Note:
+    | string
+    | null
+
+  ClosedAt:
+    | string
+    | null
+
+  ClosedByID:
+    | number
+    | null
+
+  ClosedByName:
+    | string
+    | null
+
+  SummaryNote:
+    | string
+    | null
 }
 
 export interface TrainingPlan {
@@ -488,43 +865,54 @@ export interface TrainingPlan {
   TrainerHorseAssignmentID: number
 
   HorseID: number
+
   HorseName: string
 
   TrainerID: number
+
   TrainerName: string
 
-  Goal: string | null
+  Goal:
+    | string
+    | null
 
   StartDate: string
 
-  EndDate: string | null
+  EndDate:
+    | string
+    | null
 
   OverallIntensity:
     | TrainingIntensity
     | null
 
-  Note: string | null
+  Note:
+    | string
+    | null
 
   Status:
-    | 'Draft'
-    | 'Pending Approval'
-    | 'Active'
-    | 'Completed'
-    | 'Cancelled'
+    TrainingPlanStatus
 
   CreatedAt: string
 
-  SubmittedAt: string | null
+  SubmittedAt:
+    | string
+    | null
 
   ApprovedByHeadTrainerID:
     | number
     | null
 
-  ApprovedAt: string | null
+  ApprovedAt:
+    | string
+    | null
 
-  ReviewNote: string | null
+  ReviewNote:
+    | string
+    | null
 
-  Stages: TrainingPlanStage[]
+  Stages:
+    TrainingPlanStage[]
 }
 
 export interface TrainingStageInput {
@@ -565,15 +953,49 @@ export interface TrainingStageInput {
     | null
 }
 
+export interface TrainingPlanInput {
+  HorseID: number
+
+  Goal?:
+    | string
+    | null
+
+  StartDate: string
+
+  EndDate?:
+    | string
+    | null
+
+  OverallIntensity?:
+    | TrainingIntensity
+    | null
+
+  Note?:
+    | string
+    | null
+
+  Stages?:
+    TrainingStageInput[]
+}
+
 export function getTrainingPlans(
   params: {
-    HorseID?: number | string
-    TrainerID?: number | string
+    HorseID?:
+      | number
+      | string
+
+    TrainerID?:
+      | number
+      | string
+
     Status?: string
+
     mine?: boolean
   } = {},
 ) {
-  return apiGet<TrainingPlan[]>(
+  return apiGet<
+    TrainingPlan[]
+  >(
     `/training-plans${buildQuery(
       params,
     )}`,
@@ -581,7 +1003,9 @@ export function getTrainingPlans(
 }
 
 export function getTrainingPlan(
-  planId: number | string,
+  planId:
+    | number
+    | string,
 ) {
   return apiGet<TrainingPlan>(
     `/training-plans/${planId}`,
@@ -589,14 +1013,26 @@ export function getTrainingPlan(
 }
 
 export function createTrainingPlan(
-  payload: {
-    HorseID: number
+  payload:
+    TrainingPlanInput,
+) {
+  return apiPost<TrainingPlan>(
+    '/training-plans',
+    payload,
+  )
+}
 
+export function updateTrainingPlan(
+  planId:
+    | number
+    | string,
+
+  payload: {
     Goal?:
       | string
       | null
 
-    StartDate: string
+    StartDate?: string
 
     EndDate?:
       | string
@@ -609,30 +1045,6 @@ export function createTrainingPlan(
     Note?:
       | string
       | null
-
-    Stages?: TrainingStageInput[]
-  },
-) {
-  return apiPost<TrainingPlan>(
-    '/training-plans',
-    payload,
-  )
-}
-
-export function updateTrainingPlan(
-  planId: number,
-  payload: {
-    Goal?: string | null
-
-    StartDate?: string
-
-    EndDate?: string | null
-
-    OverallIntensity?:
-      | TrainingIntensity
-      | null
-
-    Note?: string | null
   },
 ) {
   return apiPatch<TrainingPlan>(
@@ -642,8 +1054,12 @@ export function updateTrainingPlan(
 }
 
 export function addTrainingPlanStage(
-  planId: number,
-  payload: TrainingStageInput,
+  planId:
+    | number
+    | string,
+
+  payload:
+    TrainingStageInput,
 ) {
   return apiPost<TrainingPlanStage>(
     `/training-plans/${planId}/stages`,
@@ -652,8 +1068,12 @@ export function addTrainingPlanStage(
 }
 
 export function updateTrainingPlanStage(
-  stageId: number,
-  payload: Partial<TrainingStageInput>,
+  stageId:
+    | number
+    | string,
+
+  payload:
+    Partial<TrainingStageInput>,
 ) {
   return apiPatch<TrainingPlanStage>(
     `/training-plan-stages/${stageId}`,
@@ -662,7 +1082,9 @@ export function updateTrainingPlanStage(
 }
 
 export function deleteTrainingPlanStage(
-  stageId: number,
+  stageId:
+    | number
+    | string,
 ) {
   return apiDelete<void>(
     `/training-plan-stages/${stageId}`,
@@ -670,7 +1092,9 @@ export function deleteTrainingPlanStage(
 }
 
 export function submitTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
 ) {
   return apiPost<TrainingPlan>(
     `/training-plans/${planId}/submit`,
@@ -679,7 +1103,10 @@ export function submitTrainingPlan(
 }
 
 export function approveTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
+
   reviewNote?: string,
 ) {
   return apiPost<TrainingPlan>(
@@ -692,19 +1119,25 @@ export function approveTrainingPlan(
 }
 
 export function returnTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
+
   reviewNote: string,
 ) {
   return apiPost<TrainingPlan>(
     `/training-plans/${planId}/return`,
     {
-      ReviewNote: reviewNote,
+      ReviewNote:
+        reviewNote,
     },
   )
 }
 
 export function completeTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
 ) {
   return apiPost<TrainingPlan>(
     `/training-plans/${planId}/complete`,
@@ -713,7 +1146,10 @@ export function completeTrainingPlan(
 }
 
 export function cancelTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
+
   reason?: string,
 ) {
   return apiPost<TrainingPlan>(
@@ -726,7 +1162,9 @@ export function cancelTrainingPlan(
 }
 
 export function reviseTrainingPlan(
-  planId: number,
+  planId:
+    | number
+    | string,
 ) {
   return apiPost<TrainingPlan>(
     `/training-plans/${planId}/revise`,
@@ -735,7 +1173,7 @@ export function reviseTrainingPlan(
 }
 
 /* =========================================================
- * SESSION / RESULT / REVIEW
+ * SESSION RESULT / REVIEW
  * ======================================================= */
 
 export interface TrainingResult {
@@ -796,20 +1234,19 @@ export interface TrainingReview {
   TrainingSessionID: number
 
   HorseID: number
+
   HorseName: string
 
   SessionDate: string
 
   TrainerID: number
+
   TrainerName: string
 
   ReviewDate: string
 
   Evaluation:
-    | 'Excellent'
-    | 'Good'
-    | 'Average'
-    | 'Needs Improvement'
+    TrainingEvaluation
 
   TrainerComment:
     | string
@@ -835,7 +1272,9 @@ export interface TrainingSession {
 
   HorseName: string
 
-  HorseCode: string | null
+  HorseCode:
+    | string
+    | null
 
   WorkRiderID: number
 
@@ -861,7 +1300,9 @@ export interface TrainingSession {
 
   StartTime: string
 
-  EndTime: string | null
+  EndTime:
+    | string
+    | null
 
   SequenceNo: number
 
@@ -896,11 +1337,7 @@ export interface TrainingSession {
     | null
 
   Status:
-    | 'Assigned'
-    | 'In Progress'
-    | 'Completed'
-    | 'Cancelled'
-    | 'Missed'
+    TrainingSessionStatus
 
   Result:
     | TrainingResult
@@ -963,10 +1400,69 @@ export interface TrainingSessionInput {
     | null
 }
 
+export interface TrainingResultInput {
+  ActualDurationMinutes?:
+    | number
+    | null
+
+  ActualDistanceKm?:
+    | number
+    | null
+
+  AvgSpeedKmh?:
+    | number
+    | null
+
+  MaxSpeedKmh?:
+    | number
+    | null
+
+  AvgHeartRate?:
+    | number
+    | null
+
+  MaxHeartRate?:
+    | number
+    | null
+
+  RecoveryMinutes?:
+    | number
+    | null
+
+  PerformanceScore?:
+    | number
+    | null
+
+  RiderObservation?:
+    | string
+    | null
+
+  VideoUrl?:
+    | string
+    | null
+}
+
+export interface TrainingReviewInput {
+  Evaluation:
+    TrainingEvaluation
+
+  TrainerComment?:
+    | string
+    | null
+
+  AdjustmentRequired?: boolean
+
+  AdjustmentNote?:
+    | string
+    | null
+}
+
 export function getTrainingSessions(
   params: {
     Date?: string
+
     From?: string
+
     To?: string
 
     HorseID?:
@@ -996,7 +1492,9 @@ export function getTrainingSessions(
 }
 
 export function getTrainingSession(
-  sessionId: number | string,
+  sessionId:
+    | number
+    | string,
 ) {
   return apiGet<TrainingSession>(
     `/training-sessions/${sessionId}`,
@@ -1004,7 +1502,8 @@ export function getTrainingSession(
 }
 
 export function createTrainingSession(
-  payload: TrainingSessionInput,
+  payload:
+    TrainingSessionInput,
 ) {
   return apiPost<TrainingSession>(
     '/training-sessions',
@@ -1013,8 +1512,12 @@ export function createTrainingSession(
 }
 
 export function updateTrainingSession(
-  sessionId: number,
-  payload: Partial<TrainingSessionInput>,
+  sessionId:
+    | number
+    | string,
+
+  payload:
+    Partial<TrainingSessionInput>,
 ) {
   return apiPatch<TrainingSession>(
     `/training-sessions/${sessionId}`,
@@ -1023,7 +1526,9 @@ export function updateTrainingSession(
 }
 
 export function startTrainingSession(
-  sessionId: number,
+  sessionId:
+    | number
+    | string,
 ) {
   return apiPost<TrainingSession>(
     `/training-sessions/${sessionId}/start`,
@@ -1032,48 +1537,12 @@ export function startTrainingSession(
 }
 
 export function submitTrainingResult(
-  sessionId: number,
-  payload: {
-    ActualDurationMinutes?:
-      | number
-      | null
+  sessionId:
+    | number
+    | string,
 
-    ActualDistanceKm?:
-      | number
-      | null
-
-    AvgSpeedKmh?:
-      | number
-      | null
-
-    MaxSpeedKmh?:
-      | number
-      | null
-
-    AvgHeartRate?:
-      | number
-      | null
-
-    MaxHeartRate?:
-      | number
-      | null
-
-    RecoveryMinutes?:
-      | number
-      | null
-
-    PerformanceScore?:
-      | number
-      | null
-
-    RiderObservation?:
-      | string
-      | null
-
-    VideoUrl?:
-      | string
-      | null
-  },
+  payload:
+    TrainingResultInput,
 ) {
   return apiPost<TrainingSession>(
     `/training-sessions/${sessionId}/result`,
@@ -1082,7 +1551,10 @@ export function submitTrainingResult(
 }
 
 export function submitSubstituteObservation(
-  sessionId: number,
+  sessionId:
+    | number
+    | string,
+
   observation: string,
 ) {
   return apiPost<TrainingSession>(
@@ -1095,10 +1567,18 @@ export function submitSubstituteObservation(
 }
 
 export function stopTrainingSession(
-  sessionId: number,
+  sessionId:
+    | number
+    | string,
+
   payload: {
     Reason: string
 
+    /*
+     * Flow 3 only.
+     * Không tạo UI cho 3 field dưới
+     * cho tới khi BE Flow 3 được merge.
+     */
     ReportHealth?: boolean
 
     Severity?:
@@ -1115,7 +1595,10 @@ export function stopTrainingSession(
 }
 
 export function cancelTrainingSession(
-  sessionId: number,
+  sessionId:
+    | number
+    | string,
+
   reason?: string,
 ) {
   return apiPost<TrainingSession>(
@@ -1128,7 +1611,10 @@ export function cancelTrainingSession(
 }
 
 export function markTrainingSessionMissed(
-  sessionId: number,
+  sessionId:
+    | number
+    | string,
+
   reason?: string,
 ) {
   return apiPost<TrainingSession>(
@@ -1141,24 +1627,12 @@ export function markTrainingSessionMissed(
 }
 
 export function reviewTrainingSession(
-  sessionId: number,
-  payload: {
-    Evaluation:
-      | 'Excellent'
-      | 'Good'
-      | 'Average'
-      | 'Needs Improvement'
+  sessionId:
+    | number
+    | string,
 
-    TrainerComment?:
-      | string
-      | null
-
-    AdjustmentRequired?: boolean
-
-    AdjustmentNote?:
-      | string
-      | null
-  },
+  payload:
+    TrainingReviewInput,
 ) {
   return apiPost<TrainingReview>(
     `/training-sessions/${sessionId}/review`,
@@ -1177,7 +1651,9 @@ export function getTrainingReviews(
     Days?: number
   } = {},
 ) {
-  return apiGet<TrainingReview[]>(
+  return apiGet<
+    TrainingReview[]
+  >(
     `/training-reviews${buildQuery(
       params,
     )}`,
@@ -1185,19 +1661,201 @@ export function getTrainingReviews(
 }
 
 /* =========================================================
- * DASHBOARD
+ * OWNER SUMMARY TYPES
+ * ======================================================= */
+
+export interface OwnerTrainingHealthSummary {
+  TrainingLockCount: number
+
+  HealthReportCount: number
+
+  UrgentHealthReportCount: number
+
+  IsLockedNow: boolean
+
+  Text: string
+}
+
+export interface OwnerTrainingPeriodSummary {
+  From: string
+
+  To: string
+
+  PlannedSessions: number
+
+  CompletedSessions: number
+
+  ReviewedSessions: number
+
+  AwaitingReviewSessions: number
+
+  CancelledSessions: number
+
+  MissedSessions: number
+
+  UpcomingSessions: number
+
+  TotalDistanceKm: number
+
+  DistanceTargetKm:
+    | number
+    | null
+
+  DistanceProgressPercent:
+    | number
+    | null
+
+  TotalDurationMinutes: number
+
+  AvgDistancePerSessionKm:
+    | number
+    | null
+
+  AvgSpeedKmh:
+    | number
+    | null
+
+  MaxSpeedKmh:
+    | number
+    | null
+
+  AvgPerformanceScore:
+    | number
+    | null
+
+  AvgHeartRate:
+    | number
+    | null
+
+  AvgRecoveryMinutes:
+    | number
+    | null
+
+  Evaluations: Record<
+    TrainingEvaluation,
+    number
+  >
+
+  /*
+   * Current Flow 2 source:
+   * null vì Flow 3 chưa merge.
+   */
+  Health:
+    | OwnerTrainingHealthSummary
+    | null
+}
+
+export interface OwnerStageComparison {
+  AvgSpeedKmh:
+    | number
+    | null
+
+  AvgPerformanceScore:
+    | number
+    | null
+
+  AvgDistancePerSessionKm:
+    | number
+    | null
+
+  AvgRecoveryMinutes:
+    | number
+    | null
+}
+
+export interface OwnerTrainingStageSummary {
+  TrainingPlanStageID: number
+
+  StageOrder: number
+
+  StageName: string
+
+  Goal:
+    | string
+    | null
+
+  StartDate: string
+
+  EndDate:
+    | string
+    | null
+
+  Intensity:
+    | TrainingIntensity
+    | null
+
+  StageState:
+    | 'NotStarted'
+    | 'InProgress'
+    | 'Closed'
+
+  IsOverdue: boolean
+
+  AsOf:
+    | string
+    | null
+
+  ClosedAt:
+    | string
+    | null
+
+  ClosedByName:
+    | string
+    | null
+
+  SummaryNote:
+    | string
+    | null
+
+  Summary:
+    | OwnerTrainingPeriodSummary
+    | null
+
+  ComparedToPreviousStage:
+    | OwnerStageComparison
+    | null
+}
+
+export function closeTrainingPlanStage(
+  stageId:
+    | number
+    | string,
+
+  summaryNote?:
+    | string
+    | null,
+) {
+  return apiPost<
+    OwnerTrainingStageSummary
+  >(
+    `/training-plan-stages/${stageId}/close`,
+    {
+      SummaryNote:
+        summaryNote || undefined,
+    },
+  )
+}
+
+/* =========================================================
+ * TRAINING DASHBOARD
  * ======================================================= */
 
 export interface TrainingDashboardItem {
   HorseID: number
 
-  HorseCode: string | null
+  HorseCode:
+    | string
+    | null
 
   HorseName: string
 
-  Gender: string | null
+  Gender:
+    | string
+    | null
 
-  SexClass: string | null
+  SexClass:
+    | string
+    | null
 
   CurrentHealthStatus:
     | string
@@ -1247,6 +1905,10 @@ export interface TrainingDashboardItem {
     | number
     | null
 
+  /*
+   * Chỉ xuất hiện khi Flow 3
+   * thực sự được cài.
+   */
   IsTrainingLocked?: boolean
 
   TrainingLockID?:
@@ -1268,13 +1930,325 @@ export interface TrainingDashboardItem {
 }
 
 export function getTrainingDashboard(
-  horseId?: number | string,
+  horseId?:
+    | number
+    | string,
 ) {
   return apiGet<
     TrainingDashboardItem[]
   >(
-    `/training-dashboard${buildQuery({
-      HorseID: horseId,
-    })}`,
+    `/training-dashboard${buildQuery(
+      {
+        HorseID:
+          horseId,
+      },
+    )}`,
+  )
+}
+
+/* =========================================================
+ * OWNER TRAINING PLANS
+ * ======================================================= */
+
+export interface OwnerTrainingPlanSummary {
+  TrainingPlanID: number
+
+  Goal:
+    | string
+    | null
+
+  StartDate: string
+
+  EndDate:
+    | string
+    | null
+
+  Status:
+    | 'Active'
+    | 'Completed'
+    | 'Cancelled'
+
+  TrainerName: string
+
+  SpecializationName: string
+
+  ApprovedAt:
+    | string
+    | null
+
+  ProgressPercent:
+    | number
+    | null
+
+  StageCount: number
+
+  CurrentStageName:
+    | string
+    | null
+
+  Summary:
+    OwnerTrainingPeriodSummary
+
+  Stages:
+    OwnerTrainingStageSummary[]
+}
+
+export type OwnerTrainingPlanListItem =
+  Omit<
+    OwnerTrainingPlanSummary,
+    'Stages'
+  >
+
+export interface OwnerTrainingPlanListResponse {
+  HorseID: number
+
+  HorseName: string
+
+  HorseCode:
+    | string
+    | null
+
+  Plans:
+    OwnerTrainingPlanListItem[]
+}
+
+export interface OwnerTrainingPlanDetail
+  extends OwnerTrainingPlanSummary {
+  HorseID: number
+
+  HorseName: string
+
+  HorseCode:
+    | string
+    | null
+}
+
+export function getOwnerTrainingPlans(
+  horseId:
+    | number
+    | string,
+) {
+  return apiGet<
+    OwnerTrainingPlanListResponse
+  >(
+    `/owner/horses/${horseId}/training-plans`,
+  )
+}
+
+export function getOwnerTrainingPlan(
+  planId:
+    | number
+    | string,
+) {
+  return apiGet<
+    OwnerTrainingPlanDetail
+  >(
+    `/owner/training-plans/${planId}`,
+  )
+}
+
+/* =========================================================
+ * OWNER TRAINING SESSIONS
+ * ======================================================= */
+
+export interface OwnerTrainingSessionOverview {
+  TrainingSessionID: number
+
+  SessionDate: string
+
+  StartTime: string
+
+  TrainingType: string
+
+  TrainingPlanID: number
+
+  TrainingPlanStageID: number
+
+  StageName: string
+
+  Status:
+    | 'Completed'
+    | 'Cancelled'
+    | 'Missed'
+
+  DurationMinutes:
+    | number
+    | null
+
+  DistanceKm:
+    | number
+    | null
+
+  PerformanceScore:
+    | number
+    | null
+
+  Evaluation:
+    | TrainingEvaluation
+    | null
+
+  IsStopped: boolean
+
+  Reason:
+    | string
+    | null
+}
+
+export interface OwnerTrainingSessionDetail
+  extends OwnerTrainingSessionOverview {
+  HorseID: number
+
+  HorseName: string
+
+  TrainerName: string
+
+  WorkRiderName: string
+
+  Surface:
+    | string
+    | null
+
+  Location:
+    | string
+    | null
+
+  DurationPlannedMinutes:
+    | number
+    | null
+
+  DistancePlannedKm:
+    | number
+    | null
+
+  TargetSpeedKmh:
+    | number
+    | null
+
+  AvgSpeedKmh:
+    | number
+    | null
+
+  MaxSpeedKmh:
+    | number
+    | null
+
+  AvgHeartRate:
+    | number
+    | null
+
+  MaxHeartRate:
+    | number
+    | null
+
+  RecoveryMinutes:
+    | number
+    | null
+
+  RiderObservation:
+    | string
+    | null
+
+  VideoUrl:
+    | string
+    | null
+
+  TrainerComment:
+    | string
+    | null
+
+  AdjustmentRequired: boolean
+
+  AdjustmentNote:
+    | string
+    | null
+
+  ReviewedBy:
+    | string
+    | null
+
+  ReviewDate:
+    | string
+    | null
+}
+
+export function getOwnerTrainingSessions(
+  horseId:
+    | number
+    | string,
+
+  params: {
+    From?: string
+
+    To?: string
+
+    TrainingPlanID?:
+      | number
+      | string
+
+    TrainingPlanStageID?:
+      | number
+      | string
+  } = {},
+) {
+  return apiGet<
+    OwnerTrainingSessionOverview[]
+  >(
+    `/owner/horses/${horseId}/training-sessions${buildQuery(
+      params,
+    )}`,
+  )
+}
+
+export function getOwnerTrainingSession(
+  sessionId:
+    | number
+    | string,
+) {
+  return apiGet<
+    OwnerTrainingSessionDetail
+  >(
+    `/owner/training-sessions/${sessionId}`,
+  )
+}
+
+/* =========================================================
+ * NOTIFICATIONS
+ * ======================================================= */
+
+export interface NotificationItem {
+  Type: string
+
+  Priority:
+    | 'High'
+    | 'Normal'
+
+  Title: string
+
+  Message:
+    | string
+    | null
+
+  EntityName: string
+
+  EntityID: number
+
+  HorseID:
+    | number
+    | null
+
+  HorseName:
+    | string
+    | null
+
+  At:
+    | string
+    | null
+}
+
+export function getNotifications() {
+  return apiGet<
+    NotificationItem[]
+  >(
+    '/notifications',
   )
 }

@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -16,11 +15,46 @@ import {
   endTrainerAssignment,
   getHorseAssessments,
   getSpecializations,
-  getTrainer,
   getTrainerAssignments,
   getTrainers,
   getTrainingDashboard,
 } from '../../api/trainingApi.ts'
+
+const INITIAL_FORM = {
+  SpecializationID: '',
+  QualityScore: '',
+  FitnessLevel: 'Good',
+  AssessmentNote: '',
+  DecisionStatus: 'Recommended',
+}
+
+const FITNESS_LABELS = {
+  Excellent: 'Rất tốt',
+  Good: 'Tốt',
+  Average: 'Trung bình',
+  'Needs Monitoring':
+    'Cần theo dõi',
+}
+
+const DECISION_LABELS = {
+  Recommended:
+    'Đề xuất tiếp tục huấn luyện',
+  Rejected:
+    'Không đề xuất',
+  Superseded:
+    'Đã được thay thế',
+}
+
+const EXPERIENCE_LABELS = {
+  Junior:
+    'Mới vào nghề',
+  Intermediate:
+    'Trung cấp',
+  Senior:
+    'Kỳ cựu',
+  Expert:
+    'Chuyên gia',
+}
 
 function show(
   value,
@@ -33,11 +67,267 @@ function show(
     : value
 }
 
-export default function HorseAssessmentAssignmentPage() {
-  const { horseId } = useParams()
+function formatDate(
+  value,
+) {
+  if (!value) {
+    return '—'
+  }
 
-  const [horse, setHorse] =
-    useState(null)
+  const raw =
+    String(value)
+
+  const date =
+    raw.includes('T')
+      ? new Date(raw)
+      : new Date(
+          `${raw}T00:00:00`,
+        )
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return raw
+  }
+
+  return new Intl.DateTimeFormat(
+    'vi-VN',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    },
+  ).format(date)
+}
+
+function formatDateTime(
+  value,
+) {
+  if (!value) {
+    return '—'
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return String(value)
+  }
+
+  return new Intl.DateTimeFormat(
+    'vi-VN',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+  ).format(date)
+}
+
+function formatNumber(
+  value,
+  suffix = '',
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+    return '—'
+  }
+
+  const numeric =
+    Number(value)
+
+  if (
+    Number.isNaN(
+      numeric,
+    )
+  ) {
+    return String(value)
+  }
+
+  const result =
+    new Intl.NumberFormat(
+      'vi-VN',
+      {
+        maximumFractionDigits: 1,
+      },
+    ).format(numeric)
+
+  return suffix
+    ? `${result}${suffix}`
+    : result
+}
+
+function experienceLabel(
+  level,
+  backendName,
+) {
+  if (
+    EXPERIENCE_LABELS[level]
+  ) {
+    return EXPERIENCE_LABELS[level]
+  }
+
+  return (
+    backendName ||
+    show(level)
+  )
+}
+
+function fitnessLabel(
+  value,
+) {
+  return (
+    FITNESS_LABELS[value] ||
+    show(value)
+  )
+}
+
+function decisionLabel(
+  value,
+) {
+  return (
+    DECISION_LABELS[value] ||
+    show(value)
+  )
+}
+
+function healthLabel(
+  value,
+) {
+  switch (value) {
+    case 'Healthy':
+      return 'Khỏe mạnh'
+
+    case 'Monitor':
+      return 'Cần theo dõi'
+
+    case 'Injured':
+      return 'Chấn thương'
+
+    case 'Recovering':
+      return 'Đang hồi phục'
+
+    case 'Isolated':
+      return 'Cách ly'
+
+    default:
+      return show(
+        value,
+        'Chưa cập nhật',
+      )
+  }
+}
+
+function getErrorMessage(
+  error,
+  fallback,
+) {
+  if (
+    error instanceof Error &&
+    error.message
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
+async function fetchPageData(
+  horseId,
+) {
+  const [
+    dashboardRows,
+    specializationRows,
+    assessmentRows,
+    assignmentRows,
+  ] =
+    await Promise.all([
+      getTrainingDashboard(
+        horseId,
+      ),
+
+      getSpecializations(),
+
+      getHorseAssessments(
+        horseId,
+      ),
+
+      getTrainerAssignments({
+        HorseID:
+          horseId,
+      }),
+    ])
+
+  const recommended =
+    assessmentRows.find(
+      (item) =>
+        item.DecisionStatus ===
+        'Recommended',
+    ) || null
+
+  const trainerRows =
+    recommended
+      ? await getTrainers({
+          HorseID:
+            horseId,
+        })
+      : []
+
+  return {
+    horse:
+      dashboardRows[0] ||
+      null,
+
+    specializations:
+      Array.isArray(
+        specializationRows,
+      )
+        ? specializationRows
+        : [],
+
+    assessments:
+      Array.isArray(
+        assessmentRows,
+      )
+        ? assessmentRows
+        : [],
+
+    assignments:
+      Array.isArray(
+        assignmentRows,
+      )
+        ? assignmentRows
+        : [],
+
+    trainers:
+      Array.isArray(
+        trainerRows,
+      )
+        ? trainerRows
+        : [],
+  }
+}
+
+export default function HorseAssessmentAssignmentPage() {
+  const {
+    horseId,
+  } = useParams()
+
+  const [
+    horse,
+    setHorse,
+  ] = useState(null)
 
   const [
     specializations,
@@ -54,13 +344,10 @@ export default function HorseAssessmentAssignmentPage() {
     setAssignments,
   ] = useState([])
 
-  const [trainers, setTrainers] =
-    useState([])
-
   const [
-    trainerDetail,
-    setTrainerDetail,
-  ] = useState(null)
+    trainers,
+    setTrainers,
+  ] = useState([])
 
   const [
     selectedTrainerId,
@@ -77,27 +364,99 @@ export default function HorseAssessmentAssignmentPage() {
     setEndReason,
   ] = useState('')
 
-  const [loading, setLoading] =
-    useState(true)
+  const [
+    endModalOpen,
+    setEndModalOpen,
+  ] = useState(false)
 
-  const [busy, setBusy] =
-    useState(false)
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
 
-  const [error, setError] =
-    useState('')
+  const [
+    busy,
+    setBusy,
+  ] = useState(false)
 
-  const [message, setMessage] =
-    useState('')
+  const [
+    error,
+    setError,
+  ] = useState('')
 
-  const [form, setForm] =
-    useState({
-      SpecializationID: '',
-      QualityScore: '',
-      FitnessLevel: 'Good',
-      AssessmentNote: '',
-      DecisionStatus:
-        'Recommended',
-    })
+  const [
+    message,
+    setMessage,
+  ] = useState('')
+
+  const [
+    form,
+    setForm,
+  ] = useState({
+    ...INITIAL_FORM,
+  })
+
+  useEffect(() => {
+    if (!horseId) {
+      return undefined
+    }
+
+    let active = true
+
+    fetchPageData(
+      horseId,
+    )
+      .then((data) => {
+        if (!active) {
+          return
+        }
+
+        setHorse(
+          data.horse,
+        )
+
+        setSpecializations(
+          data.specializations,
+        )
+
+        setAssessments(
+          data.assessments,
+        )
+
+        setAssignments(
+          data.assignments,
+        )
+
+        setTrainers(
+          data.trainers,
+        )
+
+        setError('')
+      })
+      .catch(
+        (loadError) => {
+          if (!active) {
+            return
+          }
+
+          setError(
+            getErrorMessage(
+              loadError,
+              'Không thể tải dữ liệu đánh giá ngựa.',
+            ),
+          )
+        },
+      )
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [horseId])
 
   const activeAssignment =
     useMemo(
@@ -121,110 +480,70 @@ export default function HorseAssessmentAssignmentPage() {
       [assessments],
     )
 
-  const load =
-    useCallback(
-      async () => {
-        if (!horseId) return
+  const latestAssessment =
+    assessments[0] ||
+    null
 
-        setLoading(true)
-        setError('')
-
-        try {
-          const [
-            dashboardRows,
-            specializationRows,
-            assessmentRows,
-            assignmentRows,
-          ] =
-            await Promise.all([
-              getTrainingDashboard(
-                horseId,
-              ),
-
-              getSpecializations(),
-
-              getHorseAssessments(
-                horseId,
-              ),
-
-              getTrainerAssignments({
-                HorseID:
-                  horseId,
-              }),
-            ])
-
-          setHorse(
-            dashboardRows[0] ||
-              null,
-          )
-
-          setSpecializations(
-            specializationRows,
-          )
-
-          setAssessments(
-            assessmentRows,
-          )
-
-          setAssignments(
-            assignmentRows,
-          )
-
-          const recommended =
-            assessmentRows.find(
-              (item) =>
-                item.DecisionStatus ===
-                'Recommended',
-            )
-
-          if (recommended) {
-            setForm({
-              SpecializationID:
-                String(
-                  recommended.SpecializationID,
-                ),
-
-              QualityScore:
-                recommended.QualityScore ??
-                '',
-
-              FitnessLevel:
-                recommended.FitnessLevel ||
-                'Good',
-
-              AssessmentNote:
-                recommended.AssessmentNote ||
-                '',
-
-              DecisionStatus:
-                'Recommended',
-            })
-
-            setTrainers(
-              await getTrainers({
-                HorseID:
-                  horseId,
-              }),
-            )
-          } else {
-            setTrainers([])
-          }
-        } catch (loadError) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : 'Không thể tải dữ liệu đánh giá ngựa.',
-          )
-        } finally {
-          setLoading(false)
-        }
-      },
-      [horseId],
+  const selectedTrainer =
+    useMemo(
+      () =>
+        trainers.find(
+          (item) =>
+            String(
+              item.UserID,
+            ) ===
+            String(
+              selectedTrainerId,
+            ),
+        ) || null,
+      [
+        selectedTrainerId,
+        trainers,
+      ],
     )
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  async function reloadData() {
+    if (!horseId) {
+      return
+    }
+
+    const data =
+      await fetchPageData(
+        horseId,
+      )
+
+    setHorse(
+      data.horse,
+    )
+
+    setSpecializations(
+      data.specializations,
+    )
+
+    setAssessments(
+      data.assessments,
+    )
+
+    setAssignments(
+      data.assignments,
+    )
+
+    setTrainers(
+      data.trainers,
+    )
+  }
+
+  function updateForm(
+    field,
+    value,
+  ) {
+    setForm(
+      (current) => ({
+        ...current,
+        [field]: value,
+      }),
+    )
+  }
 
   async function saveAssessment(
     event,
@@ -235,6 +554,34 @@ export default function HorseAssessmentAssignmentPage() {
       !horseId ||
       !form.SpecializationID
     ) {
+      setError(
+        'Vui lòng chọn chuyên môn phù hợp.',
+      )
+
+      return
+    }
+
+    const qualityScore =
+      form.QualityScore === ''
+        ? null
+        : Number(
+            form.QualityScore,
+          )
+
+    if (
+      qualityScore !== null &&
+      (
+        Number.isNaN(
+          qualityScore,
+        ) ||
+        qualityScore < 0 ||
+        qualityScore > 100
+      )
+    ) {
+      setError(
+        'Điểm chất lượng phải từ 0 đến 100.',
+      )
+
       return
     }
 
@@ -252,72 +599,120 @@ export default function HorseAssessmentAssignmentPage() {
             ),
 
           QualityScore:
-            form.QualityScore === ''
-              ? null
-              : Number(
-                  form.QualityScore,
-                ),
+            qualityScore,
 
           FitnessLevel:
             form.FitnessLevel,
 
           AssessmentNote:
             form.AssessmentNote
-              .trim() || null,
+              .trim() ||
+            null,
 
           DecisionStatus:
             form.DecisionStatus,
         },
       )
 
-      setMessage(
-        'Đã lưu đánh giá ngựa.',
+      await reloadData()
+
+      setSelectedTrainerId(
+        '',
       )
 
-      setSelectedTrainerId('')
+      setAssignmentNote(
+        '',
+      )
 
-      setTrainerDetail(null)
+      setForm({
+        ...INITIAL_FORM,
+      })
 
-      await load()
+      setMessage(
+        form.DecisionStatus ===
+          'Recommended'
+          ? 'Đã lưu đánh giá. Danh sách Trainer bên dưới đã được Backend gợi ý lại theo đánh giá mới.'
+          : 'Đã lưu kết quả đánh giá không đề xuất.',
+      )
     } catch (saveError) {
       setError(
-        saveError instanceof Error
-          ? saveError.message
-          : 'Không thể lưu đánh giá.',
+        getErrorMessage(
+          saveError,
+          'Không thể lưu đánh giá ngựa.',
+        ),
       )
     } finally {
       setBusy(false)
     }
   }
 
-  async function openTrainer(
-    trainerId,
+  function selectTrainer(
+    trainer,
   ) {
-    setError('')
-
-    setTrainerDetail(null)
-
-    try {
-      setTrainerDetail(
-        await getTrainer(
-          trainerId,
-        ),
-      )
-    } catch (loadError) {
+    if (
+      activeAssignment
+    ) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : 'Không thể tải hồ sơ Trainer.',
+        'Ngựa đang có Trainer phụ trách. Hãy kết thúc phân công hiện tại trước khi chọn Trainer mới.',
       )
+
+      return
     }
+
+    if (
+      trainer
+        .MatchesSpecialization ===
+      false
+    ) {
+      setError(
+        'Trainer này không có chuyên môn khớp với đánh giá hiện tại.',
+      )
+
+      return
+    }
+
+    setError('')
+    setMessage('')
+
+    setSelectedTrainerId(
+      String(
+        trainer.UserID,
+      ),
+    )
   }
 
   async function createAssignment() {
     if (
       !horseId ||
-      !selectedTrainerId ||
-      !latestRecommended
+      !latestRecommended ||
+      !selectedTrainer
     ) {
+      setError(
+        'Chưa đủ dữ liệu để phân Trainer.',
+      )
+
+      return
+    }
+
+    if (
+      activeAssignment
+    ) {
+      setError(
+        'Ngựa đã có Trainer đang phụ trách. Backend yêu cầu kết thúc phân công hiện tại trước.',
+      )
+
+      return
+    }
+
+    if (
+      selectedTrainer
+        .MatchesSpecialization ===
+      false
+    ) {
+      setError(
+        'Trainer được chọn không đúng chuyên môn.',
+      )
+
       return
     }
 
@@ -333,7 +728,7 @@ export default function HorseAssessmentAssignmentPage() {
 
           TrainerID:
             Number(
-              selectedTrainerId,
+              selectedTrainer.UserID,
             ),
 
           SpecializationID:
@@ -346,25 +741,31 @@ export default function HorseAssessmentAssignmentPage() {
 
           AssignmentNote:
             assignmentNote
-              .trim() || null,
+              .trim() ||
+            null,
         })
+
+      await reloadData()
+
+      setSelectedTrainerId(
+        '',
+      )
+
+      setAssignmentNote(
+        '',
+      )
 
       setMessage(
         saved.LevelWarning
-          ? `Đã phân Trainer. Cảnh báo: ${saved.LevelWarning}`
+          ? `Đã phân Trainer thành công. Cảnh báo từ Backend: ${saved.LevelWarning}`
           : 'Đã phân Trainer thành công.',
       )
-
-      setSelectedTrainerId('')
-
-      setAssignmentNote('')
-
-      await load()
     } catch (assignError) {
       setError(
-        assignError instanceof Error
-          ? assignError.message
-          : 'Không thể phân Trainer.',
+        getErrorMessage(
+          assignError,
+          'Không thể phân Trainer.',
+        ),
       )
     } finally {
       setBusy(false)
@@ -372,7 +773,9 @@ export default function HorseAssessmentAssignmentPage() {
   }
 
   async function endCurrentAssignment() {
-    if (!activeAssignment) {
+    if (
+      !activeAssignment
+    ) {
       return
     }
 
@@ -385,22 +788,34 @@ export default function HorseAssessmentAssignmentPage() {
         activeAssignment
           .TrainerHorseAssignmentID,
 
-        endReason.trim() ||
-          undefined,
+        endReason
+          .trim() ||
+        undefined,
       )
 
-      setEndReason('')
+      await reloadData()
+
+      setEndReason(
+        '',
+      )
+
+      setEndModalOpen(
+        false,
+      )
+
+      setSelectedTrainerId(
+        '',
+      )
 
       setMessage(
-        'Đã kết thúc phân công Trainer hiện tại.',
+        'Đã kết thúc phân công Trainer hiện tại. Bây giờ có thể chọn Trainer mới.',
       )
-
-      await load()
     } catch (endError) {
       setError(
-        endError instanceof Error
-          ? endError.message
-          : 'Không thể kết thúc phân công.',
+        getErrorMessage(
+          endError,
+          'Không thể kết thúc phân công Trainer.',
+        ),
       )
     } finally {
       setBusy(false)
@@ -409,42 +824,64 @@ export default function HorseAssessmentAssignmentPage() {
 
   if (loading) {
     return (
-      <main className="page-content">
+      <main className="page-content assessment-assignment-page">
         <section
-          className="panel"
+          className="panel assessment-loading"
           role="status"
         >
-          Đang tải...
+          <strong>
+            Đang tải đánh giá ngựa
+          </strong>
+
+          <span>
+            Hệ thống đang lấy Assessment,
+            Trainer suggestion và phân công
+            hiện tại.
+          </span>
         </section>
       </main>
     )
   }
 
   return (
-    <main className="page-content">
-      <div className="horse-actions">
-        <Link
-          className="breadcrumb-back-button"
-          to="/training/dashboard"
-        >
-          ← Quay lại quản lý huấn luyện
+    <main className="page-content assessment-assignment-page">
+      <div className="breadcrumb">
+        <Link to="/training/dashboard">
+          Huấn luyện
         </Link>
+
+        <span>
+          /
+        </span>
+
+        <strong>
+          Đánh giá ngựa
+        </strong>
       </div>
 
-      <div className="page-heading">
-        <h1>
-          Đánh giá và phân Trainer
-        </h1>
-
-        {horse && (
-          <p>
-            {horse.HorseName}
-            {' · '}
-            {show(
-              horse.HorseCode,
-            )}
+      <div className="page-heading assessment-page-heading">
+        <div>
+          <p className="eyebrow">
+            HEAD TRAINER
           </p>
-        )}
+
+          <h1>
+            Đánh giá và phân Trainer
+          </h1>
+
+          <p>
+            Đánh giá khả năng huấn luyện,
+            chọn chuyên môn và phân Trainer
+            phù hợp theo gợi ý từ Backend.
+          </p>
+        </div>
+
+        <Link
+          className="button button-secondary"
+          to="/training/dashboard"
+        >
+          Quay lại tổng quan
+        </Link>
       </div>
 
       {error && (
@@ -457,27 +894,239 @@ export default function HorseAssessmentAssignmentPage() {
       )}
 
       {message && (
-        <p
+        <div
           className="success-message"
           role="status"
         >
           {message}
-        </p>
+        </div>
       )}
 
-      <section className="panel">
-        <h2>
-          Đánh giá ngựa
-        </h2>
+      <section className="panel assessment-horse-context">
+        <div className="assessment-horse-main">
+          <span className="assessment-section-kicker">
+            NGỰA ĐANG ĐÁNH GIÁ
+          </span>
+
+          <h2>
+            {show(
+              horse?.HorseName,
+              `Ngựa #${horseId}`,
+            )}
+          </h2>
+
+          <p>
+            {show(
+              horse?.HorseCode,
+              'Chưa có mã ngựa',
+            )}
+          </p>
+        </div>
+
+        <div className="assessment-horse-facts">
+          <div>
+            <span>
+              Sức khỏe
+            </span>
+
+            <strong>
+              {healthLabel(
+                horse
+                  ?.CurrentHealthStatus,
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Trainer
+            </span>
+
+            <strong>
+              {show(
+                horse?.TrainerName,
+                'Chưa phân công',
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Chuyên môn
+            </span>
+
+            <strong>
+              {show(
+                horse
+                  ?.SpecializationName,
+                'Chưa xác định',
+              )}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Giáo án Active
+            </span>
+
+            <strong>
+              {horse
+                ?.ActiveTrainingPlanID
+                ? `#${horse.ActiveTrainingPlanID}`
+                : 'Chưa có'}
+            </strong>
+          </div>
+        </div>
+      </section>
+
+      {latestAssessment && (
+        <section className="panel assessment-current-panel">
+          <div className="assessment-section-heading">
+            <div>
+              <span className="assessment-section-kicker">
+                ĐÁNH GIÁ GẦN NHẤT
+              </span>
+
+              <h2>
+                Kết quả Assessment
+              </h2>
+            </div>
+
+            <Link
+              className="button button-secondary"
+              to={`/training/horses/${horseId}/assessment-history`}
+            >
+              Xem lịch sử
+            </Link>
+          </div>
+
+          <div className="assessment-current-grid">
+            <div>
+              <span>
+                Chuyên môn
+              </span>
+
+              <strong>
+                {
+                  latestAssessment
+                    .SpecializationName
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Điểm chất lượng
+              </span>
+
+              <strong>
+                {show(
+                  latestAssessment
+                    .QualityScore,
+                  'Chưa chấm',
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Thể trạng
+              </span>
+
+              <strong>
+                {fitnessLabel(
+                  latestAssessment
+                    .FitnessLevel,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Kết luận
+              </span>
+
+              <strong>
+                {decisionLabel(
+                  latestAssessment
+                    .DecisionStatus,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Người đánh giá
+              </span>
+
+              <strong>
+                {show(
+                  latestAssessment
+                    .HeadTrainerName,
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Thời điểm
+              </span>
+
+              <strong>
+                {formatDateTime(
+                  latestAssessment
+                    .AssessmentDate,
+                )}
+              </strong>
+            </div>
+          </div>
+
+          {latestAssessment
+            .AssessmentNote && (
+            <div className="assessment-note-box">
+              <span>
+                Ghi chú
+              </span>
+
+              <p>
+                {
+                  latestAssessment
+                    .AssessmentNote
+                }
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="panel assessment-form-panel">
+        <div className="assessment-section-heading">
+          <div>
+            <span className="assessment-section-kicker">
+              ASSESSMENT MỚI
+            </span>
+
+            <h2>
+              Đánh giá ngựa
+            </h2>
+
+            <p>
+              Mỗi lần lưu sẽ tạo một
+              Assessment mới. FE không sửa
+              lại Assessment lịch sử.
+            </p>
+          </div>
+        </div>
 
         <form
+          className="assessment-form-grid"
           onSubmit={
             saveAssessment
           }
         >
           <label className="form-field">
             <span>
-              Chuyên môn phù hợp
+              Chuyên môn đề xuất *
             </span>
 
             <select
@@ -485,17 +1134,10 @@ export default function HorseAssessmentAssignmentPage() {
               value={
                 form.SpecializationID
               }
-              onChange={(
-                event,
-              ) =>
-                setForm(
-                  (current) => ({
-                    ...current,
-
-                    SpecializationID:
-                      event.target
-                        .value,
-                  }),
+              onChange={(event) =>
+                updateForm(
+                  'SpecializationID',
+                  event.target.value,
                 )
               }
             >
@@ -520,11 +1162,16 @@ export default function HorseAssessmentAssignmentPage() {
                 ),
               )}
             </select>
+
+            <small>
+              Trainer được phân phải có
+              chuyên môn này.
+            </small>
           </label>
 
           <label className="form-field">
             <span>
-              Điểm chất lượng (0–100)
+              Điểm chất lượng
             </span>
 
             <input
@@ -535,20 +1182,19 @@ export default function HorseAssessmentAssignmentPage() {
               value={
                 form.QualityScore
               }
-              onChange={(
-                event,
-              ) =>
-                setForm(
-                  (current) => ({
-                    ...current,
-
-                    QualityScore:
-                      event.target
-                        .value,
-                  }),
+              placeholder="0 - 100"
+              onChange={(event) =>
+                updateForm(
+                  'QualityScore',
+                  event.target.value,
                 )
               }
             />
+
+            <small>
+              Backend dùng điểm này để xác
+              định cấp độ Trainer nên có.
+            </small>
           </label>
 
           <label className="form-field">
@@ -560,34 +1206,27 @@ export default function HorseAssessmentAssignmentPage() {
               value={
                 form.FitnessLevel
               }
-              onChange={(
-                event,
-              ) =>
-                setForm(
-                  (current) => ({
-                    ...current,
-
-                    FitnessLevel:
-                      event.target
-                        .value,
-                  }),
+              onChange={(event) =>
+                updateForm(
+                  'FitnessLevel',
+                  event.target.value,
                 )
               }
             >
               <option value="Excellent">
-                Excellent
+                Rất tốt
               </option>
 
               <option value="Good">
-                Good
+                Tốt
               </option>
 
               <option value="Average">
-                Average
+                Trung bình
               </option>
 
               <option value="Needs Monitoring">
-                Needs Monitoring
+                Cần theo dõi
               </option>
             </select>
           </label>
@@ -601,33 +1240,31 @@ export default function HorseAssessmentAssignmentPage() {
               value={
                 form.DecisionStatus
               }
-              onChange={(
-                event,
-              ) =>
-                setForm(
-                  (current) => ({
-                    ...current,
-
-                    DecisionStatus:
-                      event.target
-                        .value,
-                  }),
+              onChange={(event) =>
+                updateForm(
+                  'DecisionStatus',
+                  event.target.value,
                 )
               }
             >
               <option value="Recommended">
-                Recommended
+                Đề xuất tiếp tục huấn luyện
               </option>
 
               <option value="Rejected">
-                Rejected
+                Không đề xuất
               </option>
             </select>
+
+            <small>
+              Giá trị gửi Backend vẫn là
+              Recommended / Rejected.
+            </small>
           </label>
 
-          <label className="form-field">
+          <label className="form-field assessment-form-note">
             <span>
-              Ghi chú
+              Ghi chú đánh giá
             </span>
 
             <textarea
@@ -635,66 +1272,111 @@ export default function HorseAssessmentAssignmentPage() {
               value={
                 form.AssessmentNote
               }
-              onChange={(
-                event,
-              ) =>
-                setForm(
-                  (current) => ({
-                    ...current,
-
-                    AssessmentNote:
-                      event.target
-                        .value,
-                  }),
+              placeholder="Nhập nhận xét chuyên môn nếu có..."
+              onChange={(event) =>
+                updateForm(
+                  'AssessmentNote',
+                  event.target.value,
                 )
               }
             />
           </label>
 
-          <button
-            className="button"
-            type="submit"
-            disabled={busy}
-          >
-            {busy
-              ? 'Đang lưu...'
-              : 'Lưu đánh giá'}
-          </button>
+          <div className="assessment-form-actions">
+            <button
+              className="button"
+              type="submit"
+              disabled={
+                busy ||
+                !form.SpecializationID
+              }
+            >
+              {busy
+                ? 'Đang lưu...'
+                : 'Lưu đánh giá'}
+            </button>
+          </div>
         </form>
       </section>
 
-      {latestRecommended && (
-        <section className="panel">
+      {!latestRecommended ? (
+        <section className="panel assessment-no-suggestion">
           <h2>
-            Trainer được đề xuất
+            Chưa có Trainer suggestion
           </h2>
 
           <p>
-            Chuyên môn:{' '}
-            <strong>
-              {
-                latestRecommended
-                  .SpecializationName
-              }
-            </strong>
-
-            {' · '}
-
-            Điểm chất lượng:{' '}
-
-            {show(
-              latestRecommended
-                .QualityScore,
-              'Chưa chấm',
-            )}
+            Cần có ít nhất một Assessment
+            ở trạng thái Recommended trước
+            khi Backend có thể gợi ý Trainer
+            cho ngựa này.
           </p>
+        </section>
+      ) : (
+        <section className="panel assessment-suggestion-panel">
+          <div className="assessment-section-heading assessment-suggestion-heading">
+            <div>
+              <span className="assessment-section-kicker">
+                TRAINER SUGGESTION
+              </span>
+
+              <h2>
+                Trainer phù hợp
+              </h2>
+
+              <p>
+                Danh sách và thứ tự dưới
+                đây do Backend tính. FE
+                không tự tính Trainer
+                suggestion.
+              </p>
+            </div>
+
+            <div className="assessment-requirement">
+              <span>
+                Assessment đang áp dụng
+              </span>
+
+              <strong>
+                {
+                  latestRecommended
+                    .SpecializationName
+                }
+              </strong>
+
+              <small>
+                Điểm:{' '}
+                {show(
+                  latestRecommended
+                    .QualityScore,
+                  'Chưa chấm',
+                )}
+              </small>
+            </div>
+          </div>
+
+          {activeAssignment && (
+            <div className="assessment-assignment-blocker">
+              Ngựa đã có Trainer đang phụ
+              trách. Nếu muốn đổi Trainer,
+              phải kết thúc phân công hiện
+              tại trước.
+            </div>
+          )}
 
           {trainers.length === 0 ? (
-            <p>
-              Chưa có Trainer trong CLB.
-            </p>
+            <div className="empty-state">
+              <h3>
+                Chưa có Trainer
+              </h3>
+
+              <p>
+                Chưa có Trainer trong CLB
+                phù hợp để hiển thị.
+              </p>
+            </div>
           ) : (
-            <div className="request-list">
+            <div className="trainer-suggestion-list">
               {trainers.map(
                 (trainer) => {
                   const selected =
@@ -705,157 +1387,252 @@ export default function HorseAssessmentAssignmentPage() {
                       trainer.UserID,
                     )
 
-                  const cannotAssign =
+                  const wrongSpecialization =
                     trainer
                       .MatchesSpecialization ===
                     false
 
+                  const lowLevel =
+                    trainer
+                      .MatchesLevel ===
+                    false
+
                   return (
                     <article
-                      className="request-item"
+                      className={[
+                        'trainer-suggestion-card',
+
+                        trainer.IsSuggested
+                          ? 'is-suggested'
+                          : '',
+
+                        selected
+                          ? 'is-selected'
+                          : '',
+                      ]
+                        .filter(
+                          Boolean,
+                        )
+                        .join(' ')}
                       key={
                         trainer.UserID
                       }
                     >
-                      <div>
-                        <strong>
-                          {
-                            trainer.FullName
-                          }
+                      <div className="trainer-suggestion-card-head">
+                        <div>
+                          <div className="trainer-name-row">
+                            <h3>
+                              {
+                                trainer.FullName
+                              }
+                            </h3>
 
-                          {trainer.IsSuggested
-                            ? ' · Đề xuất'
-                            : ''}
-                        </strong>
+                            {trainer.IsSuggested && (
+                              <span className="status-badge assessment-status-good">
+                                Backend đề xuất
+                              </span>
+                            )}
 
-                        <p>
-                          Chuyên môn:{' '}
+                            {!trainer.IsSuggested &&
+                              wrongSpecialization && (
+                              <span className="status-badge assessment-status-danger">
+                                Sai chuyên môn
+                              </span>
+                            )}
 
-                          {trainer.Specializations
-                            .map(
-                              (item) =>
-                                item.SpecializationName,
-                            )
-                            .join(
-                              ', ',
-                            ) ||
-                            'Chưa có'}
-                        </p>
+                            {!trainer.IsSuggested &&
+                              !wrongSpecialization &&
+                              lowLevel && (
+                              <span className="status-badge assessment-status-warning">
+                                Chưa đạt cấp độ đề xuất
+                              </span>
+                            )}
+                          </div>
 
-                        <p>
-                          Kinh nghiệm:{' '}
-                          {
-                            trainer.YearsOfExperience
-                          }{' '}
-                          năm ·{' '}
-                          {
-                            trainer.ExperienceLevelName
-                          }{' '}
-                          (
-                          {
-                            trainer.ExperienceLevel
-                          }
-                          )
-                        </p>
-
-                        <p>
-                          Thâm niên có minh chứng:{' '}
-
-                          {trainer.Seniority ==
-                          null
-                            ? 'Chưa có'
-                            : `${trainer.Seniority} năm`}
-                        </p>
-
-                        <p>
-                          Rating:{' '}
-                          {show(
-                            trainer.TrainerRating,
-                          )}
-                          {' · '}
-                          Career wins:{' '}
-                          {
-                            trainer.CareerWins
-                          }
-                        </p>
-
-                        <p>
-                          Win rate 12 tháng:{' '}
-
-                          {trainer.WinRate ==
-                          null
-                            ? show(
-                                trainer.WinRateNote,
-                                'Chưa đủ dữ liệu',
+                          <p>
+                            {trainer.Specializations
+                              ?.map(
+                                (item) =>
+                                  item.SpecializationName,
                               )
-                            : `${trainer.WinRate}%`}
-                        </p>
-
-                        <p>
-                          Đang phụ trách:{' '}
-                          {
-                            trainer.ActiveHorseCount
-                          }{' '}
-                          ngựa
-                        </p>
-
-                        {trainer.RequiredLevel && (
-                          <p>
-                            Cấp độ nên có:{' '}
-                            {
-                              trainer.RequiredLevel
-                            }{' '}
-                            trở lên
+                              .join(', ') ||
+                              'Chưa có chuyên môn'}
                           </p>
-                        )}
+                        </div>
 
-                        {trainer.SuggestionReason && (
-                          <p>
+                        <div className="trainer-card-actions">
+                          <Link
+                            className="button button-secondary"
+                            to={`/training/trainers/${trainer.UserID}`}
+                          >
+                            Xem hồ sơ
+                          </Link>
+
+                          <button
+                            className="button"
+                            type="button"
+                            disabled={
+                              busy ||
+                              Boolean(
+                                activeAssignment,
+                              ) ||
+                              wrongSpecialization
+                            }
+                            onClick={() =>
+                              selectTrainer(
+                                trainer,
+                              )
+                            }
+                          >
+                            {selected
+                              ? 'Đã chọn'
+                              : 'Chọn Trainer'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="trainer-metrics-grid">
+                        <div>
+                          <span>
+                            Kinh nghiệm
+                          </span>
+
+                          <strong>
+                            {formatNumber(
+                              trainer
+                                .YearsOfExperience,
+                              ' năm',
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Cấp độ
+                          </span>
+
+                          <strong>
+                            {experienceLabel(
+                              trainer
+                                .ExperienceLevel,
+                              trainer
+                                .ExperienceLevelName,
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Cấp độ nên có
+                          </span>
+
+                          <strong>
+                            {trainer.RequiredLevel
+                              ? experienceLabel(
+                                  trainer.RequiredLevel,
+                                )
+                              : 'Không yêu cầu tối thiểu'}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Đang phụ trách
+                          </span>
+
+                          <strong>
+                            {
+                              trainer.ActiveHorseCount
+                            }{' '}
+                            ngựa
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Rating
+                          </span>
+
+                          <strong>
+                            {show(
+                              trainer.TrainerRating,
+                              'Chưa có',
+                            )}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Bằng/chứng chỉ
+                          </span>
+
+                          <strong>
+                            {
+                              trainer.QualificationCount
+                            }
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Thành tích sự nghiệp
+                          </span>
+
+                          <strong>
+                            {
+                              trainer.CareerWins
+                            }
+                            /
+                            {
+                              trainer.CareerStarts
+                            }{' '}
+                            thắng
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>
+                            Win rate gần đây
+                          </span>
+
+                          <strong>
+                            {trainer.WinRate ==
+                            null
+                              ? 'Chưa đủ dữ liệu'
+                              : `${trainer.WinRate}%`}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {trainer.SuggestionReason && (
+                        <div
+                          className={`trainer-suggestion-reason ${
+                            trainer.IsSuggested
+                              ? 'is-positive'
+                              : 'is-warning'
+                          }`}
+                        >
+                          <strong>
+                            Lý do gợi ý
+                          </strong>
+
+                          <span>
                             {
                               trainer.SuggestionReason
                             }
+                          </span>
+                        </div>
+                      )}
+
+                      {trainer.WinRate ==
+                        null &&
+                        trainer.WinRateNote && (
+                          <p className="trainer-data-note">
+                            {
+                              trainer.WinRateNote
+                            }
                           </p>
                         )}
-
-                        {cannotAssign && (
-                          <p>
-                            Trainer này không
-                            đúng chuyên môn
-                            được đánh giá.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="profile-actions">
-                      <Link
-  className="button button-secondary"
-  to={`/training/trainers/${trainer.UserID}`}
->
-  Xem hồ sơ
-</Link>
-
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={
-                            cannotAssign ||
-                            Boolean(
-                              activeAssignment,
-                            )
-                          }
-                          onClick={() =>
-                            setSelectedTrainerId(
-                              String(
-                                trainer.UserID,
-                              ),
-                            )
-                          }
-                        >
-                          {selected
-                            ? 'Đã chọn'
-                            : 'Chọn Trainer'}
-                        </button>
-                      </div>
                     </article>
                   )
                 },
@@ -865,305 +1642,414 @@ export default function HorseAssessmentAssignmentPage() {
         </section>
       )}
 
-      {trainerDetail && (
-        <section className="panel">
-          <h2>
-            Hồ sơ Trainer:{' '}
-            {
-              trainerDetail.FullName
+      {activeAssignment && (
+        <section className="panel current-trainer-panel">
+          <div className="assessment-section-heading">
+            <div>
+              <span className="assessment-section-kicker">
+                ACTIVE ASSIGNMENT
+              </span>
+
+              <h2>
+                Trainer đang phụ trách
+              </h2>
+            </div>
+
+            <span className="status-badge assessment-status-good">
+              Đang hoạt động
+            </span>
+          </div>
+
+          <div className="current-trainer-content">
+            <div className="current-trainer-main">
+              <h3>
+                {
+                  activeAssignment
+                    .TrainerName
+                }
+              </h3>
+
+              <p>
+                {
+                  activeAssignment
+                    .SpecializationName
+                }
+              </p>
+
+              <Link
+                to={`/training/trainers/${activeAssignment.TrainerID}`}
+              >
+                Xem hồ sơ Trainer
+              </Link>
+            </div>
+
+            <div className="current-trainer-facts">
+              <div>
+                <span>
+                  Ngày bắt đầu
+                </span>
+
+                <strong>
+                  {formatDate(
+                    activeAssignment
+                      .StartDate,
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Người phân công
+                </span>
+
+                <strong>
+                  {show(
+                    activeAssignment
+                      .AssignedByName,
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Assessment
+                </span>
+
+                <strong>
+                  {activeAssignment
+                    .AssessmentID
+                    ? `#${activeAssignment.AssessmentID}`
+                    : 'Không liên kết'}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {activeAssignment
+            .AssignmentNote && (
+            <div className="assessment-note-box">
+              <span>
+                Ghi chú phân công
+              </span>
+
+              <p>
+                {
+                  activeAssignment
+                    .AssignmentNote
+                }
+              </p>
+            </div>
+          )}
+
+          <div className="current-trainer-warning">
+            Khi kết thúc phân công, Backend
+            sẽ hủy các giáo án chưa hoàn tất
+            và các session còn ở trạng thái
+            Assigned của phân công này.
+          </div>
+
+          <button
+            className="button assessment-danger-button"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              setEndModalOpen(
+                true,
+              )
             }
-          </h2>
+          >
+            Kết thúc phân công
+          </button>
+        </section>
+      )}
 
-          <div className="health-summary-grid">
-            <div className="info-item">
-              <span>
-                Kinh nghiệm
+      {!activeAssignment &&
+        selectedTrainer && (
+        <section className="panel assignment-confirm-panel">
+          <div className="assessment-section-heading">
+            <div>
+              <span className="assessment-section-kicker">
+                XÁC NHẬN PHÂN CÔNG
               </span>
 
-              <strong>
-                {
-                  trainerDetail
-                    .YearsOfExperience
-                }{' '}
-                năm
-              </strong>
+              <h2>
+                Phân Trainer cho ngựa
+              </h2>
             </div>
 
-            <div className="info-item">
+            <button
+              className="button button-secondary"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setSelectedTrainerId(
+                  '',
+                )
+
+                setAssignmentNote(
+                  '',
+                )
+              }}
+            >
+              Chọn lại
+            </button>
+          </div>
+
+          <div className="assignment-confirm-grid">
+            <div>
               <span>
-                Cấp độ
+                Trainer
               </span>
 
               <strong>
                 {
-                  trainerDetail
-                    .ExperienceLevelName
+                  selectedTrainer.FullName
                 }
               </strong>
             </div>
 
-            <div className="info-item">
+            <div>
               <span>
-                Thâm niên minh chứng
-              </span>
-
-              <strong>
-                {trainerDetail
-                  .Seniority == null
-                  ? '—'
-                  : `${trainerDetail.Seniority} năm`}
-              </strong>
-            </div>
-
-            <div className="info-item">
-              <span>
-                Bằng/chứng chỉ
+                Chuyên môn
               </span>
 
               <strong>
                 {
-                  trainerDetail
-                    .QualificationCount
+                  latestRecommended
+                    ?.SpecializationName
                 }
               </strong>
             </div>
 
-            <div className="info-item">
+            <div>
               <span>
-                Giải thưởng
+                Cấp độ hiện tại
               </span>
 
               <strong>
-                {
-                  trainerDetail
-                    .AwardCount
-                }
-              </strong>
-            </div>
-
-            <div className="info-item">
-              <span>
-                Career wins
-              </span>
-
-              <strong>
-                {
-                  trainerDetail
-                    .CareerWins
-                }
-                /
-                {
-                  trainerDetail
-                    .CareerStarts
-                }
-              </strong>
-            </div>
-
-            <div className="info-item">
-              <span>
-                Win rate 12 tháng
-              </span>
-
-              <strong>
-                {trainerDetail
-                  .WinRate == null
-                  ? '—'
-                  : `${trainerDetail.WinRate}%`}
-              </strong>
-            </div>
-
-            <div className="info-item">
-              <span>
-                Trainer rating
-              </span>
-
-              <strong>
-                {show(
-                  trainerDetail
-                    .TrainerRating,
+                {experienceLabel(
+                  selectedTrainer
+                    .ExperienceLevel,
+                  selectedTrainer
+                    .ExperienceLevelName,
                 )}
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Cấp độ nên có
+              </span>
+
+              <strong>
+                {selectedTrainer
+                  .RequiredLevel
+                  ? experienceLabel(
+                      selectedTrainer
+                        .RequiredLevel,
+                    )
+                  : 'Không yêu cầu tối thiểu'}
               </strong>
             </div>
           </div>
 
-          {trainerDetail
-            .Credentials.length >
-            0 && (
-            <>
-              <h3>
-                Bằng cấp / chứng chỉ /
-                giải thưởng
-              </h3>
+          {selectedTrainer
+            .MatchesLevel ===
+            false && (
+            <div className="assessment-level-warning">
+              <strong>
+                Cảnh báo cấp độ
+              </strong>
 
-              <div className="request-list">
-                {trainerDetail.Credentials.map(
-                  (item) => (
-                    <article
-                      className="request-item"
-                      key={
-                        item.CredentialID
-                      }
-                    >
-                      <div>
-                        <strong>
-                          {item.Title}
-                        </strong>
+              <span>
+                {
+                  selectedTrainer
+                    .SuggestionReason
+                }
+              </span>
 
-                        <p>
-                          {
-                            item.CredentialType
-                          }
-                          {' · '}
-                          {
-                            item.IssuedDate
-                          }
-                        </p>
-
-                        <p>
-                          {show(
-                            item.IssuedBy,
-                          )}
-                        </p>
-                      </div>
-                    </article>
-                  ),
-                )}
-              </div>
-            </>
+              <small>
+                Backend hiện không chặn phân
+                công vì thiếu cấp độ; Backend
+                sẽ trả LevelWarning sau khi
+                phân Trainer.
+              </small>
+            </div>
           )}
-        </section>
-      )}
 
-      {activeAssignment ? (
-        <section className="panel">
-          <h2>
-            Trainer đang phụ trách
-          </h2>
-
-          <p>
-            <strong>
-              {
-                activeAssignment
-                  .TrainerName
-              }
-            </strong>
-          </p>
-
-          <p>
-            Chuyên môn:{' '}
-            {
-              activeAssignment
-                .SpecializationName
-            }
-          </p>
-
-          <p>
-            Ngày bắt đầu:{' '}
-            {
-              activeAssignment
-                .StartDate
-            }
-          </p>
-
-          <label className="form-field">
-            <span>
-              Lý do kết thúc phân công
-            </span>
-
-            <textarea
-              rows="3"
-              value={endReason}
-              onChange={(
-                event,
-              ) =>
-                setEndReason(
-                  event.target
-                    .value,
-                )
-              }
-            />
-          </label>
-
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void endCurrentAssignment()
-            }
-          >
-            Kết thúc phân công hiện tại
-          </button>
-        </section>
-      ) : selectedTrainerId ? (
-        <section className="panel">
-          <h2>
-            Xác nhận phân Trainer
-          </h2>
-
-          <p>
-            Trainer:{' '}
-
-            <strong>
-              {
-                trainers.find(
-                  (item) =>
-                    String(
-                      item.UserID,
-                    ) ===
-                    String(
-                      selectedTrainerId,
-                    ),
-                )?.FullName
-              }
-            </strong>
-          </p>
-
-          <label className="form-field">
+          <label className="form-field assignment-note-field">
             <span>
               Ghi chú phân công
             </span>
 
             <textarea
               rows="3"
-              value={assignmentNote}
-              onChange={(
-                event,
-              ) =>
+              value={
+                assignmentNote
+              }
+              placeholder="Ghi chú cho lần phân công này nếu có..."
+              onChange={(event) =>
                 setAssignmentNote(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
             />
           </label>
 
-          <button
-            className="button"
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void createAssignment()
-            }
-          >
-            {busy
-              ? 'Đang phân công...'
-              : 'Xác nhận phân Trainer'}
-          </button>
+          <div className="assessment-form-actions">
+            <button
+              className="button"
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void createAssignment()
+              }
+            >
+              {busy
+                ? 'Đang phân công...'
+                : 'Xác nhận phân Trainer'}
+            </button>
+          </div>
         </section>
-      ) : null}
+      )}
 
-      <section className="panel">
-  <div className="profile-actions">
-    <Link
-      className="button button-secondary"
-      to={`/training/horses/${horseId}/assessment-history`}
-    >
-      Xem lịch sử đánh giá
-    </Link>
-  </div>
-</section>
+      <section className="panel assessment-history-shortcut">
+        <div>
+          <h2>
+            Lịch sử đánh giá
+          </h2>
 
+          <p>
+            Toàn bộ Assessment cũ được giữ
+            ở trang riêng, không nhồi lịch
+            sử dài vào trang đánh giá.
+          </p>
+        </div>
+
+        <Link
+          className="button button-secondary"
+          to={`/training/horses/${horseId}/assessment-history`}
+        >
+          Xem lịch sử đánh giá
+        </Link>
+      </section>
+
+      {endModalOpen &&
+        activeAssignment && (
+        <div
+          className="assessment-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              setEndModalOpen(
+                false,
+              )
+            }
+          }}
+        >
+          <section
+            className="assessment-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="end-assignment-title"
+          >
+            <div className="assessment-confirm-modal-head">
+              <div>
+                <span className="assessment-section-kicker">
+                  XÁC NHẬN
+                </span>
+
+                <h2 id="end-assignment-title">
+                  Kết thúc phân công Trainer?
+                </h2>
+              </div>
+
+              <button
+                className="assessment-modal-close"
+                type="button"
+                aria-label="Đóng"
+                disabled={busy}
+                onClick={() =>
+                  setEndModalOpen(
+                    false,
+                  )
+                }
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="assessment-modal-description">
+              Trainer{' '}
+              <strong>
+                {
+                  activeAssignment
+                    .TrainerName
+                }
+              </strong>{' '}
+              sẽ không còn là Trainer phụ
+              trách của ngựa này.
+            </p>
+
+            <div className="assessment-modal-warning">
+              Backend sẽ hủy các giáo án
+              chưa hoàn tất và session còn
+              Assigned thuộc phân công hiện
+              tại.
+            </div>
+
+            <label className="form-field">
+              <span>
+                Lý do kết thúc
+              </span>
+
+              <textarea
+                rows="4"
+                value={
+                  endReason
+                }
+                placeholder="Có thể để trống vì Backend không bắt buộc Reason..."
+                onChange={(event) =>
+                  setEndReason(
+                    event.target.value,
+                  )
+                }
+              />
+            </label>
+
+            <div className="assessment-modal-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  setEndModalOpen(
+                    false,
+                  )
+                }
+              >
+                Giữ phân công
+              </button>
+
+              <button
+                className="button assessment-danger-button"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void endCurrentAssignment()
+                }
+              >
+                {busy
+                  ? 'Đang xử lý...'
+                  : 'Kết thúc phân công'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
