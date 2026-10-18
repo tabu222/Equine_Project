@@ -62,6 +62,15 @@ import OwnerCorrectionRequest from './pages/owner/OwnerCorrectionRequest.jsx'
 import HorsesNeedingExam from './pages/vet/HorsesNeedingExam.jsx'
 import VetExaminationForm from './pages/vet/VetExaminationForm.tsx'
 
+import HeadTrainerTrainingDashboard from './pages/training/HeadTrainerTrainingDashboard.jsx'
+import HorseAssessmentAssignmentPage from './pages/training/HorseAssessmentAssignmentPage.jsx'
+import TrainerProfilePage from './pages/training/TrainerProfilePage.jsx'
+import HeadTrainerPlanApprovalPage from './pages/training/HeadTrainerPlanApprovalPage.jsx'
+import TrainerPlansPage from './pages/training/TrainerPlansPage.jsx'
+import TrainerSessionsPage from './pages/training/TrainerSessionsPage.jsx'
+import WorkRiderSessionsPage from './pages/training/WorkRiderSessionsPage.jsx'
+import HorseAssessmentHistoryPage from './pages/training/HorseAssessmentHistoryPage.jsx'
+
 import HorseProfile from './components/horse/HorseProfile.jsx'
 import {
   registrationGroupLabel,
@@ -75,7 +84,14 @@ import { formatHorseDateTime, valueOrMissing } from './components/horse/horseDis
 
 import './App.css'
 
-const roleLabels = { manager: 'Quản lý câu lạc bộ', owner: 'Chủ sở hữu ngựa', vet: 'Bác sĩ thú y' }
+const roleLabels = {
+  manager: 'Quản lý câu lạc bộ',
+  owner: 'Chủ sở hữu ngựa',
+  vet: 'Bác sĩ thú y',
+  headTrainer: 'Huấn luyện viên trưởng',
+  trainer: 'Huấn luyện viên',
+  workRider: 'Work Rider',
+}
 
 function userRole(user) {
   if (user?.role === 'CLUB_MANAGER') {
@@ -94,6 +110,18 @@ function userRole(user) {
     user?.role === 'VETERINARIAN'
   ) {
     return 'vet'
+  }
+
+  if (user?.role === 'HEAD_TRAINER') {
+    return 'headTrainer'
+  }
+
+  if (user?.role === 'TRAINER') {
+    return 'trainer'
+  }
+
+  if (user?.role === 'WORK_RIDER') {
+    return 'workRider'
   }
 
   return ''
@@ -1623,7 +1651,13 @@ function AppContent() {
       ? '/owner/horses'
       : role === 'vet'
         ? '/vet/horses-needing-exam'
-        : '/manager/horses'
+        : role === 'headTrainer'
+          ? '/training/dashboard'
+          : role === 'trainer'
+            ? '/training/my-plans'
+            : role === 'workRider'
+              ? '/training/work-rider-sessions'
+              : '/manager/horses'
 
   const ownerList =
     useMemo(
@@ -1802,6 +1836,65 @@ function AppContent() {
 
               <span>
                 Hàng đợi khám
+              </span>
+            </NavLink>
+          )}
+
+          {role === 'headTrainer' && (
+            <>
+              <NavLink
+                end
+                to="/training/dashboard"
+              >
+                <NavIcon kind="manager" />
+
+                <span>
+                  Tổng quan huấn luyện
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/approvals">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Duyệt giáo án
+                </span>
+              </NavLink>
+            </>
+          )}
+
+          {role === 'trainer' && (
+            <>
+              <NavLink
+                end
+                to="/training/my-plans"
+              >
+                <NavIcon kind="manager" />
+
+                <span>
+                  Ngựa & giáo án
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/trainer-sessions">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Buổi tập giám sát
+                </span>
+              </NavLink>
+            </>
+          )}
+
+          {role === 'workRider' && (
+            <NavLink
+              end
+              to="/training/work-rider-sessions"
+            >
+              <NavIcon kind="manager" />
+
+              <span>
+                Buổi tập của tôi
               </span>
             </NavLink>
           )}
@@ -2285,6 +2378,99 @@ function AppContent() {
                     syncHorse
                   }
                 />
+              }
+            />
+
+            <Route
+              path="/training/dashboard"
+              element={
+                role === 'headTrainer' ? (
+                  <HeadTrainerTrainingDashboard />
+                ) : (
+                  <Navigate
+                    to={home}
+                    replace
+                  />
+                )
+              }
+            />
+
+            <Route
+              path="/training/horses/:horseId/assessment"
+              element={
+                role === 'headTrainer' ? (
+                  <HorseAssessmentAssignmentPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/horses/:horseId/assessment-history"
+  element={
+    role === 'headTrainer' ? (
+      <HorseAssessmentHistoryPage />
+    ) : (
+      <Navigate to={home} replace />
+    )
+  }
+/>
+
+            <Route
+              path="/training/trainers/:trainerId"
+              element={
+                role === 'headTrainer' ? (
+                  <TrainerProfilePage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+              path="/training/approvals"
+              element={
+                role === 'headTrainer' ? (
+                  <HeadTrainerPlanApprovalPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+              path="/training/my-plans"
+              element={
+                role === 'trainer' ? (
+                  <TrainerPlansPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+              path="/training/trainer-sessions"
+              element={
+                role === 'trainer' ? (
+                  <TrainerSessionsPage
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+              path="/training/work-rider-sessions"
+              element={
+                role === 'workRider' ? (
+                  <WorkRiderSessionsPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
               }
             />
 
