@@ -95,6 +95,9 @@ DROP TABLE IF EXISTS dbo.TrainingPlan;
 DROP TABLE IF EXISTS dbo.HorseWorkRiderPreference;
 DROP TABLE IF EXISTS dbo.TrainerHorseAssignment;
 DROP TABLE IF EXISTS dbo.HorseAssessment;
+DROP TABLE IF EXISTS dbo.TrainerRaceResult;
+DROP TABLE IF EXISTS dbo.TrainerCredential;
+DROP TABLE IF EXISTS dbo.TrainerProfile;
 DROP TABLE IF EXISTS dbo.TrainerSpecialization;
 DROP TABLE IF EXISTS dbo.Specialization;
 DROP TABLE IF EXISTS dbo.StallAssignment;
@@ -495,6 +498,81 @@ CREATE TABLE dbo.TrainerSpecialization
 );
 GO
 
+/* Hồ sơ năng lực Trainer (Head Trainer / Manager nhập). Backend TÍNH, không lưu:
+     YearsOfExperience = số năm từ CareerStartDate; ExperienceLevel: 0-2 năm Junior, 3-5 Intermediate,
+     6-10 Senior, trên 10 Expert; Seniority = số năm từ bằng cấp / chứng chỉ / giấy phép sớm nhất (TrainerCredential);
+     WinRate / PlaceRate = tỉ lệ về nhất / top 3 trong 12 tháng gần nhất, CareerStarts / CareerWins = cả sự nghiệp
+     (TrainerRaceResult). */
+CREATE TABLE dbo.TrainerProfile
+(
+    TrainerID INT NOT NULL PRIMARY KEY,
+    CareerStartDate DATE NULL,
+    TrainerRating DECIMAL(2,1) NULL,
+    UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_TrainerProfile_UpdatedAt DEFAULT SYSDATETIME(),
+    UpdatedBy INT NULL,
+
+    CONSTRAINT FK_TrainerProfile_Trainer FOREIGN KEY (TrainerID)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT FK_TrainerProfile_UpdatedBy FOREIGN KEY (UpdatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT CK_TrainerProfile_Rating CHECK (TrainerRating IS NULL OR (TrainerRating >= 0 AND TrainerRating <= 5))
+);
+GO
+
+/* Bằng cấp, chứng chỉ, giấy phép hành nghề, bằng khen của trainer (minh chứng thâm niên nghề). */
+CREATE TABLE dbo.TrainerCredential
+(
+    CredentialID INT IDENTITY(1,1) PRIMARY KEY,
+    TrainerID INT NOT NULL,
+    CredentialType VARCHAR(20) NOT NULL,
+    Title NVARCHAR(200) NOT NULL,
+    IssuedBy NVARCHAR(200) NULL,
+    IssuedDate DATE NOT NULL,
+    ExpiryDate DATE NULL,
+    FileUrl VARCHAR(500) NULL,
+    Note NVARCHAR(1000) NULL,
+    CreatedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_TrainerCredential_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TrainerCredential_Trainer FOREIGN KEY (TrainerID)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT FK_TrainerCredential_CreatedBy FOREIGN KEY (CreatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT CK_TrainerCredential_Type CHECK (CredentialType IN ('Degree', 'Certificate', 'License', 'Award')),
+    CONSTRAINT CK_TrainerCredential_Dates CHECK (ExpiryDate IS NULL OR ExpiryDate >= IssuedDate)
+);
+GO
+
+/* Mỗi lần ngựa do trainer chuẩn bị ra đường đua (HorseID NULL = ngựa ngoài CLB, chỉ ghi HorseName). */
+CREATE TABLE dbo.TrainerRaceResult
+(
+    RaceResultID INT IDENTITY(1,1) PRIMARY KEY,
+    TrainerID INT NOT NULL,
+    HorseID INT NULL,
+    HorseName NVARCHAR(100) NOT NULL,
+    RaceDate DATE NOT NULL,
+    RaceName NVARCHAR(200) NOT NULL,
+    RaceClass VARCHAR(20) NOT NULL CONSTRAINT DF_TrainerRaceResult_Class DEFAULT 'Other',
+    FinishPosition INT NOT NULL,
+    FieldSize INT NOT NULL,
+    Note NVARCHAR(1000) NULL,
+    CreatedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_TrainerRaceResult_CreatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TrainerRaceResult_Trainer FOREIGN KEY (TrainerID)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT FK_TrainerRaceResult_Horse FOREIGN KEY (HorseID)
+        REFERENCES dbo.Horse(HorseID),
+    CONSTRAINT FK_TrainerRaceResult_CreatedBy FOREIGN KEY (CreatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT CK_TrainerRaceResult_Class CHECK
+        (RaceClass IN ('Group 1', 'Group 2', 'Group 3', 'Listed', 'Handicap', 'Maiden', 'Other')),
+    CONSTRAINT CK_TrainerRaceResult_Position CHECK (FieldSize >= 2 AND FinishPosition BETWEEN 1 AND FieldSize)
+);
+GO
+CREATE INDEX IX_TrainerRaceResult_Trainer_Date ON dbo.TrainerRaceResult (TrainerID, RaceDate);
+GO
+
 CREATE TABLE dbo.HorseAssessment
 (
     AssessmentID INT IDENTITY(1,1) PRIMARY KEY,
@@ -649,9 +727,15 @@ CREATE TABLE dbo.TrainingPlanStage
     DistanceTargetKm DECIMAL(10,2) NULL,
     Surface VARCHAR(50),
     Note NVARCHAR(1500),
+    -- Trainer chốt giai đoạn: tổng kết gửi chủ ngựa
+    ClosedAt DATETIME2 NULL,
+    ClosedByID INT NULL,
+    SummaryNote NVARCHAR(2000) NULL,
 
     CONSTRAINT FK_TrainingPlanStage_Plan FOREIGN KEY (TrainingPlanID)
         REFERENCES dbo.TrainingPlan(TrainingPlanID),
+    CONSTRAINT FK_TrainingPlanStage_ClosedBy FOREIGN KEY (ClosedByID)
+        REFERENCES dbo.[User](UserID),
     CONSTRAINT UQ_TrainingPlanStage_Order UNIQUE (TrainingPlanID, StageOrder),
     CONSTRAINT CK_TrainingPlanStage_Order CHECK (StageOrder > 0),
     CONSTRAINT CK_TrainingPlanStage_Dates CHECK
@@ -1735,7 +1819,7 @@ VALUES
 ('TRAINER_ASSIGN',             N'Phân công Trainer',          N'Head Trainer giao ngựa cho Trainer phụ trách theo chuyên môn.'),
 ('TRAINING_PLAN_MANAGE',       N'Quản lý giáo án',            N'Trainer phụ trách tạo, điều chỉnh và gửi duyệt giáo án.'),
 ('TRAINING_PLAN_APPROVE',      N'Duyệt giáo án',              N'Head Trainer duyệt hoặc trả về giáo án trước khi áp dụng.'),
-('TRAINING_SESSION_ASSIGN',    N'Xếp buổi tập',               N'Head Trainer xếp buổi tập, giao Work Rider, chỉ định Substitute Trainer.'),
+('TRAINING_SESSION_ASSIGN',    N'Xếp buổi tập',               N'Xếp buổi tập, giao Work Rider, chỉ định Substitute Trainer: Head Trainer cho mọi ngựa, Trainer cho ngựa mình đang phụ trách.'),
 ('TRAINING_SESSION_SUPERVISE', N'Giám sát buổi tập',          N'Có mặt giám sát, dừng buổi tập khi ngựa có vấn đề, ghi nhận xét khi giám sát thay.'),
 ('TRAINING_RESULT_UPDATE',     N'Cập nhật kết quả tập',       N'Work Rider bắt đầu buổi tập và ghi kết quả thực tế.'),
 ('TRAINING_REVIEW',            N'Đánh giá buổi tập',          N'Trainer phụ trách đánh giá kết quả và đề xuất điều chỉnh giáo án.'),
@@ -1777,6 +1861,7 @@ FROM
     -- Trainer (phụ trách hoặc Substitute)
     ('TRAINER', 'HORSE_VIEW'),
     ('TRAINER', 'TRAINING_PLAN_MANAGE'),
+    ('TRAINER', 'TRAINING_SESSION_ASSIGN'),
     ('TRAINER', 'TRAINING_SESSION_SUPERVISE'),
     ('TRAINER', 'TRAINING_REVIEW'),
     ('TRAINER', 'HEALTH_REPORT'),
