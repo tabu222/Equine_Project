@@ -58,12 +58,38 @@ import OwnerHorses from './pages/owner/OwnerHorses.jsx'
 import OwnerHorseForm from './pages/owner/OwnerHorseForm.jsx'
 import LoginScreen from './components/layout/LoginScreen.jsx'
 import OwnerCorrectionRequest from './pages/owner/OwnerCorrectionRequest.jsx'
+import OwnerTrainingSessionsPage from './pages/owner/OwnerTrainingSessionsPage.jsx'
+import OwnerTrainingSessionDetailPage from './pages/owner/OwnerTrainingSessionDetailPage.jsx'
+import OwnerTrainingStagesPage from './pages/owner/OwnerTrainingStagesPage.jsx'
+import OwnerTrainingStageSummaryPage from './pages/owner/OwnerTrainingStageSummaryPage.jsx'
+import OwnerTrainingPlansPage from './pages/owner/OwnerTrainingPlansPage.jsx'
+import OwnerTrainingPlanSummaryPage from './pages/owner/OwnerTrainingPlanSummaryPage.jsx'
+import OwnerTrainingActivityPage from './pages/owner/OwnerTrainingActivityPage.jsx'
 
 import HorsesNeedingExam from './pages/vet/HorsesNeedingExam.jsx'
 import VetExaminationForm from './pages/vet/VetExaminationForm.tsx'
 import VetWorkspace from './pages/vet/VetWorkspace.jsx'
 import VetMedicalProfile from './pages/vet/VetMedicalProfile.jsx'
 import { vetError } from './pages/vet/vetDomain.js'
+
+import HeadTrainerTrainingDashboard from './pages/training/HeadTrainerTrainingDashboard.jsx'
+import HorseAssessmentAssignmentPage from './pages/training/HorseAssessmentAssignmentPage.jsx'
+import TrainerProfilePage from './pages/training/TrainerProfilePage.jsx'
+import HeadTrainerPlanApprovalPage from './pages/training/HeadTrainerPlanApprovalPage.jsx'
+import HeadTrainerPlanApprovalDetailPage from './pages/training/HeadTrainerPlanApprovalDetailPage.jsx'
+import TrainerPlansPage from './pages/training/TrainerPlansPage.jsx'
+import TrainingPlanCreatePage from './pages/training/TrainingPlanCreatePage.jsx'
+import TrainingPlanDetailPage from './pages/training/TrainingPlanDetailPage.jsx'
+import TrainingPlanEditPage from './pages/training/TrainingPlanEditPage.jsx'
+import TrainerSessionsPage from './pages/training/TrainerSessionsPage.jsx'
+import WorkRiderSessionsPage from './pages/training/WorkRiderSessionsPage.jsx'
+import TrainerReviewQueuePage from './pages/training/TrainerReviewQueuePage.jsx'
+import TrainingSessionReviewPage from './pages/training/TrainingSessionReviewPage.jsx'
+import HeadTrainerAdjustmentsPage from './pages/training/HeadTrainerAdjustmentsPage.jsx'
+import HorseAssessmentHistoryPage from './pages/training/HorseAssessmentHistoryPage.jsx'
+import TrainingSchedulePage from './pages/training/TrainingSchedulePage.jsx'
+import TrainingSessionCreatePage from './pages/training/TrainingSessionCreatePage.jsx'
+import TrainingSessionEditPage from './pages/training/TrainingSessionEditPage.jsx'
 
 import HorseProfile from './components/horse/HorseProfile.jsx'
 import {
@@ -78,7 +104,14 @@ import { formatHorseDateTime, valueOrMissing } from './components/horse/horseDis
 
 import './App.css'
 
-const roleLabels = { manager: 'Quản lý câu lạc bộ', owner: 'Chủ sở hữu ngựa', vet: 'Bác sĩ thú y' }
+const roleLabels = {
+  manager: 'Quản lý câu lạc bộ',
+  owner: 'Chủ sở hữu ngựa',
+  vet: 'Bác sĩ thú y',
+  headTrainer: 'Huấn luyện viên trưởng',
+  trainer: 'Huấn luyện viên',
+  workRider: 'Work Rider',
+}
 
 function userRole(user) {
   if (user?.role === 'CLUB_MANAGER') {
@@ -97,6 +130,18 @@ function userRole(user) {
     user?.role === 'VETERINARIAN'
   ) {
     return 'vet'
+  }
+
+  if (user?.role === 'HEAD_TRAINER') {
+    return 'headTrainer'
+  }
+
+  if (user?.role === 'TRAINER') {
+    return 'trainer'
+  }
+
+  if (user?.role === 'WORK_RIDER') {
+    return 'workRider'
   }
 
   return ''
@@ -373,6 +418,21 @@ function HorseProfilePage({
                   Yêu cầu sửa hồ sơ
                 </Link>
               )}
+
+              {role === 'owner' &&
+  String(
+    horse?.ownerUserId,
+  ) ===
+    String(
+      currentUser.id,
+    ) && (
+    <Link
+      className="button button-secondary"
+      to={`/owner/horses/${horse.id}/training`}
+    >
+      Kết quả huấn luyện
+    </Link>
+  )}
 
             {role === 'vet' &&
               canVetExamine &&
@@ -1611,8 +1671,14 @@ function AppContent() {
     role === 'owner'
       ? '/owner/horses'
       : role === 'vet'
-        ? '/vet/overview'
-        : '/manager/horses'
+        ? '/vet/horses-needing-exam'
+        : role === 'headTrainer'
+          ? '/training/dashboard'
+          : role === 'trainer'
+            ? '/training/my-plans'
+            : role === 'workRider'
+              ? '/training/work-rider-sessions'
+              : '/manager/horses'
 
   const ownerList =
     useMemo(
@@ -1770,26 +1836,130 @@ function AppContent() {
           )}
 
           {role === 'owner' && (
+            <>
+              <NavLink
+                end
+                to="/owner/horses"
+              >
+                <NavIcon kind="owner" />
+
+                <span>
+                  Ngựa của tôi
+                </span>
+              </NavLink>
+
+              <NavLink to="/owner/training/activity">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Hoạt động huấn luyện
+                </span>
+              </NavLink>
+            </>
+          )}
+
+          {role === 'vet' && (
             <NavLink
               end
-              to="/owner/horses"
+              to="/vet/horses-needing-exam"
             >
-              <NavIcon kind="owner" />
+              <NavIcon kind="vet" />
 
               <span>
-                Ngựa của tôi
+                Hàng đợi khám
               </span>
             </NavLink>
           )}
 
-          {role === 'vet' && <>
-            <NavLink to="/vet/overview"><NavIcon kind="vet" /><span>Tổng quan thú y</span></NavLink>
-            <NavLink to="/vet/horses-needing-exam"><NavIcon kind="vet" /><span>Hàng chờ khám đầu vào</span></NavLink>
-            <NavLink to="/vet/herd"><NavIcon kind="manager" /><span>Sức khỏe toàn đàn</span></NavLink>
-            <NavLink to="/vet/stalls"><NavIcon kind="manager" /><span>Sơ đồ chuồng</span></NavLink>
-            <NavLink to="/vet/reports"><NavIcon kind="vet" /><span>Báo cáo sức khỏe</span></NavLink>
-            <NavLink to="/vet/calendar"><NavIcon kind="manager" /><span>Lịch y tế</span></NavLink>
-          </>}
+          {role === 'headTrainer' && (
+            <>
+              <NavLink
+                end
+                to="/training/dashboard"
+              >
+                <NavIcon kind="manager" />
+
+                <span>
+                  Tổng quan huấn luyện
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/approvals">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Duyệt giáo án
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/schedule">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Lịch tập
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/adjustments">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Điều chỉnh giáo án
+                </span>
+              </NavLink>
+            </>
+          )}
+
+          {role === 'trainer' && (
+            <>
+              <NavLink
+                end
+                to="/training/my-plans"
+              >
+                <NavIcon kind="manager" />
+
+                <span>
+                  Ngựa & giáo án
+                </span>
+              </NavLink>
+
+              <NavLink to="/training/schedule">
+  <NavIcon kind="manager" />
+
+  <span>
+    Lịch tập
+  </span>
+</NavLink>
+
+              <NavLink to="/training/trainer-sessions">
+                <NavIcon kind="manager" />
+
+                <span>
+                  Buổi tập giám sát
+                </span>
+              </NavLink>
+              <NavLink to="/training/reviews">
+  <NavIcon kind="manager" />
+
+  <span>
+    Đánh giá buổi tập
+  </span>
+</NavLink>
+            </>
+          )}
+
+          {role === 'workRider' && (
+            <NavLink
+              end
+              to="/training/work-rider-sessions"
+            >
+              <NavIcon kind="manager" />
+
+              <span>
+                Buổi tập của tôi
+              </span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-support">
@@ -2140,6 +2310,48 @@ function AppContent() {
                 : <Navigate to={home} replace />} />)}
 
             <Route
+  path="/owner/horses/:horseId/training/plans"
+  element={
+    role === 'owner' ? (
+      <OwnerTrainingPlansPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/owner/horses/:horseId/training/plans/:planId"
+  element={
+    role === 'owner' ? (
+      <OwnerTrainingPlanSummaryPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/owner/training/activity"
+  element={
+    role === 'owner' ? (
+      <OwnerTrainingActivityPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
               path="/vet/horses-needing-exam"
               element={
                 role ===
@@ -2243,6 +2455,36 @@ function AppContent() {
             />
 
             <Route
+  path="/owner/horses/:horseId/training"
+  element={
+    role ===
+    'owner' ? (
+      <OwnerTrainingSessionsPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/owner/horses/:horseId/training/sessions/:sessionId"
+  element={
+    role ===
+    'owner' ? (
+      <OwnerTrainingSessionDetailPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
               path="/owner/horses/:horseId/correction-request"
               element={
                 role ===
@@ -2262,6 +2504,34 @@ function AppContent() {
             />
 
             <Route
+  path="/owner/horses/:horseId/training/stages"
+  element={
+    role === 'owner' ? (
+      <OwnerTrainingStagesPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/owner/horses/:horseId/training/plans/:planId/stages/:stageId"
+  element={
+    role === 'owner' ? (
+      <OwnerTrainingStageSummaryPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
               path="/horses/:horseId"
               element={
                 <HorseProfileRoute
@@ -2278,6 +2548,252 @@ function AppContent() {
                 />
               }
             />
+
+            <Route
+              path="/training/dashboard"
+              element={
+                role === 'headTrainer' ? (
+                  <HeadTrainerTrainingDashboard />
+                ) : (
+                  <Navigate
+                    to={home}
+                    replace
+                  />
+                )
+              }
+            />
+
+            <Route
+              path="/training/horses/:horseId/assessment"
+              element={
+                role === 'headTrainer' ? (
+                  <HorseAssessmentAssignmentPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/horses/:horseId/assessment-history"
+  element={
+    role === 'headTrainer' ? (
+      <HorseAssessmentHistoryPage />
+    ) : (
+      <Navigate to={home} replace />
+    )
+  }
+/>
+
+            <Route
+              path="/training/trainers/:trainerId"
+              element={
+                role === 'headTrainer' ? (
+                  <TrainerProfilePage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+              path="/training/approvals"
+              element={
+                role === 'headTrainer' ? (
+                  <HeadTrainerPlanApprovalPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/approvals/:planId"
+  element={
+    role === 'headTrainer' ? (
+      <HeadTrainerPlanApprovalDetailPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
+              path="/training/my-plans"
+              element={
+                role === 'trainer' ? (
+                  <TrainerPlansPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/plans/new"
+  element={
+    role === 'trainer' ? (
+      <TrainingPlanCreatePage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/plans/:planId"
+  element={
+    role === 'trainer' ? (
+      <TrainingPlanDetailPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/plans/:planId/edit"
+  element={
+    role === 'trainer' ? (
+      <TrainingPlanEditPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
+              path="/training/trainer-sessions"
+              element={
+                role === 'trainer' ? (
+                  <TrainerSessionsPage
+                    currentUser={currentUser}
+                  />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/reviews"
+  element={
+    role === 'trainer' ? (
+      <TrainerReviewQueuePage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/sessions/:sessionId/review"
+  element={
+    role === 'trainer' ? (
+      <TrainingSessionReviewPage
+        currentUser={
+          currentUser
+        }
+      />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+            <Route
+              path="/training/work-rider-sessions"
+              element={
+                role === 'workRider' ? (
+                  <WorkRiderSessionsPage />
+                ) : (
+                  <Navigate to={home} replace />
+                )
+              }
+            />
+
+            <Route
+  path="/training/schedule"
+  element={
+    role === 'headTrainer' ||
+    role === 'trainer' ? (
+      <TrainingSchedulePage
+        role={role}
+      />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/sessions/new"
+  element={
+    role === 'headTrainer' ||
+    role === 'trainer' ? (
+      <TrainingSessionCreatePage
+        role={role}
+      />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/sessions/:sessionId/edit"
+  element={
+    role === 'headTrainer' ||
+    role === 'trainer' ? (
+      <TrainingSessionEditPage
+        role={role}
+      />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
+
+<Route
+  path="/training/adjustments"
+  element={
+    role === 'headTrainer' ? (
+      <HeadTrainerAdjustmentsPage />
+    ) : (
+      <Navigate
+        to={home}
+        replace
+      />
+    )
+  }
+/>
 
             <Route
               path="*"
