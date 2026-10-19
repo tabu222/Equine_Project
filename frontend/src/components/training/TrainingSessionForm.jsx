@@ -201,7 +201,7 @@ export function validateSessionForm(
     )
 
   if (!plan) {
-    return 'Vui lòng chọn Training Plan Active.'
+    return 'Vui lòng chọn giáo án đang áp dụng.'
   }
 
   const stage =
@@ -216,11 +216,11 @@ export function validateSessionForm(
     )
 
   if (!stage) {
-    return 'Vui lòng chọn Stage.'
+    return 'Vui lòng chọn giai đoạn.'
   }
 
   if (!form.WorkRiderID) {
-    return 'Vui lòng phân Work Rider.'
+    return 'Vui lòng chọn Work Rider.'
   }
 
   if (!form.SessionDate) {
@@ -287,7 +287,7 @@ export function validateSessionForm(
       ) <= 0
     )
   ) {
-    return 'Sequence No phải lớn hơn 0.'
+    return 'Thứ tự buổi tập phải lớn hơn 0.'
   }
 
   if (
@@ -322,7 +322,7 @@ export function validateSessionForm(
       ],
       [
         form.TrainingLoad,
-        'Training Load',
+        'Mức tải tập luyện',
       ],
     ]
   ) {
@@ -345,7 +345,7 @@ export function validateSessionForm(
 export function sessionToPayload(
   form,
 ) {
-  return {
+  const payload = {
     TrainingPlanStageID:
       Number(
         form.TrainingPlanStageID,
@@ -372,11 +372,6 @@ export function sessionToPayload(
     EndTime:
       form.EndTime ||
       null,
-
-    SequenceNo:
-      optionalNumber(
-        form.SequenceNo,
-      ),
 
     TrainingType:
       form.TrainingType
@@ -417,6 +412,22 @@ export function sessionToPayload(
         .trim() ||
       null,
   }
+
+  if (
+    form.SequenceNo !==
+      '' &&
+    form.SequenceNo !==
+      null &&
+    form.SequenceNo !==
+      undefined
+  ) {
+    payload.SequenceNo =
+      Number(
+        form.SequenceNo,
+      )
+  }
+
+  return payload
 }
 
 export default function TrainingSessionForm({
@@ -621,25 +632,16 @@ export default function TrainingSessionForm({
       <section className="training-session-form-section">
         <div className="training-session-form-section-head">
           <div>
-            <span className="training-session-kicker">
-              PLAN & STAGE
-            </span>
-
             <h2>
-              Ngữ cảnh buổi tập
+              Thông tin buổi tập
             </h2>
-
-            <p>
-              Chỉ Training Plan Active mới
-              được dùng để xếp buổi tập.
-            </p>
           </div>
         </div>
 
         <div className="training-session-form-grid">
           <label className="form-field">
             <span>
-              Training Plan *
+              Giáo án *
             </span>
 
             <select
@@ -690,7 +692,7 @@ export default function TrainingSessionForm({
 
           <label className="form-field">
             <span>
-              Stage *
+              Giai đoạn *
             </span>
 
             <select
@@ -709,7 +711,7 @@ export default function TrainingSessionForm({
               }
             >
               <option value="">
-                Chọn Stage
+                Chọn giai đoạn
               </option>
 
               {selectedPlan
@@ -723,7 +725,7 @@ export default function TrainingSessionForm({
                         stage.TrainingPlanStageID
                       }
                     >
-                      Stage{' '}
+                      Giai đoạn {' '}
                       {
                         stage.StageOrder
                       }
@@ -754,7 +756,7 @@ export default function TrainingSessionForm({
 
             <div>
               <span>
-                Trainer phụ trách
+                Huấn luyện viên phụ trách
               </span>
 
               <strong>
@@ -766,7 +768,7 @@ export default function TrainingSessionForm({
 
             <div>
               <span>
-                Plan
+                Giáo án
               </span>
 
               <strong>
@@ -774,13 +776,13 @@ export default function TrainingSessionForm({
                 {
                   selectedPlan.TrainingPlanID
                 }{' '}
-                · Active
+                · Đang áp dụng
               </strong>
             </div>
 
             <div>
               <span>
-                Stage
+                Giai đoạn
               </span>
 
               <strong>
@@ -796,21 +798,9 @@ export default function TrainingSessionForm({
       <section className="training-session-form-section">
         <div className="training-session-form-section-head">
           <div>
-            <span className="training-session-kicker">
-              PEOPLE
-            </span>
-
             <h2>
-              Phân công buổi tập
+              Phân công
             </h2>
-
-            <p>
-              Work Rider là người trực tiếp
-              thực hiện buổi tập.
-              Substitute Trainer chỉ dùng
-              khi Trainer phụ trách không
-              trực tiếp giám sát.
-            </p>
           </div>
         </div>
 
@@ -865,17 +855,11 @@ export default function TrainingSessionForm({
                 },
               )}
             </select>
-
-            <small>
-              Rider quen ngựa được đưa lên
-              đầu danh sách theo Work Rider
-              Preference.
-            </small>
           </label>
 
           <label className="form-field">
             <span>
-              Substitute Trainer
+              Người giám sát thay thế
             </span>
 
             <select
@@ -890,7 +874,7 @@ export default function TrainingSessionForm({
               }
             >
               <option value="">
-                Không dùng — Trainer phụ trách giám sát
+                Không chọn
               </option>
 
               {availableSupervisors.map(
@@ -909,19 +893,12 @@ export default function TrainingSessionForm({
                     {' · '}
                     {user.role ===
                     'HEAD_TRAINER'
-                      ? 'Head Trainer'
-                      : 'Trainer'}
+                      ? 'Huấn luyện viên trưởng'
+                      : 'Huấn luyện viên'}
                   </option>
                 ),
               )}
             </select>
-
-            <small>
-              Trainer phụ trách không xuất
-              hiện trong danh sách
-              Substitute vì để trống đã có
-              cùng ý nghĩa.
-            </small>
           </label>
         </div>
       </section>
@@ -929,12 +906,8 @@ export default function TrainingSessionForm({
       <section className="training-session-form-section">
         <div className="training-session-form-section-head">
           <div>
-            <span className="training-session-kicker">
-              SCHEDULE
-            </span>
-
             <h2>
-              Thời gian buổi tập
+              Thời gian
             </h2>
           </div>
         </div>
@@ -961,7 +934,6 @@ export default function TrainingSessionForm({
 
             {selectedStage && (
               <small>
-                Stage:{' '}
                 {
                   selectedStage.StartDate
                 }{' '}
@@ -1014,7 +986,7 @@ export default function TrainingSessionForm({
 
           <label className="form-field">
             <span>
-              Sequence No
+              Thứ tự buổi tập
             </span>
 
             <input
@@ -1024,7 +996,7 @@ export default function TrainingSessionForm({
               value={
                 form.SequenceNo
               }
-              placeholder="Để trống = Backend tự xếp"
+              placeholder="Tự động"
               onChange={(event) =>
                 change(
                   'SequenceNo',
@@ -1032,12 +1004,6 @@ export default function TrainingSessionForm({
                 )
               }
             />
-
-            <small>
-              Khuyên để trống. Backend tự
-              lấy slot tiếp theo trong ngày
-              của Work Rider.
-            </small>
           </label>
         </div>
       </section>
@@ -1045,10 +1011,6 @@ export default function TrainingSessionForm({
       <section className="training-session-form-section">
         <div className="training-session-form-section-head">
           <div>
-            <span className="training-session-kicker">
-              TRAINING CONTENT
-            </span>
-
             <h2>
               Nội dung tập luyện
             </h2>
@@ -1067,7 +1029,7 @@ export default function TrainingSessionForm({
               value={
                 form.TrainingType
               }
-              placeholder="Ví dụ: Canter, Gallop, Endurance..."
+              placeholder="Ví dụ: Canter"
               onChange={(event) =>
                 change(
                   'TrainingType',
@@ -1145,7 +1107,7 @@ export default function TrainingSessionForm({
 
           <label className="form-field">
             <span>
-              Training Load
+              Mức tải tập luyện
             </span>
 
             <input
@@ -1195,7 +1157,7 @@ export default function TrainingSessionForm({
               value={
                 form.Location
               }
-              placeholder="Ví dụ: Track no. 2"
+              placeholder="Ví dụ: Track số 2"
               onChange={(event) =>
                 change(
                   'Location',
@@ -1207,7 +1169,7 @@ export default function TrainingSessionForm({
 
           <label className="form-field training-session-form-full">
             <span>
-              Hướng dẫn cho Work Rider
+              Hướng dẫn
             </span>
 
             <textarea
@@ -1216,7 +1178,7 @@ export default function TrainingSessionForm({
               value={
                 form.Instructions
               }
-              placeholder="Ví dụ: Warm up 10 phút, theo dõi nhịp thở..."
+              placeholder="Nhập hướng dẫn cho buổi tập"
               onChange={(event) =>
                 change(
                   'Instructions',

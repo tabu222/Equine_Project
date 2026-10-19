@@ -262,7 +262,7 @@ export default function TrainingSessionCreatePage({
               !initialPlan
             ) {
               setError(
-                'Training Plan không Active hoặc không thuộc phạm vi được phép xếp lịch.',
+                'Giáo án không ở trạng thái đang áp dụng hoặc không thuộc phạm vi được phép xếp lịch.',
               )
             }
           } else {
@@ -603,12 +603,11 @@ export default function TrainingSessionCreatePage({
 
           <div>
             <strong>
-              Đang chuẩn bị buổi tập
+              Đang tải dữ liệu buổi tập
             </strong>
 
             <span>
-              Đang tải Active Plan, Work
-              Rider và Trainer giám sát.
+              Đang tải giáo án, Work Rider và người giám sát.
             </span>
           </div>
         </section>
@@ -637,17 +636,16 @@ export default function TrainingSessionCreatePage({
           <p className="eyebrow">
             {role ===
             'headTrainer'
-              ? 'HEAD TRAINER'
-              : 'TRAINER'}
+              ? 'HUẤN LUYỆN VIÊN TRƯỞNG'
+              : 'HUẤN LUYỆN VIÊN'}
           </p>
 
           <h1>
-            Tạo Training Session
+            Tạo buổi tập
           </h1>
 
           <p>
-            Chọn Stage, phân Work Rider và
-            thiết lập nội dung buổi tập.
+            Chọn giáo án, người thực hiện và thời gian buổi tập.
           </p>
         </div>
 
@@ -673,13 +671,11 @@ export default function TrainingSessionCreatePage({
         <section className="panel">
           <div className="empty-state">
             <h3>
-              Không có Active Training Plan
+              Không có giáo án đang áp dụng
             </h3>
 
             <p>
-              Training Plan phải được Head
-              Trainer duyệt thành Active
-              trước khi có thể xếp buổi tập.
+              Cần có giáo án đang áp dụng trước khi xếp buổi tập.
             </p>
 
             <Link

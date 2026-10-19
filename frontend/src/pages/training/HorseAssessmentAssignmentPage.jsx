@@ -319,7 +319,7 @@ async function fetchPageData(
   }
 }
 
-export default function HorseAssessmentAssignmentPage() {
+export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
   const {
     horseId,
   } = useParams()
@@ -631,7 +631,7 @@ export default function HorseAssessmentAssignmentPage() {
       setMessage(
         form.DecisionStatus ===
           'Recommended'
-          ? 'Đã lưu đánh giá. Danh sách Trainer bên dưới đã được Backend gợi ý lại theo đánh giá mới.'
+          ? 'Đã lưu đánh giá. Có thể chuyển sang bước phân công huấn luyện viên.'
           : 'Đã lưu kết quả đánh giá không đề xuất.',
       )
     } catch (saveError) {
@@ -653,7 +653,7 @@ export default function HorseAssessmentAssignmentPage() {
       activeAssignment
     ) {
       setError(
-        'Ngựa đang có Trainer phụ trách. Hãy kết thúc phân công hiện tại trước khi chọn Trainer mới.',
+        'Ngựa đã có huấn luyện viên phụ trách. Hãy kết thúc phân công hiện tại trước khi chọn người khác.',
       )
 
       return
@@ -665,7 +665,7 @@ export default function HorseAssessmentAssignmentPage() {
       false
     ) {
       setError(
-        'Trainer này không có chuyên môn khớp với đánh giá hiện tại.',
+        'Huấn luyện viên này không có chuyên môn phù hợp với đánh giá hiện tại.',
       )
 
       return
@@ -688,7 +688,7 @@ export default function HorseAssessmentAssignmentPage() {
       !selectedTrainer
     ) {
       setError(
-        'Chưa đủ dữ liệu để phân Trainer.',
+        'Chưa đủ dữ liệu để phân công huấn luyện viên.',
       )
 
       return
@@ -698,7 +698,7 @@ export default function HorseAssessmentAssignmentPage() {
       activeAssignment
     ) {
       setError(
-        'Ngựa đã có Trainer đang phụ trách. Backend yêu cầu kết thúc phân công hiện tại trước.',
+        'Ngựa đã có huấn luyện viên phụ trách. Cần kết thúc phân công hiện tại trước.',
       )
 
       return
@@ -710,7 +710,7 @@ export default function HorseAssessmentAssignmentPage() {
       false
     ) {
       setError(
-        'Trainer được chọn không đúng chuyên môn.',
+        'Huấn luyện viên được chọn không đúng chuyên môn.',
       )
 
       return
@@ -757,14 +757,14 @@ export default function HorseAssessmentAssignmentPage() {
 
       setMessage(
         saved.LevelWarning
-          ? `Đã phân Trainer thành công. Cảnh báo từ Backend: ${saved.LevelWarning}`
-          : 'Đã phân Trainer thành công.',
+          ? `Đã phân công huấn luyện viên. Lưu ý: ${saved.LevelWarning}`
+          : 'Đã phân công huấn luyện viên thành công.',
       )
     } catch (assignError) {
       setError(
         getErrorMessage(
           assignError,
-          'Không thể phân Trainer.',
+          'Không thể phân công huấn luyện viên.',
         ),
       )
     } finally {
@@ -808,13 +808,13 @@ export default function HorseAssessmentAssignmentPage() {
       )
 
       setMessage(
-        'Đã kết thúc phân công Trainer hiện tại. Bây giờ có thể chọn Trainer mới.',
+        'Đã kết thúc phân công hiện tại. Có thể chọn huấn luyện viên mới.',
       )
     } catch (endError) {
       setError(
         getErrorMessage(
           endError,
-          'Không thể kết thúc phân công Trainer.',
+          'Không thể kết thúc phân công huấn luyện viên.',
         ),
       )
     } finally {
@@ -834,9 +834,7 @@ export default function HorseAssessmentAssignmentPage() {
           </strong>
 
           <span>
-            Hệ thống đang lấy Assessment,
-            Trainer suggestion và phân công
-            hiện tại.
+            Đang tải đánh giá và thông tin phân công hiện tại.
           </span>
         </section>
       </main>
@@ -862,25 +860,25 @@ export default function HorseAssessmentAssignmentPage() {
       <div className="page-heading assessment-page-heading">
         <div>
           <p className="eyebrow">
-            HEAD TRAINER
+            HUẤN LUYỆN VIÊN TRƯỞNG
           </p>
 
           <h1>
-            Đánh giá và phân Trainer
+            {mode === 'assignment' ? 'Phân công huấn luyện viên' : 'Đánh giá ngựa'}
           </h1>
 
           <p>
-            Đánh giá khả năng huấn luyện,
-            chọn chuyên môn và phân Trainer
-            phù hợp theo gợi ý từ Backend.
+            {mode === 'assignment'
+              ? 'Chọn huấn luyện viên phù hợp theo kết quả đánh giá đã lưu.'
+              : 'Ghi nhận thể trạng, chuyên môn và kết luận đánh giá trước khi phân công.'}
           </p>
         </div>
 
         <Link
           className="button button-secondary"
-          to="/training/dashboard"
+          to={mode === 'assignment' ? `/training/horses/${horseId}/assessment` : '/training/dashboard'}
         >
-          Quay lại tổng quan
+          {mode === 'assignment' ? 'Quay lại đánh giá' : 'Quay lại tổng quan'}
         </Link>
       </div>
 
@@ -1099,11 +1097,12 @@ export default function HorseAssessmentAssignmentPage() {
         </section>
       )}
 
+      {mode === 'assessment' && (
       <section className="panel assessment-form-panel">
         <div className="assessment-section-heading">
           <div>
             <span className="assessment-section-kicker">
-              ASSESSMENT MỚI
+              ĐÁNH GIÁ MỚI
             </span>
 
             <h2>
@@ -1164,7 +1163,7 @@ export default function HorseAssessmentAssignmentPage() {
             </select>
 
             <small>
-              Trainer được phân phải có
+              Huấn luyện viên được phân công phải có
               chuyên môn này.
             </small>
           </label>
@@ -1192,8 +1191,8 @@ export default function HorseAssessmentAssignmentPage() {
             />
 
             <small>
-              Backend dùng điểm này để xác
-              định cấp độ Trainer nên có.
+              Điểm này được dùng để xác định
+              cấp độ huấn luyện viên phù hợp.
             </small>
           </label>
 
@@ -1298,18 +1297,27 @@ export default function HorseAssessmentAssignmentPage() {
           </div>
         </form>
       </section>
+      )}
 
+      {mode === 'assessment' && (
+        <div className="assessment-form-actions">
+          <Link className="button button-secondary" to={`/training/horses/${horseId}/assignment`}>
+            Tiếp tục đến phân công huấn luyện viên
+          </Link>
+        </div>
+      )}
+
+      {mode === 'assignment' && (
+      <>
       {!latestRecommended ? (
         <section className="panel assessment-no-suggestion">
           <h2>
-            Chưa có Trainer suggestion
+            Chưa có gợi ý huấn luyện viên
           </h2>
 
           <p>
-            Cần có ít nhất một Assessment
-            ở trạng thái Recommended trước
-            khi Backend có thể gợi ý Trainer
-            cho ngựa này.
+            Cần lưu một đánh giá có kết luận đề xuất
+            huấn luyện trước khi chọn người phụ trách.
           </p>
         </section>
       ) : (
@@ -1317,11 +1325,11 @@ export default function HorseAssessmentAssignmentPage() {
           <div className="assessment-section-heading assessment-suggestion-heading">
             <div>
               <span className="assessment-section-kicker">
-                TRAINER SUGGESTION
+                GỢI Ý HUẤN LUYỆN VIÊN
               </span>
 
               <h2>
-                Trainer phù hợp
+                Huấn luyện viên phù hợp
               </h2>
 
               <p>
@@ -1367,11 +1375,11 @@ export default function HorseAssessmentAssignmentPage() {
           {trainers.length === 0 ? (
             <div className="empty-state">
               <h3>
-                Chưa có Trainer
+                Chưa có huấn luyện viên
               </h3>
 
               <p>
-                Chưa có Trainer trong CLB
+                Chưa có huấn luyện viên trong CLB
                 phù hợp để hiển thị.
               </p>
             </div>
@@ -1429,7 +1437,7 @@ export default function HorseAssessmentAssignmentPage() {
 
                             {trainer.IsSuggested && (
                               <span className="status-badge assessment-status-good">
-                                Backend đề xuất
+                                Được đề xuất
                               </span>
                             )}
 
@@ -1486,7 +1494,7 @@ export default function HorseAssessmentAssignmentPage() {
                           >
                             {selected
                               ? 'Đã chọn'
-                              : 'Chọn Trainer'}
+                              : 'Chọn huấn luyện viên'}
                           </button>
                         </div>
                       </div>
@@ -1647,11 +1655,11 @@ export default function HorseAssessmentAssignmentPage() {
           <div className="assessment-section-heading">
             <div>
               <span className="assessment-section-kicker">
-                ACTIVE ASSIGNMENT
+                PHÂN CÔNG HIỆN TẠI
               </span>
 
               <h2>
-                Trainer đang phụ trách
+                Huấn luyện viên đang phụ trách
               </h2>
             </div>
 
@@ -1679,7 +1687,7 @@ export default function HorseAssessmentAssignmentPage() {
               <Link
                 to={`/training/trainers/${activeAssignment.TrainerID}`}
               >
-                Xem hồ sơ Trainer
+                Xem hồ sơ huấn luyện viên
               </Link>
             </div>
 
@@ -1742,7 +1750,7 @@ export default function HorseAssessmentAssignmentPage() {
           )}
 
           <div className="current-trainer-warning">
-            Khi kết thúc phân công, Backend
+            Khi kết thúc phân công, hệ thống
             sẽ hủy các giáo án chưa hoàn tất
             và các session còn ở trạng thái
             Assigned của phân công này.
@@ -1773,7 +1781,7 @@ export default function HorseAssessmentAssignmentPage() {
               </span>
 
               <h2>
-                Phân Trainer cho ngựa
+                Phân công huấn luyện viên cho ngựa
               </h2>
             </div>
 
@@ -1872,7 +1880,7 @@ export default function HorseAssessmentAssignmentPage() {
                 Backend hiện không chặn phân
                 công vì thiếu cấp độ; Backend
                 sẽ trả LevelWarning sau khi
-                phân Trainer.
+                phân công huấn luyện viên.
               </small>
             </div>
           )}
@@ -1907,12 +1915,16 @@ export default function HorseAssessmentAssignmentPage() {
             >
               {busy
                 ? 'Đang phân công...'
-                : 'Xác nhận phân Trainer'}
+                : 'Xác nhận phân công huấn luyện viên'}
             </button>
           </div>
         </section>
       )}
 
+      </>
+      )}
+
+      {mode === 'assessment' && (
       <section className="panel assessment-history-shortcut">
         <div>
           <h2>
@@ -1920,9 +1932,7 @@ export default function HorseAssessmentAssignmentPage() {
           </h2>
 
           <p>
-            Toàn bộ Assessment cũ được giữ
-            ở trang riêng, không nhồi lịch
-            sử dài vào trang đánh giá.
+            Xem các lần đánh giá trước đây của ngựa.
           </p>
         </div>
 
@@ -1933,8 +1943,9 @@ export default function HorseAssessmentAssignmentPage() {
           Xem lịch sử đánh giá
         </Link>
       </section>
+      )}
 
-      {endModalOpen &&
+      {mode === 'assignment' && endModalOpen &&
         activeAssignment && (
         <div
           className="assessment-modal-backdrop"
@@ -1963,7 +1974,7 @@ export default function HorseAssessmentAssignmentPage() {
                 </span>
 
                 <h2 id="end-assignment-title">
-                  Kết thúc phân công Trainer?
+                  Kết thúc phân công huấn luyện viên?
                 </h2>
               </div>
 
@@ -1995,7 +2006,7 @@ export default function HorseAssessmentAssignmentPage() {
             </p>
 
             <div className="assessment-modal-warning">
-              Backend sẽ hủy các giáo án
+              Hệ thống sẽ hủy các giáo án
               chưa hoàn tất và session còn
               Assigned thuộc phân công hiện
               tại.
@@ -2011,7 +2022,7 @@ export default function HorseAssessmentAssignmentPage() {
                 value={
                   endReason
                 }
-                placeholder="Có thể để trống vì Backend không bắt buộc Reason..."
+                placeholder="Có thể để trống nếu không có ghi chú..."
                 onChange={(event) =>
                   setEndReason(
                     event.target.value,

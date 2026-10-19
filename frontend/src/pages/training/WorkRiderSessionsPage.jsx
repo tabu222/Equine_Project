@@ -301,7 +301,7 @@ function validateResult(
       ) > 100
     )
   ) {
-    return 'Performance Score phải nằm trong khoảng 0–100.'
+    return 'Điểm đánh giá phải từ 0 đến 100.'
   }
 
   return ''
@@ -716,7 +716,7 @@ export default function WorkRiderSessionsPage() {
       )
 
       setMessage(
-        `Đã ghi kết quả buổi tập của ${horseName}. Session đã hoàn thành.`,
+        `Đã lưu kết quả buổi tập của ${horseName}.`,
       )
     } catch (
       actionError
@@ -751,8 +751,7 @@ export default function WorkRiderSessionsPage() {
             </strong>
 
             <span>
-              Đang lấy các Training Session
-              được phân cho Work Rider.
+              Đang tải danh sách buổi tập.
             </span>
           </div>
         </section>
@@ -779,7 +778,7 @@ export default function WorkRiderSessionsPage() {
       <div className="page-heading work-rider-page-heading">
         <div>
           <p className="eyebrow">
-            WORK RIDER
+            NHÂN VIÊN CƯỠI NGỰA
           </p>
 
           <h1>
@@ -924,19 +923,10 @@ export default function WorkRiderSessionsPage() {
       <section className="panel work-rider-session-list-panel">
         <div className="work-rider-section-head">
           <div>
-            <span className="work-rider-kicker">
-              MY TRAINING SESSIONS
-            </span>
-
             <h2>
               Lịch buổi tập
             </h2>
 
-            <p>
-              Chỉ hiển thị Training Session
-              được phân cho Work Rider đang
-              đăng nhập.
-            </p>
           </div>
         </div>
 
@@ -948,8 +938,7 @@ export default function WorkRiderSessionsPage() {
             </h3>
 
             <p>
-              Không có Session phù hợp với
-              trạng thái đang chọn.
+              Không có buổi tập phù hợp.
             </p>
           </div>
         ) : (
@@ -982,7 +971,7 @@ export default function WorkRiderSessionsPage() {
                     <div className="work-rider-session-head">
                       <div>
                         <span className="work-rider-session-code">
-                          SESSION #
+                          BUỔI TẬP #
                           {
                             session.TrainingSessionID
                           }
@@ -1010,7 +999,7 @@ export default function WorkRiderSessionsPage() {
                             : ''}
 
                           {' · '}
-                          Slot{' '}
+                          Lượt{' '}
                           {
                             session.SequenceNo
                           }
@@ -1032,7 +1021,7 @@ export default function WorkRiderSessionsPage() {
                     <div className="work-rider-session-grid">
                       <div>
                         <span>
-                          Training Plan
+                          Giáo án
                         </span>
 
                         <strong>
@@ -1045,7 +1034,7 @@ export default function WorkRiderSessionsPage() {
 
                       <div>
                         <span>
-                          Stage
+                          Giai đoạn
                         </span>
 
                         <strong>
@@ -1057,7 +1046,7 @@ export default function WorkRiderSessionsPage() {
 
                       <div>
                         <span>
-                          Trainer phụ trách
+                          Huấn luyện viên phụ trách
                         </span>
 
                         <strong>
@@ -1080,7 +1069,7 @@ export default function WorkRiderSessionsPage() {
 
                         {session.IsSubstitute && (
                           <small>
-                            Substitute Trainer
+                            Giám sát thay thế
                           </small>
                         )}
                       </div>
@@ -1144,7 +1133,7 @@ export default function WorkRiderSessionsPage() {
 
                       <div>
                         <span>
-                          Training Load
+                          Mức tải tập luyện
                         </span>
 
                         <strong>
@@ -1182,7 +1171,7 @@ export default function WorkRiderSessionsPage() {
                     {session.Instructions && (
                       <div className="work-rider-instructions">
                         <span>
-                          Hướng dẫn từ Trainer
+                          Hướng dẫn buổi tập
                         </span>
 
                         <p>
@@ -1217,7 +1206,7 @@ export default function WorkRiderSessionsPage() {
                           </span>
 
                           <span>
-                            Avg speed:{' '}
+                            Tốc độ trung bình:{' '}
                             {show(
                               session.Result
                                 .AvgSpeedKmh,
@@ -1225,7 +1214,7 @@ export default function WorkRiderSessionsPage() {
                           </span>
 
                           <span>
-                            Score:{' '}
+                            Điểm đánh giá:{' '}
                             {show(
                               session.Result
                                 .PerformanceScore,
@@ -1282,9 +1271,7 @@ export default function WorkRiderSessionsPage() {
                       {session.Status ===
                         'Completed' && (
                         <div className="work-rider-completed-note">
-                          Buổi tập đã hoàn thành.
-                          Trainer sẽ review kết
-                          quả ở Phase 11.
+                          Đã hoàn thành.
                         </div>
                       )}
 
@@ -1298,8 +1285,7 @@ export default function WorkRiderSessionsPage() {
                       {session.Status ===
                         'Missed' && (
                         <div className="work-rider-disabled-reason">
-                          Buổi tập đã được đánh
-                          dấu Missed.
+                          Đã ghi nhận vắng mặt.
                         </div>
                       )}
                     </div>
@@ -1334,7 +1320,7 @@ export default function WorkRiderSessionsPage() {
             aria-labelledby="work-rider-result-title"
           >
             <span className="work-rider-kicker">
-              TRAINING RESULT
+              KẾT QUẢ BUỔI TẬP
             </span>
 
             <h2 id="work-rider-result-title">
@@ -1512,7 +1498,7 @@ export default function WorkRiderSessionsPage() {
 
                 <label className="form-field">
                   <span>
-                    Performance Score
+                    Điểm đánh giá
                   </span>
 
                   <input
@@ -1535,7 +1521,7 @@ export default function WorkRiderSessionsPage() {
 
                 <label className="form-field work-rider-result-form-full">
                   <span>
-                    Nhận xét của Work Rider
+                    Nhận xét buổi tập
                   </span>
 
                   <textarea
@@ -1574,14 +1560,6 @@ export default function WorkRiderSessionsPage() {
                     }
                   />
                 </label>
-              </div>
-
-              <div className="work-rider-modal-warning">
-                Sau khi lưu kết quả,
-                Backend sẽ chuyển Session
-                sang trạng thái Completed.
-                Work Rider không tự đổi
-                Status.
               </div>
 
               <div className="work-rider-modal-actions">
