@@ -508,7 +508,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
       {plan.ReviewNote && (
         <section className="plan-approval-previous-note">
           <span>
-            PHẢN HỒI ĐANG LƯU TRÊN PLAN
+            PHẢN HỒI TRƯỚC ĐÓ
           </span>
 
           <p>
@@ -523,7 +523,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
         <div className="plan-approval-section-head">
           <div>
             <span className="plan-approval-kicker">
-              PLAN OVERVIEW
+              THÔNG TIN GIÁO ÁN
             </span>
 
             <h2>

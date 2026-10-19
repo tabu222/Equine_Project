@@ -498,7 +498,7 @@ export default function TrainingPlanDetailPage() {
       await reloadPlan()
 
       setMessage(
-        'Đã chốt giai đoạn và tạo Stage Summary cho Owner.',
+        'Đã chốt giai đoạn. Chủ ngựa có thể xem tổng kết.',
       )
     } catch (actionError) {
       setError(
