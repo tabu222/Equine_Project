@@ -373,6 +373,8 @@ def ensure_pending(plan):
 def approve_plan(plan, user, note=None):
     """Head Trainer duyệt -> Active. Giáo án Active cũ của cùng phân công (bản trước khi điều chỉnh) -> Completed."""
     ensure_pending(plan)
+    if plan.assignment.trainer_id == user.pk:  # tách quyền: người soạn không tự duyệt
+        raise BusinessRuleError("Không tự duyệt giáo án do chính mình soạn.", "SELF_APPROVAL")
     check_plan_lock(plan)
     now = timezone.now()
     replaced = []

@@ -112,3 +112,81 @@ class GoogleSignupSerializer(OwnerRegisterSerializer):
 
     Password = None
     FullName = serializers.CharField(max_length=150)
+
+
+# ---------------------------------------------------------------------------
+# Tài khoản cá nhân, quản trị (Manager), CLB
+# ---------------------------------------------------------------------------
+def clean_phone(value):
+    phone = value.replace(" ", "").replace(".", "")
+    if not PHONE_RE.match(phone):
+        raise serializers.ValidationError(
+            "Số điện thoại không hợp lệ: 10 số bắt đầu bằng 0 (vd 0901234567) hoặc dạng +84 (vd +84901234567).")
+    return phone
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    """PATCH /api/auth/me và PATCH /api/users/<id>: họ tên, số điện thoại, địa chỉ (email không đổi)."""
+
+    FullName = serializers.CharField(max_length=150, required=False)
+    Phone = serializers.CharField(max_length=20, required=False)
+    Address = serializers.CharField(max_length=255, required=False)
+
+    FIELD_MAP = {"FullName": "full_name", "Phone": "phone", "Address": "address"}
+
+    def validate_Phone(self, value):
+        return clean_phone(value)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Cần gửi ít nhất một trường: FullName, Phone, Address.")
+        return attrs
+
+    def model_values(self):
+        return {self.FIELD_MAP[k]: v for k, v in self.validated_data.items()}
+
+
+PASSWORD_ERRORS = {"min_length": "Mật khẩu phải có ít nhất 6 ký tự.", "required": "Cần nhập mật khẩu mới.",
+                   "blank": "Cần nhập mật khẩu mới."}
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    CurrentPassword = serializers.CharField(trim_whitespace=False, required=False, allow_blank=True)
+    NewPassword = serializers.CharField(min_length=6, trim_whitespace=False, error_messages=PASSWORD_ERRORS)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    Email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    Uid = serializers.CharField()
+    Token = serializers.CharField()
+    NewPassword = serializers.CharField(min_length=6, trim_whitespace=False, error_messages=PASSWORD_ERRORS)
+
+
+class RoleCodesSerializer(serializers.Serializer):
+    RoleCodes = serializers.ListField(child=serializers.CharField(max_length=40), allow_empty=True)
+
+
+class PermissionCodesSerializer(serializers.Serializer):
+    PermissionCodes = serializers.ListField(child=serializers.CharField(max_length=60), allow_empty=True)
+
+
+class ReasonSerializer(serializers.Serializer):
+    Reason = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
+
+
+class ClubSerializer(DBColumnModelSerializer):
+    class Meta:
+        model = Club
+        fields = ["id", "club_name", "address", "phone", "email", "status", "created_at"]
+        read_only_fields = ["id", "status", "created_at"]
+
+    def validate_club_name(self, value):
+        if Club.objects.filter(club_name__iexact=value).exclude(pk=getattr(self.instance, "pk", None)).exists():
+            raise serializers.ValidationError("Tên CLB đã được dùng.")
+        return value
+
+    def validate_phone(self, value):
+        return clean_phone(value) if value else value

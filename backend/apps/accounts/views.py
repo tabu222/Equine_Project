@@ -1,10 +1,16 @@
 import secrets
 
+from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed, NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -13,13 +19,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.core import emails
 from apps.core.audit import log_action
+from apps.core.params import date_param, int_param
 from apps.core.permissions import HasAnyPermission, user_has_any
 
-from .models import Role, User, UserRole
+from . import user_admin
+from .models import Club, Role, User, UserRole
 from .google_auth import verify_google_credential
 from .serializers import (
-    CurrentUserSerializer, GoogleLoginSerializer, GoogleSignupSerializer, LoginSerializer, OwnerRegisterSerializer,
-    UserCreateSerializer, UserSerializer,
+    ChangePasswordSerializer, ClubSerializer, CurrentUserSerializer, GoogleLoginSerializer, GoogleSignupSerializer,
+    LoginSerializer, OwnerRegisterSerializer, PasswordResetConfirmSerializer, PasswordResetRequestSerializer,
+    PermissionCodesSerializer, ProfileUpdateSerializer, ReasonSerializer, RoleCodesSerializer, UserCreateSerializer,
+    UserSerializer,
 )
 
 
@@ -160,6 +170,13 @@ class MeView(APIView):
     def get(self, request):
         return Response(CurrentUserSerializer(request.user).data)
 
+    @extend_schema(request=ProfileUpdateSerializer, summary="Tự sửa hồ sơ (họ tên, số điện thoại, địa chỉ)")
+    def patch(self, request):
+        data = ProfileUpdateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        user_admin.update_profile(request.user, request.user, data.model_values())
+        return Response(CurrentUserSerializer(request.user).data)
+
 
 class UserListCreateView(APIView):
     """
@@ -178,6 +195,12 @@ class UserListCreateView(APIView):
 
     def get(self, request):
         users = User.objects.filter(club_id=request.user.club_id).prefetch_related("roles")
+        p = request.query_params
+        if p.get("Status"):
+            users = users.filter(status=p["Status"])
+        if p.get("Search"):
+            users = users.filter(Q(full_name__icontains=p["Search"]) | Q(email__icontains=p["Search"])
+                                 | Q(phone__icontains=p["Search"]))
         role_code = request.query_params.get("RoleCode")
         if not user_has_any(request.user, "RBAC_MANAGE", "HORSE_REGISTER_REVIEW", "TRAINER_ASSIGN"):
             if role_code and role_code not in self.SESSION_ROLES:
@@ -224,3 +247,245 @@ class UserDetailView(APIView):
         if not (is_self or same_club_manager):
             raise PermissionDenied("Bạn không có quyền xem người dùng này.")
         return Response(UserSerializer(user).data)
+
+    @extend_schema(request=ProfileUpdateSerializer, summary="Manager sửa thông tin người dùng trong CLB")
+    def patch(self, request, user_id):
+        if not request.user.has_perm("RBAC_MANAGE"):
+            raise PermissionDenied("Chỉ Manager mới sửa thông tin người dùng.")
+        user = user_admin.club_member(request.user, user_id)
+        data = ProfileUpdateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        user_admin.update_profile(user, request.user, data.model_values())
+        return Response(UserSerializer(user).data)
+
+
+# ---------------------------------------------------------------------------
+# Tài khoản cá nhân: đổi mật khẩu, quên mật khẩu
+# ---------------------------------------------------------------------------
+class ChangePasswordView(APIView):
+    """POST /api/auth/change-password {"CurrentPassword", "NewPassword"} -> token mới (token cũ hết hiệu lực)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=ChangePasswordSerializer, summary="Đổi mật khẩu")
+    def post(self, request):
+        data = ChangePasswordSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        v, user = data.validated_data, request.user
+        # Tài khoản tạo bằng Google chưa có mật khẩu thì được đặt mật khẩu lần đầu không cần mật khẩu cũ
+        if user.has_usable_password() and not user.check_password(v.get("CurrentPassword") or ""):
+            raise ValidationError({"CurrentPassword": ["Mật khẩu hiện tại không đúng."]})
+        if user.check_password(v["NewPassword"]):
+            raise ValidationError({"NewPassword": ["Mật khẩu mới phải khác mật khẩu hiện tại."]})
+        user.set_password(v["NewPassword"])
+        user.save(update_fields=["password"])
+        log_action(user, "CHANGE_PASSWORD", user)
+        return _token_response(user)
+
+
+class PasswordResetThrottle(AnonRateThrottle):
+    rate = "10/hour"
+
+
+class PasswordResetRequestView(APIView):
+    """
+    POST /api/auth/password-reset {"Email"} -> gửi email có link đặt lại mật khẩu (hiệu lực 1 giờ).
+    Luôn trả 200 dù email có tồn tại hay không (không lộ danh sách tài khoản).
+    Link: <FRONTEND_URL>/reset-password?uid=<Uid>&token=<Token>
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetThrottle]
+
+    @extend_schema(request=PasswordResetRequestSerializer, auth=[], summary="Quên mật khẩu: gửi link đặt lại")
+    def post(self, request):
+        data = PasswordResetRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        user = User.objects.filter(email__iexact=data.validated_data["Email"], status=User.Status.ACTIVE).first()
+        if user is not None:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            emails.password_reset_link(user, f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?uid={uid}&token={token}")
+            log_action(user, "REQUEST_PASSWORD_RESET", user)
+        return Response({"detail": "Nếu email có tài khoản, link đặt lại mật khẩu đã được gửi tới email đó."})
+
+
+class PasswordResetConfirmView(APIView):
+    """POST /api/auth/password-reset/confirm {"Uid", "Token", "NewPassword"}"""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetThrottle]
+
+    @extend_schema(request=PasswordResetConfirmSerializer, auth=[], summary="Đặt mật khẩu mới từ link trong email")
+    def post(self, request):
+        data = PasswordResetConfirmSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        v = data.validated_data
+        try:
+            user = User.objects.get(pk=int(force_str(urlsafe_base64_decode(v["Uid"]))), status=User.Status.ACTIVE)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        if user is None or not default_token_generator.check_token(user, v["Token"]):
+            raise ValidationError({"Token": ["Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."]})
+        user.set_password(v["NewPassword"])
+        user.save(update_fields=["password"])
+        log_action(user, "RESET_PASSWORD", user)
+        return Response({"detail": "Đã đặt mật khẩu mới. Hãy đăng nhập lại."})
+
+
+# ---------------------------------------------------------------------------
+# Quản trị tài khoản (Manager, quyền RBAC_MANAGE)
+# ---------------------------------------------------------------------------
+class UserRolesView(APIView):
+    """PUT /api/users/<id>/roles {"RoleCodes": ["TRAINER", "GROOM"]} - đặt lại toàn bộ role của tài khoản."""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=RoleCodesSerializer, summary="Gán role cho tài khoản")
+    def put(self, request, user_id):
+        user = user_admin.club_member(request.user, user_id)
+        data = RoleCodesSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        user_admin.set_roles(request.user, user, data.validated_data["RoleCodes"])
+        return Response(UserSerializer(user).data)
+
+
+class UserLockView(APIView):
+    """POST /api/users/<id>/lock {"Reason"?} -> Suspended: không đăng nhập, không gọi API được nữa (ngay lập tức)."""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=ReasonSerializer, summary="Khóa tài khoản")
+    def post(self, request, user_id):
+        user = user_admin.club_member(request.user, user_id)
+        data = ReasonSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        reason = data.validated_data.get("Reason")
+        user_admin.lock_user(request.user, user, reason)
+        emails.account_status_changed(user, True, reason)
+        return Response(UserSerializer(user).data)
+
+
+class UserUnlockView(APIView):
+    """POST /api/users/<id>/unlock"""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=None, summary="Mở khóa tài khoản")
+    def post(self, request, user_id):
+        user = user_admin.unlock_user(request.user, user_admin.club_member(request.user, user_id))
+        emails.account_status_changed(user, False)
+        return Response(UserSerializer(user).data)
+
+
+class UserResetPasswordView(APIView):
+    """POST /api/users/<id>/reset-password -> {"TemporaryPassword"} (chỉ trả 1 lần, Manager báo trực tiếp)."""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=None, summary="Manager đặt lại mật khẩu (mật khẩu tạm)")
+    def post(self, request, user_id):
+        user = user_admin.club_member(request.user, user_id)
+        temporary = user_admin.reset_password(request.user, user)
+        emails.password_reset_by_manager(user, request.user)
+        return Response({**UserSerializer(user).data, "TemporaryPassword": temporary})
+
+
+class RoleMatrixView(APIView):
+    """
+    GET /api/roles - bảng phân quyền: Roles (kèm Permissions, số người trong CLB), Permissions (theo nhóm),
+    LockedCells (ô không sửa được, kèm lý do).
+    """
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    def get(self, request):
+        return Response(user_admin.matrix(request.user.club_id))
+
+
+class RolePermissionsView(APIView):
+    """PUT /api/roles/<RoleCode>/permissions {"PermissionCodes": [...]} - đặt lại quyền của role (dùng chung mọi CLB)."""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=PermissionCodesSerializer, summary="Sửa chức năng của một role")
+    def put(self, request, role_code):
+        data = PermissionCodesSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        result = user_admin.set_role_permissions(request.user, role_code, data.validated_data["PermissionCodes"])
+        return Response({**result, **user_admin.matrix(request.user.club_id)})
+
+
+class RoleResetDefaultsView(APIView):
+    """POST /api/roles/reset-defaults - đưa bảng phân quyền về mặc định (giống sql/horse_v2.sql)."""
+
+    permission_classes = [HasAnyPermission("RBAC_MANAGE")]
+
+    @extend_schema(request=None, summary="Khôi phục phân quyền mặc định")
+    def post(self, request):
+        removed = user_admin.reset_default_permissions(request.user)
+        return Response({"Removed": removed, **user_admin.matrix(request.user.club_id)})
+
+
+class AuditLogListView(APIView):
+    """
+    GET /api/audit-logs?UserID=&ActionType=&EntityName=&EntityID=&From=&To=&Limit=100&Offset=0
+    Nhật ký thao tác của người dùng trong CLB (mới nhất trước).
+    """
+
+    permission_classes = [HasAnyPermission("AUDIT_VIEW")]
+
+    def get(self, request):
+        from apps.core.models import AuditLog
+
+        p = request.query_params
+        logs = AuditLog.objects.filter(user__club_id=request.user.club_id).select_related("user")
+        if p.get("UserID"):
+            logs = logs.filter(user_id=int_param(p, "UserID"))
+        if p.get("ActionType"):
+            logs = logs.filter(action_type=p["ActionType"])
+        if p.get("EntityName"):
+            logs = logs.filter(entity_name=p["EntityName"])
+        if p.get("EntityID"):
+            logs = logs.filter(entity_id=int_param(p, "EntityID"))
+        if p.get("From"):
+            logs = logs.filter(action_time__date__gte=date_param(p, "From"))
+        if p.get("To"):
+            logs = logs.filter(action_time__date__lte=date_param(p, "To"))
+        limit = min(int_param(p, "Limit") if p.get("Limit") else 100, 500)
+        offset = int_param(p, "Offset") if p.get("Offset") else 0
+        total = logs.count()
+        rows = [{
+            "AuditLogID": log.id, "UserID": log.user_id, "UserName": log.user.full_name if log.user_id else None,
+            "ActionType": log.action_type, "EntityName": log.entity_name, "EntityID": log.entity_id,
+            "ActionTime": log.action_time, "Details": log.details,
+        } for log in logs[offset:offset + limit]]
+        return Response({"Total": total, "Limit": limit, "Offset": offset, "Items": rows})
+
+
+class MyClubView(APIView):
+    """GET /api/clubs/mine - CLB của người đang đăng nhập; PATCH - Manager sửa thông tin CLB (CLUB_MANAGE)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _club(self, request):
+        club = Club.objects.filter(pk=request.user.club_id).first()
+        if club is None:
+            raise NotFound("Tài khoản chưa thuộc CLB nào.")
+        return club
+
+    def get(self, request):
+        return Response(ClubSerializer(self._club(request)).data)
+
+    @extend_schema(request=ClubSerializer, summary="Manager sửa thông tin CLB")
+    def patch(self, request):
+        if not request.user.has_perm("CLUB_MANAGE"):
+            raise PermissionDenied("Chỉ Manager mới sửa thông tin CLB.")
+        club = self._club(request)
+        data = ClubSerializer(club, data=request.data, partial=True)
+        data.is_valid(raise_exception=True)
+        data.save()
+        log_action(request.user, "UPDATE_CLUB", club, {"Fields": sorted(data.validated_data)})
+        return Response(ClubSerializer(club).data)

@@ -72,6 +72,7 @@ DROP VIEW IF EXISTS dbo.vw_VetHealthReportQueue;
 GO
 
 /* Bảng v2 - theo thứ tự con trước, cha sau */
+DROP TABLE IF EXISTS dbo.NotificationRead;
 DROP TABLE IF EXISTS dbo.AuditLog;
 DROP TABLE IF EXISTS dbo.InventoryRequestItem;
 DROP TABLE IF EXISTS dbo.InventoryRequest;
@@ -1309,6 +1310,19 @@ CREATE TABLE dbo.AuditLog
     Details NVARCHAR(MAX),
 
     CONSTRAINT FK_AuditLog_User FOREIGN KEY (UserID)
+        REFERENCES dbo.[User](UserID)
+);
+GO
+
+-- Thông báo được tính lại mỗi lần gọi API; bảng này chỉ nhớ thông báo nào người dùng đã đọc
+CREATE TABLE dbo.NotificationRead
+(
+    UserID INT NOT NULL,
+    NotificationKey NVARCHAR(200) NOT NULL,
+    ReadAt DATETIME2 NOT NULL CONSTRAINT DF_NotificationRead_ReadAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_NotificationRead PRIMARY KEY (UserID, NotificationKey),
+    CONSTRAINT FK_NotificationRead_User FOREIGN KEY (UserID)
         REFERENCES dbo.[User](UserID)
 );
 GO

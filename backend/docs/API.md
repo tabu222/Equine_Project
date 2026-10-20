@@ -33,6 +33,7 @@ Public signup ignores client roles; the backend grants only `HORSE_OWNER`. JWT/s
 | [8](#8-notifications) | Notifications (bell) for each role |
 | [9](#9-frontend-changes-flow-1) | What the frontend needs to change in the existing Flow 1 |
 | [10](#10-frontend-for-flow-24) | Suggested frontend screens for Flow 2–4 |
+| [12](#12-administration-club-manager) | **Administration** (Club Manager): accounts, roles, permission matrix, audit log, club, dashboard |
 
 ## 1. General conventions
 
@@ -151,9 +152,14 @@ Data scope: staff only see data **within their own club**; horse owners only see
 | POST | `/auth/google` | no login required | Sign in with Google: `{"Credential": "<Google ID token>"}` → existing email: `{access, refresh, User}`; unknown email: `{"SignupRequired": true, "Email", "FullName"}`. Send again with `"Phone", "Address", "ClubID"` (and optional `"FullName"`) to create a **horse owner** account → **201** `{access, refresh, User}`. Needs `GOOGLE_CLIENT_ID` in `.env` (otherwise 409 `GOOGLE_LOGIN_DISABLED`) |
 | POST | `/auth/refresh` | everyone | `{"refresh"}` → `{access}` |
 | GET | `/auth/me` | logged in | → `User` with `Roles`, `Permissions` |
-| GET | `/users?RoleCode=HORSE_OWNER` | Manager, Head Trainer, Trainer | users in the club (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments). A Trainer only gets `WORK_RIDER` / `TRAINER` / `HEAD_TRAINER` (other `RoleCode` → 403) |
+| PATCH | `/auth/me` | logged in | edit own profile `{"FullName"?, "Phone"?, "Address"?}` (email cannot change) |
+| POST | `/auth/change-password` | logged in | `{"CurrentPassword", "NewPassword" (min 6)}` → new `{access, refresh, User}`; **all old tokens stop working**. Google accounts without a password may omit `CurrentPassword` the first time |
+| POST | `/auth/password-reset` | no login required | forgot password: `{"Email"}` → always 200; if the account exists an email with a link `<FRONTEND_URL>/reset-password?uid=...&token=...` (valid 1 hour) is sent. Max 10 per hour per IP |
+| POST | `/auth/password-reset/confirm` | no login required | `{"Uid", "Token", "NewPassword"}` (values from the link) → 200; wrong / expired / already used link → 400 `Token` |
+| GET | `/users?RoleCode=&Status=&Search=` | Manager, Head Trainer, Trainer | users in the club (`Search`: name / email / phone) (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments). A Trainer only gets `WORK_RIDER` / `TRAINER` / `HEAD_TRAINER` (other `RoleCode` → 403) |
 | POST | `/users` | Manager | `{"FullName", "Email", "Phone", "Address", "RoleCode"? (default HORSE_OWNER), "Password"?}`; `Phone` = 10 digits starting with 0 or `+84` + 9 digits |
 | GET | `/users/{UserID}` | self / Manager of the same club | |
+| PATCH | `/users/{UserID}` | Manager | `{"FullName"?, "Phone"?, "Address"?}` – more account actions in section 12 |
 | GET | `/clubs` | no login required | Active clubs (picked on the sign-up form and when an Owner registers a horse) |
 
 If `POST /users` is sent without `Password`, the backend generates a temporary password and returns `TemporaryPassword` **only once**.
@@ -903,8 +909,17 @@ Specific error codes: `INSUFFICIENT_STOCK`, `NOT_REQUESTER`.
 
 ## 8. Notifications
 
-`GET /notifications` – items needing the logged-in user's attention. The database has no notifications table, so the list is
-**recomputed on every call** from current data (there is no "read" state). The frontend calls it on page load or every 1–2 minutes to show the bell.
+`GET /notifications?unread=1` – items needing the logged-in user's attention. The list is **recomputed on every call** from
+current data; the `NotificationRead` table only remembers which items the user has read. Every item has `Key` and `IsRead`.
+The frontend calls it on page load or every 1–2 minutes to show the bell.
+
+| Method | URL | Notes |
+|---|---|---|
+| GET | `/notifications?unread=1` | `unread=1`: only unread items |
+| GET | `/notifications/unread-count` | `{"Unread": 3, "Total": 5}` – the number on the bell |
+| POST | `/notifications/read` | `{"Keys": ["<Key>", ...]}` or `{"All": true}` → `{"Marked": n}` |
+
+`Key` = `Type|EntityName|EntityID|At`: a new event (new time) is a new, unread item.
 
 ```json
 [{"Type": "HEALTH_REPORT", "Priority": "High", "Title": "Health report (Urgent) - Reported",
@@ -1191,4 +1206,91 @@ Run commands are in the backend/frontend READMEs. Local SQL Server schema deploy
 read APIs for horse 8 were subsequently verified after fixing the initial deployment mismatch.
 SQL Server locking under simultaneous requests and production storage deployment still require
 verification in the target environment; SQLite tests cannot verify those database-specific behaviors.
+
+## 12. Administration (Club Manager)
+
+The Club Manager is the club's administrator (`RBAC_MANAGE`, `AUDIT_VIEW`, `CLUB_MANAGE`). Two levels of authorization:
+
+```
+Account ──assigned──> Role ──can do──> Permission (function)
+  PUT /users/{id}/roles      PUT /roles/{RoleCode}/permissions
+```
+
+Permissions are read from the database on every request, so changes apply **immediately** (no code change, no re-login).
+
+### 12.1 Accounts
+
+| Method | URL | Notes |
+|---|---|---|
+| PUT | `/users/{UserID}/roles` | `{"RoleCodes": ["TRAINER", "GROOM"]}` – replaces all roles of the account → `User` |
+| POST | `/users/{UserID}/lock` | `{"Reason"?}` → `Status: Suspended`; the user cannot log in and **existing tokens are rejected at once** (401); email to the user |
+| POST | `/users/{UserID}/unlock` | → `Status: Active` |
+| POST | `/users/{UserID}/reset-password` | → `User` + `TemporaryPassword` (**returned once**, give it to the person); old tokens stop working; email to the user |
+
+Rules (error `code`):
+- only people in the Manager's own club (`404` otherwise); no self-lock / self password reset / removing one's own `CLUB_MANAGER` role (`SELF_ACTION`);
+- the club keeps at least one active Manager (`LAST_MANAGER`);
+- `HORSE_OWNER` is never combined with staff roles, and staff accounts are not turned into owners (`OWNER_ROLE_EXCLUSIVE`);
+- a role is not removed / an account is not locked while the person still has pending work (`ROLE_IN_USE`, the message lists it):
+  Trainer – horses in charge or substitute sessions; Work Rider – assigned sessions; Vet – draft medical records or health
+  reports in progress; Groom – pending care tasks; Owner – owned horses. Reassign the work first.
+
+### 12.2 Permission matrix (role → functions)
+
+| Method | URL | Notes |
+|---|---|---|
+| GET | `/roles` | `{"Roles": [{RoleCode, RoleName, UserCount, IsLocked, Permissions: [...]}], "Permissions": [{PermissionCode, PermissionName, Description, Group, ExclusiveRole}], "LockedCells": [{RoleCode, PermissionCode, Reason}]}` |
+| PUT | `/roles/{RoleCode}/permissions` | `{"PermissionCodes": [...]}` – replaces the role's permissions → `{"Added", "Removed"}` + the matrix |
+| POST | `/roles/reset-defaults` | back to the default matrix of `sql/horse_v2.sql` → `{"Removed": {...}}` + the matrix |
+
+The frontend draws a table (rows = permissions grouped by `Group`, columns = roles, checkboxes) and greys out `LockedCells`.
+Safety locks:
+- exclusive permissions: `MEDICAL_MANAGE`, `MEDICAL_SIGN`, `TRAINING_LOCK_MANAGE` only `VETERINARIAN`; `RBAC_MANAGE` only `CLUB_MANAGER`
+  (always kept); `HORSE_REGISTER`, `PROFILE_EDIT_REQUEST`, `OWNER_VIEW` only `HORSE_OWNER` → `PERMISSION_LOCKED`;
+- `HORSE_OWNER` permissions cannot change (owners are outside the club) → `PERMISSION_LOCKED`;
+- every permission keeps at least one role → `PERMISSION_ORPHAN`;
+- separation of duties stays in code: nobody approves their own training plan (`SELF_APPROVAL`) or own diet plan.
+
+The matrix is **shared by all clubs** (`Role` / `RolePermission` have no `ClubID`). Every change is in the audit log.
+
+### 12.3 Audit log, club, dashboard
+
+| Method | URL | Who | Notes |
+|---|---|---|---|
+| GET | `/audit-logs?UserID=&ActionType=&EntityName=&EntityID=&From=&To=&Limit=100&Offset=0` | Manager (`AUDIT_VIEW`) | actions of people in the club, newest first → `{"Total", "Limit", "Offset", "Items": [{AuditLogID, UserID, UserName, ActionType, EntityName, EntityID, ActionTime, Details}]}` (max `Limit` 500) |
+| GET | `/clubs/mine` | logged in | own club |
+| PATCH | `/clubs/mine` | Manager (`CLUB_MANAGE`) | `{"ClubName"?, "Address"?, "Phone"?, "Email"?}` |
+| GET | `/dashboard` | Manager (`CLUB_MANAGE`) | club statistics (below) |
+
+`GET /dashboard` (`Training` / `Medical` / `Care` are `null` until that flow is installed):
+
+```json
+{"ClubID": 1, "GeneratedAt": "2026-10-20T22:04:04",
+ "Users": {"Total": 18, "ByStatus": {"Active": 18}, "ByRole": {"CLUB_MANAGER": 1, "TRAINER": 3, "GROOM": 3}},
+ "Horses": {"Total": 6, "ByRegistrationStatus": {"Approved": 3, "PendingExam": 1}, "ApprovedByHealthStatus": {"Healthy": 3},
+            "Stalls": {"Total": 6, "ByStatus": {"Occupied": 3, "Available": 3}}},
+ "Training": {"ActiveAssignments": 1, "PlansByStatus": {"Active": 1}, "SessionsToday": {"Completed": 1},
+              "SessionsThisWeek": {"Completed": 1, "Assigned": 2}, "SessionsLast30Days": {"Completed": 6, "Cancelled": 1, "Missed": 1},
+              "AvgPerformanceScore30Days": 75.3, "SessionsAwaitingReview": 0},
+ "Medical": {"OpenHealthReports": 1, "UrgentOpenHealthReports": 0, "ActiveTrainingLocks": {}, "VaccinationsDue14Days": 1,
+             "MedicalSchedulesDue14Days": 1},
+ "Care": {"DietPlansByStatus": {"Approved": 1}, "CareTasksToday": {"Pending": 8}, "OverdueCareTasks": 2,
+          "InventoryByStatus": {"Available": 4, "Low Stock": 1}, "PendingInventoryRequests": 0}}
+```
+
+### 12.4 New club and first Manager
+
+Creating a club is a system administration task done on the server (there is no system-admin role in the app):
+
+```powershell
+python manage.py create_club --name "Saigon Racing Club" --phone 0281234567 --manager-email manager@sgr.vn --manager-name "Nguyễn Văn A"
+```
+
+It prints a temporary password; the Manager logs in, changes the password and manages the club from section 12.1–12.3.
+
+### 12.5 Database
+
+On an existing database run `sql/migrations/20261020_admin_notification_read.sql` (adds `NotificationRead`). Everything else
+uses existing tables. After this version is deployed, tokens issued before it are rejected once (they do not carry the password
+check) – everyone logs in again one time.
 

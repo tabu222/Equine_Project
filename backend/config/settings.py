@@ -131,7 +131,10 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "UPDATE_LAST_LOGIN": False,  # bảng User không có cột LastLogin
     "AUTH_HEADER_TYPES": ("Bearer",),
+    # Đổi / đặt lại mật khẩu thì mọi token cũ hết hiệu lực (token mang hash của mật khẩu)
+    "CHECK_REVOKE_TOKEN": True,
 }
+PASSWORD_RESET_TIMEOUT = 3600  # link "quên mật khẩu" hiệu lực 1 giờ
 
 # Frontend dev chạy qua Vite proxy (cùng origin) nên thường không cần CORS;
 # vẫn cho phép sẵn cổng Vite để gọi thẳng khi cần.
