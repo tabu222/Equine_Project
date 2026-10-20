@@ -46,7 +46,8 @@ class SchemaMatchesSqlTests(SimpleTestCase):
             "Flow 3": (flows.has_flow3, {
                 "TrainingLock", "Treatment", "Vaccination", "MedicalSchedule", "HealthReport", "HealthReportNote"}),
             "Flow 4": (flows.has_care, {
-                "DietPlan", "DietMeal", "CareTask", "InventoryItem", "InventoryRequest", "InventoryRequestItem"}),
+                "DietPlan", "DietMeal", "CareTask", "CareTaskRule", "HorseGroom", "InventoryItem", "InventoryRequest",
+                "InventoryRequestItem"}),
         }
         not_delivered = set().union(*(tables for installed, tables in flow_tables.values() if not installed()))
         self.assertEqual(set(sql_tables()) - modelled, not_delivered, "Thiếu model của flow đã có")
