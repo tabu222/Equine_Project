@@ -29,7 +29,7 @@ from apps.core.exceptions import TRIGGER_MESSAGES, BusinessRuleError
 from apps.core.permissions import require_club_user
 from apps.horses.models import Horse
 
-from . import owner_emails
+from . import owner_emails, plan_templates
 from .models import (
     HorseAssessment, HorseWorkRiderPreference, TrainerCredential, TrainerHorseAssignment, TrainerProfile,
     TrainerRaceResult, TrainerSpecialization, TrainingPlan, TrainingPlanStage, TrainingResult, TrainingReview,
@@ -220,6 +220,9 @@ def assign_trainer(horse, user, trainer_id, specialization, assessment=None, sta
         start_date=start_date or date.today(), assignment_note=note or None,
     )
     log_action(user, "ASSIGN_TRAINER", horse, {"TrainerHorseAssignmentID": assignment.id, "TrainerID": trainer.id})
+    # Gửi kèm giáo án nháp chép từ giáo án mẫu của chuyên môn (trainer sửa rồi gửi duyệt)
+    template = plan_templates.template_for(horse.club, specialization)
+    assignment.draft_plan = plan_templates.draft_from_template(assignment, user, template) if template else None
     return assignment
 
 
@@ -297,6 +300,7 @@ def create_plan(horse, user, values, stages):
         raise BusinessRuleError("Chỉ trainer đang phụ trách ngựa mới được soạn giáo án.", "NOT_PLAN_OWNER")
     if values.get("end_date") and values["end_date"] < values["start_date"]:
         raise ValidationError({"EndDate": ["Ngày kết thúc phải sau ngày bắt đầu."]})
+    plan_templates.discard_untouched_template_drafts(assignment, user)   # tự soạn thay bản nháp từ mẫu
     plan = TrainingPlan.objects.create(assignment=assignment, created_at=timezone.now(), **values)
     for order, stage in enumerate(stages, start=1):
         add_stage(plan, user, {**stage, "stage_order": stage.get("stage_order") or order}, log=False)

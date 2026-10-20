@@ -95,6 +95,8 @@ DROP TABLE IF EXISTS dbo.TrainingResult;
 DROP TABLE IF EXISTS dbo.TrainingSession;
 DROP TABLE IF EXISTS dbo.TrainingPlanStage;
 DROP TABLE IF EXISTS dbo.TrainingPlan;
+DROP TABLE IF EXISTS dbo.TrainingPlanTemplateStage;
+DROP TABLE IF EXISTS dbo.TrainingPlanTemplate;
 DROP TABLE IF EXISTS dbo.HorseWorkRiderPreference;
 DROP TABLE IF EXISTS dbo.TrainerHorseAssignment;
 DROP TABLE IF EXISTS dbo.HorseAssessment;
@@ -672,6 +674,65 @@ CREATE TABLE dbo.HorseWorkRiderPreference
 );
 GO
 
+-- Giáo án mẫu: mỗi CLB, mỗi chuyên môn 1 bản; giai đoạn mẫu tính theo "ngày thứ mấy" của giáo án
+CREATE TABLE dbo.TrainingPlanTemplate
+(
+    TemplateID INT IDENTITY(1,1) PRIMARY KEY,
+    ClubID INT NOT NULL,
+    SpecializationID INT NOT NULL,
+    TemplateName NVARCHAR(150) NOT NULL,
+    Goal NVARCHAR(1000),
+    DurationDays INT NOT NULL,
+    OverallIntensity VARCHAR(30),
+    DailyStructure NVARCHAR(2000),
+    WeeklyPattern NVARCHAR(2000),
+    Note NVARCHAR(2000),
+    IsActive BIT NOT NULL CONSTRAINT DF_TrainingPlanTemplate_Active DEFAULT 1,
+    UpdatedBy INT NULL,
+    UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_TrainingPlanTemplate_UpdatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TrainingPlanTemplate_Club FOREIGN KEY (ClubID)
+        REFERENCES dbo.Club(ClubID),
+    CONSTRAINT FK_TrainingPlanTemplate_Spec FOREIGN KEY (SpecializationID)
+        REFERENCES dbo.Specialization(SpecializationID),
+    CONSTRAINT FK_TrainingPlanTemplate_UpdatedBy FOREIGN KEY (UpdatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT UQ_TrainingPlanTemplate_Club_Spec UNIQUE (ClubID, SpecializationID),
+    CONSTRAINT CK_TrainingPlanTemplate_Duration CHECK (DurationDays > 0),
+    CONSTRAINT CK_TrainingPlanTemplate_Intensity CHECK
+    (
+        OverallIntensity IS NULL OR OverallIntensity IN ('Low', 'Moderate', 'High', 'Very High')
+    )
+);
+GO
+
+CREATE TABLE dbo.TrainingPlanTemplateStage
+(
+    TemplateStageID INT IDENTITY(1,1) PRIMARY KEY,
+    TemplateID INT NOT NULL,
+    StageOrder INT NOT NULL,
+    StageName NVARCHAR(100) NOT NULL,
+    Goal NVARCHAR(1000),
+    StartDay INT NOT NULL,
+    DurationDays INT NOT NULL,
+    Intensity VARCHAR(30),
+    TrainingLoad DECIMAL(10,2) NULL,
+    DistanceTargetKm DECIMAL(10,2) NULL,
+    Surface VARCHAR(50),
+    Note NVARCHAR(1500),
+    ExitCriteria NVARCHAR(1000),
+
+    CONSTRAINT FK_TemplateStage_Template FOREIGN KEY (TemplateID)
+        REFERENCES dbo.TrainingPlanTemplate(TemplateID),
+    CONSTRAINT UQ_TemplateStage_Order UNIQUE (TemplateID, StageOrder),
+    CONSTRAINT CK_TemplateStage_Days CHECK (StageOrder > 0 AND StartDay >= 1 AND DurationDays > 0),
+    CONSTRAINT CK_TemplateStage_Intensity CHECK
+    (
+        Intensity IS NULL OR Intensity IN ('Low', 'Moderate', 'High', 'Very High')
+    )
+);
+GO
+
 CREATE TABLE dbo.TrainingPlan
 (
     TrainingPlanID INT IDENTITY(1,1) PRIMARY KEY,
@@ -690,9 +751,12 @@ CREATE TABLE dbo.TrainingPlan
     ApprovedByHeadTrainerID INT NULL,
     ApprovedAt DATETIME2 NULL,
     ReviewNote NVARCHAR(1000),          -- lý do trả về hoặc ghi chú khi duyệt
+    TemplateID INT NULL,                -- giáo án mẫu đã dùng để tạo bản nháp (NULL = trainer tự soạn)
 
     CONSTRAINT FK_TrainingPlan_TrainerHorseAssignment FOREIGN KEY (TrainerHorseAssignmentID)
         REFERENCES dbo.TrainerHorseAssignment(TrainerHorseAssignmentID),
+    CONSTRAINT FK_TrainingPlan_Template FOREIGN KEY (TemplateID)
+        REFERENCES dbo.TrainingPlanTemplate(TemplateID),
     CONSTRAINT FK_TrainingPlan_ApprovedBy FOREIGN KEY (ApprovedByHeadTrainerID)
         REFERENCES dbo.[User](UserID),
     CONSTRAINT CK_TrainingPlan_Dates CHECK

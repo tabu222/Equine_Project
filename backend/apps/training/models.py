@@ -4,7 +4,9 @@ FLOW 2 - huấn luyện (horse_v2.sql):
   TrainerHorseAssignment, HorseWorkRiderPreference, TrainingPlan, TrainingPlanStage, TrainingSession, TrainingResult,
   TrainingReview.
 
-Head Trainer đánh giá ngựa -> giao 1 Trainer phụ trách -> Trainer soạn giáo án -> Head Trainer duyệt
+Mỗi chuyên môn có 1 giáo án mẫu (TrainingPlanTemplate + TrainingPlanTemplateStage, theo "ngày thứ mấy").
+Head Trainer đánh giá ngựa -> giao 1 Trainer phụ trách -> hệ thống tạo giáo án nháp từ giáo án mẫu của chuyên môn
+-> Trainer sửa (hoặc giữ nguyên) -> Head Trainer duyệt / trả về (lặp đến khi ổn)
 -> Head Trainer xếp buổi tập (giao Work Rider, chỉ định Substitute Trainer khi cần)
 -> Work Rider bắt đầu buổi tập, ghi kết quả -> Trainer phụ trách đánh giá.
 """
@@ -246,6 +248,8 @@ class TrainingPlan(models.Model):
                                     db_column="ApprovedByHeadTrainerID", related_name="+")
     approved_at = models.DateTimeField(null=True, blank=True, db_column="ApprovedAt")
     review_note = models.CharField(max_length=1000, null=True, blank=True, db_column="ReviewNote")
+    template = models.ForeignKey("TrainingPlanTemplate", on_delete=models.DO_NOTHING, null=True, blank=True,
+                                 db_column="TemplateID", related_name="plans")
 
     class Meta:
         managed = False
@@ -386,3 +390,62 @@ class TrainingReview(models.Model):
         managed = False
         db_table = "TrainingReview"
         ordering = ["-review_date", "-id"]
+
+
+class TrainingPlanTemplate(models.Model):
+    """Giáo án mẫu của 1 chuyên môn trong CLB (mỗi CLB, mỗi chuyên môn 1 bản). Head Trainer soạn / sửa."""
+
+    id = models.AutoField(primary_key=True, db_column="TemplateID")
+    club = models.ForeignKey("accounts.Club", on_delete=models.DO_NOTHING, db_column="ClubID",
+                             related_name="plan_templates")
+    specialization = models.ForeignKey(Specialization, on_delete=models.DO_NOTHING, db_column="SpecializationID",
+                                       related_name="plan_templates")
+    template_name = models.CharField(max_length=150, db_column="TemplateName")
+    goal = models.CharField(max_length=1000, null=True, blank=True, db_column="Goal")
+    duration_days = models.IntegerField(db_column="DurationDays")
+    overall_intensity = models.CharField(max_length=30, choices=INTENSITY_CHOICES, null=True, blank=True,
+                                         db_column="OverallIntensity")
+    daily_structure = models.CharField(max_length=2000, null=True, blank=True, db_column="DailyStructure")
+    weekly_pattern = models.CharField(max_length=2000, null=True, blank=True, db_column="WeeklyPattern")
+    note = models.CharField(max_length=2000, null=True, blank=True, db_column="Note")
+    is_active = models.BooleanField(default=True, db_column="IsActive")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, null=True, blank=True,
+                                   db_column="UpdatedBy", related_name="+")
+    updated_at = models.DateTimeField(default=timezone.now, db_column="UpdatedAt")
+
+    class Meta:
+        managed = False
+        db_table = "TrainingPlanTemplate"
+        ordering = ["specialization_id", "id"]
+        constraints = [models.UniqueConstraint(fields=["club", "specialization"],
+                                               name="UQ_TrainingPlanTemplate_Club_Spec")]
+
+
+class TrainingPlanTemplateStage(models.Model):
+    """Giai đoạn mẫu: bắt đầu từ ngày thứ StartDay của giáo án, kéo dài DurationDays ngày."""
+
+    id = models.AutoField(primary_key=True, db_column="TemplateStageID")
+    template = models.ForeignKey(TrainingPlanTemplate, on_delete=models.DO_NOTHING, db_column="TemplateID",
+                                 related_name="stages")
+    stage_order = models.IntegerField(db_column="StageOrder")
+    stage_name = models.CharField(max_length=100, db_column="StageName")
+    goal = models.CharField(max_length=1000, null=True, blank=True, db_column="Goal")
+    start_day = models.IntegerField(db_column="StartDay")
+    duration_days = models.IntegerField(db_column="DurationDays")
+    intensity = models.CharField(max_length=30, choices=INTENSITY_CHOICES, null=True, blank=True,
+                                 db_column="Intensity")
+    training_load = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                        db_column="TrainingLoad")
+    distance_target_km = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                             db_column="DistanceTargetKm")
+    surface = models.CharField(max_length=50, null=True, blank=True, db_column="Surface")
+    note = models.CharField(max_length=1500, null=True, blank=True, db_column="Note")
+    exit_criteria = models.CharField(max_length=1000, null=True, blank=True, db_column="ExitCriteria")
+
+    class Meta:
+        managed = False
+        db_table = "TrainingPlanTemplateStage"
+        ordering = ["stage_order", "id"]
+        constraints = [models.UniqueConstraint(fields=["template", "stage_order"],
+                                               name="UQ_TemplateStage_Order")]
+

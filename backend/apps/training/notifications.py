@@ -30,6 +30,12 @@ def training_items(user, make_item):
                                    message=review.adjustment_note))
     if "TRAINING_PLAN_MANAGE" in perms:  # Trainer
         for plan in TrainingPlan.objects.filter(assignment__trainer=user, assignment__status="Active", status="Draft",
+                                                template__isnull=False, submitted_at__isnull=True).select_related(
+                "assignment__horse", "template"):
+            items.append(make_item("PLAN_DRAFT_FROM_TEMPLATE",
+                                   f"Giáo án nháp từ mẫu \"{plan.template.template_name}\" cần xem, sửa và gửi duyệt",
+                                   "TrainingPlan", plan.id, plan.assignment.horse, plan.created_at))
+        for plan in TrainingPlan.objects.filter(assignment__trainer=user, assignment__status="Active", status="Draft",
                                                 submitted_at__isnull=False).select_related("assignment__horse"):
             items.append(make_item("PLAN_RETURNED", "Giáo án bị trả về", "TrainingPlan", plan.id,
                                    plan.assignment.horse, plan.submitted_at, message=plan.review_note))

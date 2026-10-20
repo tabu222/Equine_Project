@@ -7,7 +7,8 @@ from apps.core.serializers import DBColumnModelSerializer
 
 from .models import (
     HorseAssessment, HorseWorkRiderPreference, Specialization, TrainerCredential, TrainerHorseAssignment, TrainerProfile,
-    TrainerRaceResult, TrainingPlan, TrainingPlanStage, TrainingResult, TrainingReview, TrainingSession,
+    TrainerRaceResult, TrainingPlan, TrainingPlanStage, TrainingPlanTemplate, TrainingPlanTemplateStage, TrainingResult,
+    TrainingReview, TrainingSession,
 )
 
 
@@ -122,11 +123,13 @@ class TrainingPlanSerializer(DBColumnModelSerializer):
     TrainerID = serializers.IntegerField(source="assignment.trainer_id", read_only=True)
     TrainerName = serializers.CharField(source="assignment.trainer.full_name", read_only=True)
     Stages = TrainingPlanStageSerializer(source="stages", many=True, read_only=True)
+    TemplateName = serializers.CharField(source="template.template_name", read_only=True, default=None)
 
     class Meta:
         model = TrainingPlan
         fields = ["id", "assignment", "HorseID", "HorseName", "TrainerID", "TrainerName", *PLAN_FIELDS, "status",
-                  "created_at", "submitted_at", "approved_by", "approved_at", "review_note", "Stages"]
+                  "created_at", "submitted_at", "approved_by", "approved_at", "review_note", "template", "TemplateName",
+                  "Stages"]
         read_only_fields = fields
 
 
@@ -376,3 +379,57 @@ class TrainerRaceResultSerializer(DBColumnModelSerializer):
 
 class TrainerSpecializationSerializer(serializers.Serializer):
     SpecializationID = serializers.IntegerField()
+
+
+# ---------------------------------------------------------------------------
+# Giáo án mẫu
+# ---------------------------------------------------------------------------
+TEMPLATE_STAGE_FIELDS = ["stage_order", "stage_name", "goal", "start_day", "duration_days", "intensity", "training_load",
+                         "distance_target_km", "surface", "note", "exit_criteria"]
+TEMPLATE_FIELDS = ["template_name", "goal", "duration_days", "overall_intensity", "daily_structure", "weekly_pattern",
+                   "note", "is_active"]
+
+
+class TrainingPlanTemplateStageSerializer(DBColumnModelSerializer):
+    class Meta:
+        model = TrainingPlanTemplateStage
+        fields = ["id", *TEMPLATE_STAGE_FIELDS]
+        read_only_fields = ["id"]
+
+    def validate(self, attrs):
+        for name in ("training_load", "distance_target_km"):
+            if attrs.get(name) is not None and attrs[name] < 0:
+                raise serializers.ValidationError({name: ["Không được âm."]})
+        return attrs
+
+
+class TrainingPlanTemplateSerializer(DBColumnModelSerializer):
+    SpecializationName = serializers.CharField(source="specialization.name", read_only=True)
+    SpecializationCode = serializers.CharField(source="specialization.code", read_only=True)
+    UpdatedByName = serializers.CharField(source="updated_by.full_name", read_only=True, default=None)
+    Stages = TrainingPlanTemplateStageSerializer(source="stages", many=True, read_only=True)
+
+    class Meta:
+        model = TrainingPlanTemplate
+        fields = ["id", "club", "specialization", "SpecializationName", "SpecializationCode", *TEMPLATE_FIELDS,
+                  "updated_by", "UpdatedByName", "updated_at", "Stages"]
+        read_only_fields = fields
+
+
+class TrainingPlanTemplateWriteSerializer(DBColumnModelSerializer):
+    """PUT / PATCH /api/training-plan-templates/<id>: thông tin chung (+ Stages thì thay toàn bộ giai đoạn)."""
+
+    Stages = TrainingPlanTemplateStageSerializer(many=True, required=False)
+
+    class Meta:
+        model = TrainingPlanTemplate
+        fields = [*TEMPLATE_FIELDS, "Stages"]
+
+
+class RescheduleSerializer(serializers.Serializer):
+    StartDate = serializers.DateField()
+
+
+class FromTemplateSerializer(serializers.Serializer):
+    HorseID = serializers.IntegerField()
+

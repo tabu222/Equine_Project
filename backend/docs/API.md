@@ -469,7 +469,9 @@ Each horse has only **1** `Active` responsible trainer (`ALREADY_ASSIGNED` if on
 ```
 
 `POST /trainer-assignments` also returns `TrainerExperienceLevel`, `RequiredLevel` and `LevelWarning`
-(`null`, or a sentence when the horse should go to a more experienced trainer – the assignment is still created).
+(`null`, or a sentence when the horse should go to a more experienced trainer – the assignment is still created),
+and `DraftTrainingPlanID`: the `Draft` training plan created automatically from the specialization's template (5.5.1),
+or `null` when that template is switched off.
 
 ### 5.4 Preferred work riders (familiar with the horse)
 
@@ -540,6 +542,7 @@ Returned training plan:
   "StartDate": "2026-10-12", "EndDate": "2026-12-10", "OverallIntensity": "Moderate", "Note": null,
   "Status": "Active", "CreatedAt": "2026-10-10T08:00:00", "SubmittedAt": "2026-10-10T08:05:00",
   "ApprovedByHeadTrainerID": 2, "ApprovedAt": "2026-10-10T09:00:00", "ReviewNote": "Agreed",
+  "TemplateID": 1, "TemplateName": "Chương trình chuẩn – Đua đường bằng 1.200–2.000 m",
   "Stages": [{"TrainingPlanStageID": 1, "TrainingPlanID": 1, "StageName": "Foundation", "StageOrder": 1, "Goal": null,
               "StartDate": "2026-10-12", "EndDate": "2026-11-01", "Intensity": "Low", "TrainingLoad": 30.0,
               "DistanceTargetKm": 3.0, "Surface": "Turf", "Note": null}]
@@ -548,6 +551,70 @@ Returned training plan:
 
 Specific error codes: `NOT_PLAN_OWNER` (not the currently assigned trainer), `NO_STAGES`, `DRAFT_EXISTS` (a version is already being drafted / pending approval),
 `ASSIGNMENT_ENDED`, `IN_USE` (the stage already has training sessions).
+
+### 5.5.1 Training plan templates (one per specialization)
+
+Each club has **one template per specialization** (Flat Racing 84 days / 4 stages, Steeplechase & Hurdle 98 / 5,
+Harness 84 / 4, Endurance 84 / 5, Other 56 / 3). Missing templates are created with the default content the first time
+they are read. Stages use **day numbers** (`StartDay`, `DurationDays`), not dates. Only the Head Trainer edits templates.
+
+```
+Head Trainer assigns a trainer (5.3)
+   └─> Draft training plan copied from the template, day numbers turned into dates from the assignment start (or today)
+Trainer reads it with the horse assessment (template-review), edits or keeps it, may move the start date (reschedule)
+   └─> submit ──> Head Trainer sees what changed vs. the template ──> approve ──> Active ──> schedule sessions (5.6)
+                                                                 └─> return (ReviewNote) ──> trainer edits again ...
+```
+
+| Method | URL | Used by | Notes |
+|---|---|---|---|
+| GET | `/training-plan-templates?SpecializationID=` | staff | templates of the club, with `Stages` |
+| GET | `/training-plan-templates/{TemplateID}` | staff | |
+| PUT | `/training-plan-templates/{TemplateID}` | Head Trainer | whole template, `Stages` required (replaces all stages) |
+| PATCH | `/training-plan-templates/{TemplateID}` | Head Trainer | some fields; `Stages` sent = replaces all stages. `IsActive: false` = assignments no longer create a draft |
+| GET | `/training-plans/{id}/template-review` | staff | template info + latest horse assessment + list of changes vs. the template |
+| POST | `/training-plans/{id}/reschedule` | responsible Trainer | `{"StartDate"}` – `Draft` only, every stage moves by the same number of days; past date → 400 |
+| POST | `/training-plans/from-template` | responsible Trainer | `{"HorseID"}` – new draft from the template (e.g. after it was replaced, or to adjust an `Active` plan). 400 if a `Draft` / `Pending Approval` plan exists |
+
+- Editing a template does **not** change plans already created from it.
+- If the trainer creates a plan by hand (`POST /training-plans`), the template draft that was never submitted is cancelled
+  (no two drafts for one horse).
+- The trainer edits the draft with the normal endpoints of 5.5 (`PATCH /training-plans/{id}`, stages ...). The stage `Note`
+  carries the template content plus `Điều kiện sang giai đoạn sau: ...` (exit criteria).
+- Trainer notification `PLAN_DRAFT_FROM_TEMPLATE` until the draft is submitted; returned plans show `PLAN_RETURNED` as before.
+
+Template:
+
+```json
+{"TemplateID": 1, "ClubID": 1, "SpecializationID": 4, "SpecializationName": "Endurance", "SpecializationCode": "ENDURANCE",
+ "TemplateName": "Chương trình chuẩn – Đua đường dài 80–120 km", "Goal": "...", "DurationDays": 84,
+ "OverallIntensity": "Moderate", "DailyStructure": "...", "WeeklyPattern": "...", "Note": "...", "IsActive": true,
+ "UpdatedBy": null, "UpdatedByName": null, "UpdatedAt": "2026-10-21T08:00:00",
+ "Stages": [{"TemplateStageID": 1, "StageOrder": 1, "StageName": "Làm quen & nền tảng", "Goal": "...", "StartDay": 1,
+             "DurationDays": 14, "Intensity": "Low", "TrainingLoad": 25.0, "DistanceTargetKm": 60.0,
+             "Surface": "...", "Note": "...", "ExitCriteria": "..."}]}
+```
+
+Validation: `DurationDays` > 0, at least 1 stage, no duplicate `StageOrder`, each stage inside the template
+(`StartDay` ≥ 1, `StartDay + DurationDays − 1 ≤ DurationDays` of the template).
+
+`template-review`:
+
+```json
+{"TrainingPlanID": 7, "Status": "Pending Approval", "TemplateID": 1, "TemplateName": "...",
+ "DailyStructure": "...", "WeeklyPattern": "...", "TemplateNote": "...",
+ "Assessment": {"AssessmentID": 3, "QualityScore": 78.0, "FitnessLevel": "Good", "AssessmentNote": "...", "SpecializationID": 1},
+ "ChangedFromTemplate": true, "ChangeCount": 1,
+ "Changes": [{"StageOrder": 1, "Field": "TrainingLoad", "Template": 25.0, "Plan": 20.0, "Change": "Changed"}]}
+```
+
+`Field`: `Goal`, `DurationDays`, `OverallIntensity` (whole plan, `StageOrder: null`), or per stage `StageName`, `StartDay`,
+`DurationDays`, `Intensity`, `TrainingLoad`, `DistanceTargetKm`, `Surface`, `Goal`; `Field: "Stage"` with
+`Change: "Added" / "Removed"`. Moving the whole plan (reschedule) is not a change. Plans not made from a template:
+`TemplateID`, `Changes`, `ChangedFromTemplate` are `null`.
+
+Database: on an existing database run `sql/migrations/20261021_training_plan_templates.sql` (tables `TrainingPlanTemplate`,
+`TrainingPlanTemplateStage`, column `TrainingPlan.TemplateID`). `seed_demo` creates the default templates.
 
 ### 5.6 Training sessions
 
@@ -979,7 +1046,7 @@ Sorting: `Priority = High` first, newest first. `EntityName` + `EntityID` tell w
 | Club Manager | `HORSE_TO_VERIFY`, `HORSE_TO_APPROVE`, `PROFILE_CHANGE`, `INVENTORY_REQUEST`, `LOW_STOCK` |
 | Vet | `HEALTH_REPORT`, `INITIAL_EXAM`, `VACCINATION_DUE`, `MEDICAL_SCHEDULE`, `DRAFT_RECORD`, `DIET_TO_REVIEW` |
 | Head Trainer | `HEALTH_REPORT` (all horses in the club), `PLAN_TO_APPROVE`, `ADJUSTMENT_REQUIRED`, `STAGE_TO_CLOSE`, `DIET_RETURNED`, `DIET_REVIEW_NEEDED` |
-| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW`, `STAGE_TO_CLOSE` |
+| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_DRAFT_FROM_TEMPLATE`, `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW`, `STAGE_TO_CLOSE` |
 | Work Rider | `RIDE_TODAY` |
 | Groom | `CARE_TASK` (generated + assigned tasks due today / overdue) |
 | Horse Owner | `HORSE_REJECTED`, `PROFILE_CHANGE_DONE`, `OWNER_SESSIONS_REVIEWED` (new reviewed sessions, grouped per horse), `OWNER_STAGE_SUMMARY`, `OWNER_PLAN_SUMMARY`, `OWNER_PLAN_APPROVED`, `OWNER_SESSION_STOPPED` (High); Flow 3: `OWNER_TRAINING_LOCKED` (High), `OWNER_TRAINING_UNLOCKED` |

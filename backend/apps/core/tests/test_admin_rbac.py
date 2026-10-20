@@ -202,7 +202,7 @@ class ClubAuditDashboardTests(TrainingTestCase):
         board = manager.get("/api/dashboard").data
         self.assertEqual(board["Horses"]["ByRegistrationStatus"]["Approved"], 1)
         self.assertEqual(board["Training"]["ActiveAssignments"], 1)
-        self.assertEqual(board["Training"]["PlansByStatus"], {"Active": 1})
+        self.assertEqual(board["Training"]["PlansByStatus"]["Active"], 1)
         self.assertIn("TRAINER", board["Users"]["ByRole"])
         self.assertEqual(self.client_for(self.head).get("/api/dashboard").status_code, 403)
 

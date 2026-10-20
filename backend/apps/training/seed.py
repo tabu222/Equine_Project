@@ -97,6 +97,9 @@ def seed_demo(club):
                                   field_size=size, created_by=manager or trainer)
                 for i, (day, position, size) in enumerate(rows)
             ])
+    from .plan_templates import ensure_templates
+
+    ensure_templates(club)          # giáo án mẫu mặc định cho mỗi chuyên môn
     seed_plan_demo(club)
 
 
