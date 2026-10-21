@@ -58,7 +58,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -440,7 +440,7 @@ export default function TrainerPlansPage() {
       <div className="page-heading training-plan-page-heading">
         <div>
           <p className="eyebrow">
-            TRAINER
+            HUẤN LUYỆN VIÊN
           </p>
 
           <h1>
@@ -657,8 +657,13 @@ export default function TrainerPlansPage() {
                           className="button"
                           to={`/training/plans/${plan.TrainingPlanID}`}
                         >
-                          Xem giáo án
+                          {plan.Status === 'Draft' ? 'Xem và gửi duyệt' : 'Xem giáo án'}
                         </Link>
+                        {plan.Status === 'Draft' && (
+                          <Link className="button button-secondary" to={`/training/plans/${plan.TrainingPlanID}/edit`}>
+                            Chỉnh sửa
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <div className="training-plan-no-plan">
@@ -667,8 +672,7 @@ export default function TrainerPlansPage() {
                         </strong>
 
                         <p>
-                          Tạo Training Plan mới
-                          cho ngựa này.
+                          Chưa có giáo án nháp.
                         </p>
 
                         <Link
@@ -691,7 +695,7 @@ export default function TrainerPlansPage() {
         <div className="training-plan-section-heading">
           <div>
             <span className="training-plan-kicker">
-              PLAN HISTORY
+              
             </span>
 
             <h2>
@@ -699,8 +703,7 @@ export default function TrainerPlansPage() {
             </h2>
 
             <p>
-              Bao gồm Draft, chờ duyệt,
-              Active, Completed và Cancelled.
+              
             </p>
           </div>
         </div>

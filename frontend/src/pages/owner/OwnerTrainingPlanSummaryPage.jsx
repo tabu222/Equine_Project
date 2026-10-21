@@ -53,7 +53,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -81,7 +81,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -451,36 +451,21 @@ export default function OwnerTrainingPlanSummaryPage() {
           </div>
         </div>
 
-        <div className="owner-plan-summary-progress">
-          <div>
-            <span>
-              Tiến độ giáo án
-            </span>
-
-            <strong>
-              {formatPercent(
-                plan.ProgressPercent,
-              )}
-            </strong>
+        <div className="owner-plan-progress-visual">
+          <div className="training-results-ring owner-plan-progress-ring"
+            role="img"
+            aria-label={`Tiến độ giáo án ${Math.round(progress)} phần trăm`}
+            style={{ background: `conic-gradient(#22b99d 0% ${progress}%, #e7efeb ${progress}% 100%)` }}>
+            <div className="training-results-ring-center">
+              <strong>{Math.round(progress)}%</strong>
+              <span>Tiến độ</span>
+            </div>
           </div>
-
-          <div className="owner-plan-progress-track">
-            <span
-              style={{
-                width:
-                  `${progress}%`,
-              }}
-            />
+          <div className="owner-plan-progress-details">
+            <h3>Tiến độ giáo án</h3>
+            <p>{summary?.CompletedSessions ?? 0} / {summary?.PlannedSessions ?? 0} buổi đã hoàn thành</p>
+            {plan.CurrentStageName && <p>Giai đoạn: <strong>{plan.CurrentStageName}</strong></p>}
           </div>
-
-          {plan.CurrentStageName && (
-            <p>
-              Giai đoạn hiện tại:{' '}
-              <strong>
-                {plan.CurrentStageName}
-              </strong>
-            </p>
-          )}
         </div>
       </section>
 

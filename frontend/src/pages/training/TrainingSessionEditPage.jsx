@@ -530,13 +530,7 @@ export default function TrainingSessionEditPage({
             Không thể chỉnh sửa Session
           </h2>
 
-          <p>
-            Chỉ Session ở trạng thái
-            Assigned mới được sửa. Với
-            Trainer, ngựa cũng phải còn
-            thuộc Active Assignment của
-            chính Trainer đó.
-          </p>
+          
 
           <Link
             className="button"

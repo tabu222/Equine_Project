@@ -10,6 +10,7 @@ import {
 
 import {
   getTrainingDashboard,
+  getTrainingSessions,
 } from '../../api/trainingApi.ts'
 
 function show(
@@ -41,7 +42,7 @@ function formatDate(value) {
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -172,9 +173,78 @@ function needsAttention(
   )
 }
 
+
+const SESSION_COLORS = ['#22b99d', '#c6ddbc', '#f2cda3', '#cad7d2']
+const SESSION_LABELS = ['Hoàn thành', 'Đã hủy hoặc dừng', 'Vắng', 'Sắp diễn ra / đang tập']
+
+function getSessionCounts(sessions) {
+  return sessions.reduce((counts, session) => {
+    const index = session.IsStopped || session.Status === 'Cancelled'
+      ? 1
+      : session.Status === 'Completed'
+        ? 0
+        : session.Status === 'Missed'
+          ? 2
+          : 3
+    counts[index] += 1
+    return counts
+  }, [0, 0, 0, 0])
+}
+
+function donutBackground(counts) {
+  const total = counts.reduce((sum, value) => sum + value, 0)
+  if (total === 0) return '#e7efeb'
+  let position = 0
+  const stops = counts.map((count, index) => {
+    const start = position
+    position += count * 100 / total
+    return `${SESSION_COLORS[index]} ${start}% ${position}%`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+}
+
+function SessionOverviewChart({ sessions, heading = 'Kết quả buổi tập' }) {
+  const counts = getSessionCounts(sessions)
+  const total = sessions.length
+  const percent = total ? Math.round(counts[0] * 100 / total) : 0
+  return (
+    <section className="training-results-overview" aria-label={heading}>
+      <div className="training-results-title">
+        <h2>{heading}</h2>
+      </div>
+      <div className="training-results-content">
+        <div className="training-results-ring" role="img"
+          aria-label={`Hoàn thành ${counts[0]} trên ${total} buổi tập`}
+          style={{ background: donutBackground(counts) }}>
+          <div className="training-results-ring-center">
+            <strong>{percent}%</strong>
+            <span>Hoàn thành</span>
+          </div>
+        </div>
+        <div className="training-results-breakdown">
+          <div className="training-results-count"><strong>{total}</strong><span>Tổng số buổi tập</span></div>
+          {SESSION_LABELS.map((label, index) => (
+            <div className="training-results-breakdown-row" key={label}>
+              <span className="training-results-key">
+                <i style={{ backgroundColor: SESSION_COLORS[index] }} />
+                {label}
+              </span>
+              <strong>{counts[index]}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function HeadTrainerTrainingDashboard() {
   const [rows, setRows] =
     useState([])
+
+  const [sessions, setSessions] = useState([])
+  const [sessionsError, setSessionsError] = useState('')
+  const [sessionsLoading, setSessionsLoading] = useState(true)
 
   const [loading, setLoading] =
     useState(true)
@@ -215,8 +285,6 @@ export default function HeadTrainerTrainingDashboard() {
           return
         }
 
-        setRows([])
-
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -232,6 +300,24 @@ export default function HeadTrainerTrainingDashboard() {
     return () => {
       active = false
     }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    getTrainingSessions()
+      .then((result) => {
+        if (!active) return
+        if (!Array.isArray(result)) throw new Error('Dữ liệu buổi tập không hợp lệ.')
+        setSessions(result)
+        setSessionsError('')
+      })
+      .catch(() => {
+        if (active) setSessionsError('Không thể tải kết quả buổi tập.')
+      })
+      .finally(() => {
+        if (active) setSessionsLoading(false)
+      })
+    return () => { active = false }
   }, [])
 
   const summary =
@@ -348,6 +434,14 @@ export default function HeadTrainerTrainingDashboard() {
           : 'Không thể làm mới dữ liệu huấn luyện.',
       )
     } finally {
+      try {
+        const sessionRows = await getTrainingSessions()
+        if (!Array.isArray(sessionRows)) throw new Error('Dữ liệu không hợp lệ')
+        setSessions(sessionRows)
+        setSessionsError('')
+      } catch {
+        setSessionsError('Không thể tải kết quả buổi tập.')
+      }
       setRefreshing(false)
     }
   }
@@ -366,11 +460,7 @@ export default function HeadTrainerTrainingDashboard() {
               Đang tải tổng quan huấn luyện
             </strong>
 
-            <span>
-              Hệ thống đang lấy dữ liệu
-              ngựa, Trainer và kết quả
-              tập luyện gần nhất.
-            </span>
+
           </div>
         </section>
       </main>
@@ -395,20 +485,12 @@ export default function HeadTrainerTrainingDashboard() {
 
       <div className="page-heading training-dashboard-heading">
         <div>
-          <p className="eyebrow">
-            HEAD TRAINER
-          </p>
 
           <h1>
             Tổng quan huấn luyện
           </h1>
 
-          <p>
-            Theo dõi phân công Trainer,
-            giáo án đang áp dụng và kết quả
-            tập luyện gần nhất của các ngựa
-            trong câu lạc bộ.
-          </p>
+          
         </div>
 
         <button
@@ -417,9 +499,7 @@ export default function HeadTrainerTrainingDashboard() {
           disabled={refreshing}
           onClick={refresh}
         >
-          {refreshing
-            ? 'Đang làm mới...'
-            : 'Làm mới dữ liệu'}
+          {refreshing ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
 
@@ -430,7 +510,7 @@ export default function HeadTrainerTrainingDashboard() {
         >
           <div>
             <strong>
-              Không thể tải đầy đủ dữ liệu
+              Không thể tải dữ liệu
             </strong>
 
             <span>
@@ -449,6 +529,18 @@ export default function HeadTrainerTrainingDashboard() {
         </div>
       )}
 
+      {!sessionsLoading && !sessionsError && (
+        <div className="training-dashboard-results-preview">
+          <SessionOverviewChart sessions={sessions} heading="Kết quả tập luyện" />
+          <Link className="training-results-text-link" to="/training/results">
+            Xem kết quả chi tiết →
+          </Link>
+        </div>
+      )}
+      {sessionsError && <p className="training-results-load-error" role="alert">{sessionsError}</p>}
+
+      {!error && (
+        <>
       <section
         className="training-dashboard-summary"
         aria-label="Tổng quan số liệu huấn luyện"
@@ -462,37 +554,31 @@ export default function HeadTrainerTrainingDashboard() {
             {summary.total}
           </strong>
 
-          <small>
-            Hồ sơ đã Approved 
-          </small>
+
         </article>
 
         <article className="training-dashboard-stat">
           <span>
-            Đã phân Trainer
+            Đã phân công
           </span>
 
           <strong>
             {summary.assigned}
           </strong>
 
-          <small>
-            Có Trainer đang phụ trách
-          </small>
+
         </article>
 
         <article className="training-dashboard-stat">
           <span>
-            Giáo án Active
+            Giáo án đang áp dụng
           </span>
 
           <strong>
             {summary.activePlans}
           </strong>
 
-          <small>
-            Đã được duyệt và đang áp dụng
-          </small>
+
         </article>
 
         <article
@@ -510,10 +596,7 @@ export default function HeadTrainerTrainingDashboard() {
             {summary.attention}
           </strong>
 
-          <small>
-            Chưa có Trainer, chưa có giáo
-            án hoặc đang bị hạn chế tập
-          </small>
+
         </article>
       </section>
 
@@ -526,7 +609,7 @@ export default function HeadTrainerTrainingDashboard() {
           <input
             type="search"
             value={search}
-            placeholder="Tên ngựa, mã ngựa, Trainer hoặc chuyên môn..."
+            placeholder="Tên ngựa, mã ngựa hoặc huấn luyện viên"
             onChange={(event) =>
               setSearch(
                 event.target.value,
@@ -553,19 +636,19 @@ export default function HeadTrainerTrainingDashboard() {
             </option>
 
             <option value="assigned">
-              Đã phân Trainer
+              Đã phân công
             </option>
 
             <option value="unassigned">
-              Chưa phân Trainer
+              Chưa phân công
             </option>
 
             <option value="active-plan">
-              Có giáo án Active
+              Có giáo án đang áp dụng
             </option>
 
             <option value="no-plan">
-              Chưa có giáo án Active
+              Chưa có giáo án đang áp dụng
             </option>
 
             <option value="attention">
@@ -595,7 +678,7 @@ export default function HeadTrainerTrainingDashboard() {
             <p>
               Chọn một ngựa để đánh giá,
               xem lịch sử hoặc quản lý
-              Trainer phụ trách.
+              Huấn luyện viên phụ trách.
             </p>
           </div>
         </div>
@@ -603,13 +686,11 @@ export default function HeadTrainerTrainingDashboard() {
         {rows.length === 0 ? (
           <div className="empty-state">
             <h3>
-              Chưa có ngựa trong Flow 2
+              Chưa có ngựa huấn luyện
             </h3>
 
             <p>
-              Chưa có hồ sơ ngựa Approved
-              đủ điều kiện xuất hiện trong
-              khu vực huấn luyện.
+
             </p>
           </div>
         ) : filteredRows.length ===
@@ -620,8 +701,7 @@ export default function HeadTrainerTrainingDashboard() {
             </h3>
 
             <p>
-              Không có ngựa nào phù hợp với
-              từ khóa hoặc bộ lọc hiện tại.
+
             </p>
           </div>
         ) : (
@@ -638,7 +718,7 @@ export default function HeadTrainerTrainingDashboard() {
                   </th>
 
                   <th>
-                    Trainer phụ trách
+                    Huấn luyện viên phụ trách
                   </th>
 
                   <th>
@@ -752,18 +832,17 @@ export default function HeadTrainerTrainingDashboard() {
                               <Link
                                 to={`/training/trainers/${horse.TrainerID}`}
                               >
-                                Xem hồ sơ Trainer
+                                Xem hồ sơ
                               </Link>
                             </div>
                           ) : (
                             <div className="training-missing-state">
                               <span className="status-badge training-status-badge is-warning">
-                                Chưa phân Trainer
+                                Chưa phân công
                               </span>
 
                               <small>
-                                Cần đánh giá và phân
-                                công Trainer.
+                                
                               </small>
                             </div>
                           )}
@@ -773,7 +852,7 @@ export default function HeadTrainerTrainingDashboard() {
                           {horse.ActiveTrainingPlanID ? (
                             <div className="training-plan-cell">
                               <span className="status-badge training-status-badge is-success">
-                                Active
+                                Đang áp dụng
                               </span>
 
                               <strong>
@@ -789,9 +868,7 @@ export default function HeadTrainerTrainingDashboard() {
                                 Chưa có
                               </span>
 
-                              <small>
-                                Chưa có giáo án Active.
-                              </small>
+
                             </div>
                           )}
                         </td>
@@ -889,7 +966,7 @@ export default function HeadTrainerTrainingDashboard() {
                               className="button"
                               to={`/training/horses/${horse.HorseID}/assessment`}
                             >
-                              Đánh giá / Phân Trainer
+                              Đánh giá và phân công
                             </Link>
 
                             <Link
@@ -909,6 +986,227 @@ export default function HeadTrainerTrainingDashboard() {
           </div>
         )}
       </section>
+        </>
+      )}
+    </main>
+  )
+}
+
+const SESSION_STATUS_TEXT = {
+  'Assigned': 'Đã phân công',
+  'In Progress': 'Đang tập',
+  Completed: 'Hoàn thành',
+  Cancelled: 'Đã hủy',
+  Missed: 'Vắng',
+}
+
+const SESSION_EVALUATION_TEXT = {
+  Excellent: 'Xuất sắc',
+  Good: 'Tốt',
+  Average: 'Trung bình',
+  'Needs Improvement': 'Cần cải thiện',
+}
+
+function sessionScore(session) {
+  const value = session.Result?.PerformanceScore
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const score = Number(value)
+  return Number.isFinite(score) ? score : null
+}
+
+function sessionDateKey(daysBack) {
+  const date = new Date()
+  date.setDate(date.getDate() - daysBack)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** Trang kết quả tập luyện của Huấn luyện viên trưởng.
+ * Sử dụng GET /training-sessions, không phụ thuộc API tổng quan.
+ */
+export function HeadTrainerResultsPage() {
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [horseId, setHorseId] = useState('all')
+  const [period, setPeriod] = useState('all')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    getTrainingSessions()
+      .then((data) => {
+        if (!active) return
+        if (!Array.isArray(data)) {
+          throw new Error('Không thể đọc danh sách buổi tập.')
+        }
+        setSessions(data)
+      })
+      .catch((requestError) => {
+        if (!active) return
+        setError(
+          requestError instanceof Error && requestError.message
+            ? requestError.message
+            : 'Không thể tải kết quả tập luyện.',
+        )
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [reload])
+
+  const horses = useMemo(() => {
+    const byId = new Map()
+    sessions.forEach((session) => {
+      if (session.HorseID !== null && session.HorseID !== undefined) {
+        byId.set(String(session.HorseID), session.HorseName || 'Chưa có tên')
+      }
+    })
+    return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1], 'vi'))
+  }, [sessions])
+
+  const filteredSessions = useMemo(() => {
+    const from = period === '30' ? sessionDateKey(30)
+      : period === '90' ? sessionDateKey(90)
+        : ''
+    return sessions
+      .filter((session) => (
+        (horseId === 'all' || String(session.HorseID) === horseId) &&
+        (!from || String(session.SessionDate || '').slice(0, 10) >= from)
+      ))
+      .sort((a, b) => {
+        const byDate = String(b.SessionDate || '').localeCompare(String(a.SessionDate || ''))
+        return byDate || Number(b.TrainingSessionID) - Number(a.TrainingSessionID)
+      })
+  }, [sessions, horseId, period])
+
+  const results = useMemo(
+    () => filteredSessions.filter((session) => session.Result),
+    [filteredSessions],
+  )
+
+  const totalScore = results.reduce((sum, session) => {
+    const score = sessionScore(session)
+    return sum + (score ?? 0)
+  }, 0)
+  const scoredCount = results.filter((session) => sessionScore(session) !== null).length
+  const averageScore = scoredCount ? formatNumber(totalScore / scoredCount) : '—'
+  const completedCount = filteredSessions.filter((session) => session.Status === 'Completed').length
+
+  return (
+    <main className="page-content training-results-page">
+      <div className="breadcrumb">
+        <Link to="/training/dashboard">Huấn luyện</Link>
+        <span>/</span>
+        <strong>Kết quả tập luyện</strong>
+      </div>
+
+      <div className="page-heading training-results-page-heading">
+        <h1>Kết quả tập luyện</h1>
+        <button
+          className="button button-secondary"
+          type="button"
+          disabled={loading}
+          onClick={() => setReload((value) => value + 1)}
+        >
+          {loading ? 'Đang tải...' : 'Làm mới'}
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="training-results-message" role="status">Đang tải kết quả tập luyện...</p>
+      ) : error ? (
+        <div className="training-results-failure" role="alert">
+          <strong>Không thể tải kết quả tập luyện</strong>
+          <p>{error}</p>
+          <button className="button button-secondary" type="button" onClick={() => setReload((value) => value + 1)}>
+            Thử lại
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="training-results-toolbar">
+            <label className="form-field">
+              <span>Ngựa</span>
+              <select value={horseId} onChange={(event) => setHorseId(event.target.value)}>
+                <option value="all">Tất cả ngựa</option>
+                {horses.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </label>
+            <label className="form-field">
+              <span>Thời gian</span>
+              <select value={period} onChange={(event) => setPeriod(event.target.value)}>
+                <option value="all">Toàn bộ thời gian</option>
+                <option value="30">30 ngày gần đây</option>
+                <option value="90">90 ngày gần đây</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="training-results-overview-grid">
+            <SessionOverviewChart sessions={filteredSessions} heading="Tổng quan buổi tập" />
+            <div className="training-results-summary">
+              <div><span>Buổi hoàn thành</span><strong>{completedCount}</strong></div>
+              <div><span>Đã ghi kết quả</span><strong>{results.length}</strong></div>
+              <div><span>Điểm trung bình</span><strong>{averageScore}</strong></div>
+            </div>
+          </div>
+
+          <section className="training-results-list" aria-label="Danh sách kết quả buổi tập">
+            <div className="training-results-list-heading">
+              <h2>Chi tiết buổi tập</h2>
+              <span>{filteredSessions.length} buổi</span>
+            </div>
+            {filteredSessions.length === 0 ? (
+              <p className="training-results-message">Chưa có buổi tập trong khoảng thời gian đã chọn.</p>
+            ) : (
+              <div className="table-wrapper">
+                <table className="data-table training-results-table">
+                  <thead>
+                    <tr>
+                      <th>Ngày tập</th>
+                      <th>Ngựa</th>
+                      <th>Bài tập</th>
+                      <th>Huấn luyện viên</th>
+                      <th>Trạng thái</th>
+                      <th>Thời lượng</th>
+                      <th>Quãng đường</th>
+                      <th>Điểm</th>
+                      <th>Đánh giá</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSessions.map((session) => (
+                      <tr key={session.TrainingSessionID}>
+                        <td>{formatDate(session.SessionDate)}</td>
+                        <td><strong>{show(session.HorseName)}</strong></td>
+                        <td>{show(session.TrainingType)}</td>
+                        <td>{show(session.AssignedTrainerName)}</td>
+                        <td><span className={`training-results-state training-results-state-${session.Status === 'Completed' ? 'done' : 'other'}`}>
+                          {SESSION_STATUS_TEXT[session.Status] || 'Chưa cập nhật'}
+                        </span></td>
+                        <td>{formatNumber(session.Result?.ActualDurationMinutes, 'phút')}</td>
+                        <td>{formatNumber(session.Result?.ActualDistanceKm, 'km')}</td>
+                        <td>{sessionScore(session) === null ? '—' : formatNumber(sessionScore(session))}</td>
+                        <td>{session.Review?.Evaluation
+                          ? SESSION_EVALUATION_TEXT[session.Review.Evaluation] || 'Chưa đánh giá'
+                          : 'Chưa đánh giá'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }

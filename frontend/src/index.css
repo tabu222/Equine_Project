@@ -20,19 +20,19 @@
   font-weight: 400;
   font-size: 14px;
 
-  --app-bg: #f4f7f4;
-  --sidebar-bg: #eaf1eb;
+  --app-bg: #f6f9f8;
+  --sidebar-bg: #ffffff;
 
   --surface: #ffffff;
-  --surface-soft: #f3f7f4;
+  --surface-soft: #f8faf8;
   --surface-row: #f8fbf8;
 
-  --green-primary: #176c46;
+  --green-primary: #178872;
   --green-dark: #173a2a;
   --green-muted: #506457;
 
-  --border: #d5e0d7;
-  --nav-active: #dcebe1;
+  --border: #e6eee9;
+  --nav-active: #e2f4ec;
 
   --success-bg: #e6f2e9;
   --warning-bg: #fff4d9;
@@ -55,8 +55,8 @@
   --space-8: 32px;
 
   --radius-sm: 6px;
-  --radius-md: 9px;
-  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
 }
 
 /* =========================

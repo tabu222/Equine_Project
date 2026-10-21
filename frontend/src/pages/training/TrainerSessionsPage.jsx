@@ -41,7 +41,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -590,7 +590,7 @@ export default function TrainerSessionsPage() {
             </strong>
 
             <span>
-              Đang lấy các Training Session
+              Đang lấy các Buổi tập
               thuộc phạm vi giám sát của
               Trainer.
             </span>
@@ -619,7 +619,7 @@ export default function TrainerSessionsPage() {
       <div className="page-heading trainer-supervision-page-heading">
         <div>
           <p className="eyebrow">
-            TRAINER
+            HUẤN LUYỆN VIÊN
           </p>
 
           <h1>
@@ -762,7 +762,7 @@ export default function TrainerSessionsPage() {
             value={
               search
             }
-            placeholder="Ngựa, Work Rider, Stage, bài tập..."
+            placeholder="Ngựa, Nhân viên cưỡi ngựa, Giai đoạn, bài tập..."
             onChange={(event) =>
               setSearch(
                 event.target.value,
@@ -780,11 +780,11 @@ export default function TrainerSessionsPage() {
             </span>
 
             <h2>
-              Training Session
+              Buổi tập
             </h2>
 
             <p>
-              Session có Substitute Trainer
+              Session có Người giám sát thay thế
               sẽ được đánh dấu riêng.
             </p>
           </div>
@@ -895,7 +895,7 @@ export default function TrainerSessionsPage() {
                     <div className="trainer-supervision-info-grid">
                       <div>
                         <span>
-                          Trainer phụ trách
+                          Huấn luyện viên phụ trách
                         </span>
 
                         <strong>
@@ -931,7 +931,7 @@ export default function TrainerSessionsPage() {
 
                       <div>
                         <span>
-                          Training Plan
+                          Giáo án
                         </span>
 
                         <strong>
@@ -944,7 +944,7 @@ export default function TrainerSessionsPage() {
 
                       <div>
                         <span>
-                          Stage
+                          Giai đoạn
                         </span>
 
                         <strong>
@@ -968,7 +968,7 @@ export default function TrainerSessionsPage() {
 
                       <div>
                         <span>
-                          Training Load
+                          Mức tải tập luyện
                         </span>
 
                         <strong>
@@ -1052,7 +1052,7 @@ export default function TrainerSessionsPage() {
                         <div className="trainer-supervision-result-head">
                           <div>
                             <span className="trainer-supervision-kicker">
-                              WORK RIDER RESULT
+                              NHÂN VIÊN CƯỠI NGỰA RESULT
                             </span>
 
                             <h4>
@@ -1425,7 +1425,7 @@ export default function TrainerSessionsPage() {
             aria-labelledby="substitute-observation-title"
           >
             <span className="trainer-supervision-kicker">
-              SUBSTITUTE TRAINER
+              SUBSTITUTE HUẤN LUYỆN VIÊN
             </span>
 
             <h2 id="substitute-observation-title">
@@ -1449,7 +1449,7 @@ export default function TrainerSessionsPage() {
             <div className="trainer-supervision-observation-context">
               <div>
                 <span>
-                  Trainer phụ trách
+                  Huấn luyện viên phụ trách
                 </span>
 
                 <strong>

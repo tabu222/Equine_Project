@@ -1,3 +1,4 @@
+import HorseTrainerAssignmentPage from './HorseTrainerAssignmentPage.jsx'
 import {
   useEffect,
   useMemo,
@@ -93,7 +94,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -121,7 +122,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -631,7 +632,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
       setMessage(
         form.DecisionStatus ===
           'Recommended'
-          ? 'Đã lưu đánh giá. Có thể chuyển sang bước phân công huấn luyện viên.'
+          ? 'Đã lưu đánh giá.'
           : 'Đã lưu kết quả đánh giá không đề xuất.',
       )
     } catch (saveError) {
@@ -868,9 +869,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
           </h1>
 
           <p>
-            {mode === 'assignment'
-              ? 'Chọn huấn luyện viên phù hợp theo kết quả đánh giá đã lưu.'
-              : 'Ghi nhận thể trạng, chuyên môn và kết luận đánh giá trước khi phân công.'}
+
           </p>
         </div>
 
@@ -964,7 +963,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
 
           <div>
             <span>
-              Giáo án Active
+              Giáo án đang áp dụng
             </span>
 
             <strong>
@@ -1102,7 +1101,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
         <div className="assessment-section-heading">
           <div>
             <span className="assessment-section-kicker">
-              ĐÁNH GIÁ MỚI
+
             </span>
 
             <h2>
@@ -1110,9 +1109,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
             </h2>
 
             <p>
-              Mỗi lần lưu sẽ tạo một
-              Assessment mới. FE không sửa
-              lại Assessment lịch sử.
+              
             </p>
           </div>
         </div>
@@ -1162,10 +1159,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
               )}
             </select>
 
-            <small>
-              Huấn luyện viên được phân công phải có
-              chuyên môn này.
-            </small>
+
           </label>
 
           <label className="form-field">
@@ -1190,10 +1184,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
               }
             />
 
-            <small>
-              Điểm này được dùng để xác định
-              cấp độ huấn luyện viên phù hợp.
-            </small>
+
           </label>
 
           <label className="form-field">
@@ -1256,8 +1247,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
             </select>
 
             <small>
-              Giá trị gửi Backend vẫn là
-              Recommended / Rejected.
+
             </small>
           </label>
 
@@ -1300,11 +1290,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
       )}
 
       {mode === 'assessment' && (
-        <div className="assessment-form-actions">
-          <Link className="button button-secondary" to={`/training/horses/${horseId}/assignment`}>
-            Tiếp tục đến phân công huấn luyện viên
-          </Link>
-        </div>
+        <HorseTrainerAssignmentPage embedded refreshToken={latestAssessment?.AssessmentID} />
       )}
 
       {mode === 'assignment' && (
@@ -1332,17 +1318,12 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
                 Huấn luyện viên phù hợp
               </h2>
 
-              <p>
-                Danh sách và thứ tự dưới
-                đây do Backend tính. FE
-                không tự tính Trainer
-                suggestion.
-              </p>
+
             </div>
 
             <div className="assessment-requirement">
               <span>
-                Assessment đang áp dụng
+                Đánh giá gần nhất
               </span>
 
               <strong>
@@ -1876,12 +1857,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
                 }
               </span>
 
-              <small>
-                Backend hiện không chặn phân
-                công vì thiếu cấp độ; Backend
-                sẽ trả LevelWarning sau khi
-                phân công huấn luyện viên.
-              </small>
+
             </div>
           )}
 
@@ -1931,9 +1907,7 @@ export default function HorseAssessmentAssignmentPage({ mode = 'assessment' }) {
             Lịch sử đánh giá
           </h2>
 
-          <p>
-            Xem các lần đánh giá trước đây của ngựa.
-          </p>
+          
         </div>
 
         <Link

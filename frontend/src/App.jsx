@@ -69,7 +69,7 @@ import OwnerTrainingActivityPage from './pages/owner/OwnerTrainingActivityPage.j
 import HorsesNeedingExam from './pages/vet/HorsesNeedingExam.jsx'
 import VetExaminationForm from './pages/vet/VetExaminationForm.tsx'
 
-import HeadTrainerTrainingDashboard from './pages/training/HeadTrainerTrainingDashboard.jsx'
+import HeadTrainerTrainingDashboard, { HeadTrainerResultsPage } from './pages/training/HeadTrainerTrainingDashboard.jsx'
 import HorseAssessmentAssignmentPage from './pages/training/HorseAssessmentAssignmentPage.jsx'
 import HorseTrainerAssignmentPage from './pages/training/HorseTrainerAssignmentPage.jsx'
 import TrainerProfilePage from './pages/training/TrainerProfilePage.jsx'
@@ -1918,6 +1918,11 @@ function AppContent() {
                 </span>
               </NavLink>
 
+              <NavLink to="/training/results">
+                <NavIcon kind="manager" />
+                <span>Kết quả tập luyện</span>
+              </NavLink>
+
               <NavLink to="/training/adjustments">
                 <NavIcon kind="manager" />
 
@@ -2571,6 +2576,17 @@ function AppContent() {
                     to={home}
                     replace
                   />
+                )
+              }
+            />
+
+            <Route
+              path="/training/results"
+              element={
+                role === 'headTrainer' ? (
+                  <HeadTrainerResultsPage />
+                ) : (
+                  <Navigate to={home} replace />
                 )
               }
             />

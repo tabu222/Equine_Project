@@ -476,10 +476,7 @@ export default function TrainingPlanEditPage() {
             Draft
           </h2>
 
-          <p>
-            Backend chỉ cho sửa Plan và
-            Stage khi Status = Draft.
-          </p>
+          
 
           <Link
             className="button"

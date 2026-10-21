@@ -16,7 +16,7 @@ export function vetDateTime(value) {
   const normalized = String(value).replace(' ', 'T')
   const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized) ? normalized : `${normalized}+07:00`)
   if (!Number.isFinite(date.getTime())) return 'Chưa cập nhật'
-  return new Intl.DateTimeFormat('vi-VN', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date)
+  return new Intl.DateTimeFormat('en-US', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date)
 }
 export function clubToday(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)

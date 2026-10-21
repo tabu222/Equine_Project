@@ -92,7 +92,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -905,7 +905,7 @@ export default function TrainingSchedulePage({
           <input
             type="search"
             value={search}
-            placeholder="Ngựa, Rider, bài tập, Stage..."
+            placeholder="Ngựa, Rider, bài tập, Giai đoạn..."
             onChange={(event) =>
               setSearch(
                 event.target.value,
@@ -929,20 +929,13 @@ export default function TrainingSchedulePage({
       <section className="panel training-session-list-panel">
         <div className="training-session-section-head">
           <div>
-            <span className="training-session-kicker">
-              SESSION SCHEDULE
-            </span>
+            
 
             <h2>
               Các buổi tập
             </h2>
 
-            <p>
-              Trainer chỉ thấy session của
-              các Active Plan mình đang phụ
-              trách. Head Trainer xem lịch
-              toàn CLB.
-            </p>
+            
           </div>
         </div>
 

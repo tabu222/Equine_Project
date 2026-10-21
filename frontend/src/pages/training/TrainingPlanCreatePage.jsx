@@ -328,7 +328,7 @@ export default function TrainingPlanCreatePage() {
           </h1>
 
           <p>
-            Tạo bản Draft cho ngựa đang
+            Tạo bản nháp cho ngựa đang
             thuộc Active Assignment của
             Trainer.
           </p>
@@ -436,7 +436,7 @@ export default function TrainingPlanCreatePage() {
             )
           }
           busy={busy}
-          submitLabel="Lưu Draft"
+          submitLabel="Lưu bản nháp"
           onSubmit={
             handleSubmit
           }

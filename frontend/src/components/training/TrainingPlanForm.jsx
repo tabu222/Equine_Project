@@ -722,12 +722,7 @@ export default function TrainingPlanForm({
               Các giai đoạn
             </h2>
 
-            <p>
-              Có thể lưu Draft chưa có
-              Stage. Tuy nhiên Backend yêu
-              cầu ít nhất một Stage trước
-              khi gửi duyệt.
-            </p>
+            
           </div>
 
           <button

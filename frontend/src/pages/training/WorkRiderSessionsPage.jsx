@@ -67,7 +67,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -751,7 +751,7 @@ export default function WorkRiderSessionsPage() {
             </strong>
 
             <span>
-              Đang tải danh sách buổi tập.
+
             </span>
           </div>
         </section>

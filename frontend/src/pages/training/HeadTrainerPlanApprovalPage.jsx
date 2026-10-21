@@ -56,7 +56,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -84,7 +84,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -434,7 +434,7 @@ export default function HeadTrainerPlanApprovalPage() {
           <input
             type="search"
             value={search}
-            placeholder="Tên ngựa, Trainer, mã Plan, mục tiêu..."
+            placeholder="Tên ngựa, Huấn luyện viên, mã Plan, mục tiêu..."
             onChange={(event) =>
               setSearch(
                 event.target.value,
@@ -467,10 +467,7 @@ export default function HeadTrainerPlanApprovalPage() {
               Danh sách chờ xử lý
             </h2>
 
-            <p>
-              Chỉ hiển thị Plan có Status =
-              Pending Approval.
-            </p>
+            
           </div>
         </div>
 

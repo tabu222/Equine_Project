@@ -644,6 +644,10 @@ export interface TrainerAssignment {
   LevelWarning?:
     | string
     | null
+
+  DraftTrainingPlanID?:
+    | number
+    | null
 }
 
 export interface AssignTrainerInput {
@@ -911,6 +915,14 @@ export interface TrainingPlan {
     | string
     | null
 
+  TemplateID:
+    | number
+    | null
+
+  TemplateName:
+    | string
+    | null
+
   Stages:
     TrainingPlanStage[]
 }
@@ -1169,6 +1181,239 @@ export function reviseTrainingPlan(
   return apiPost<TrainingPlan>(
     `/training-plans/${planId}/revise`,
     {},
+  )
+}
+
+/* =========================================================
+ * TRAINING PLAN TEMPLATE
+ * ======================================================= */
+
+export interface TrainingPlanTemplateStage {
+  TemplateStageID: number
+
+  StageOrder: number
+
+  StageName: string
+
+  Goal:
+    | string
+    | null
+
+  StartDay: number
+
+  DurationDays: number
+
+  Intensity:
+    | TrainingIntensity
+    | null
+
+  TrainingLoad:
+    | number
+    | null
+
+  DistanceTargetKm:
+    | number
+    | null
+
+  Surface:
+    | string
+    | null
+
+  Note:
+    | string
+    | null
+
+  ExitCriteria:
+    | string
+    | null
+}
+
+export interface TrainingPlanTemplate {
+  TemplateID: number
+
+  ClubID: number
+
+  SpecializationID: number
+
+  SpecializationName: string
+
+  SpecializationCode: string
+
+  TemplateName: string
+
+  Goal:
+    | string
+    | null
+
+  DurationDays: number
+
+  OverallIntensity:
+    | TrainingIntensity
+    | null
+
+  DailyStructure:
+    | string
+    | null
+
+  WeeklyPattern:
+    | string
+    | null
+
+  Note:
+    | string
+    | null
+
+  IsActive: boolean
+
+  UpdatedBy:
+    | number
+    | null
+
+  UpdatedByName:
+    | string
+    | null
+
+  UpdatedAt: string
+
+  Stages:
+    TrainingPlanTemplateStage[]
+}
+
+export interface TrainingPlanTemplateChange {
+  StageOrder:
+    | number
+    | null
+
+  Field: string
+
+  Template: unknown
+
+  Plan: unknown
+
+  Change?:
+    | 'Changed'
+    | 'Added'
+    | 'Removed'
+}
+
+export interface TrainingPlanTemplateReview {
+  TrainingPlanID: number
+
+  Status:
+    TrainingPlanStatus
+
+  TemplateID:
+    | number
+    | null
+
+  TemplateName:
+    | string
+    | null
+
+  DailyStructure:
+    | string
+    | null
+
+  WeeklyPattern:
+    | string
+    | null
+
+  TemplateNote:
+    | string
+    | null
+
+  Assessment:
+    | {
+        AssessmentID: number
+        QualityScore:
+          | number
+          | null
+        FitnessLevel:
+          | FitnessLevel
+          | null
+        AssessmentNote:
+          | string
+          | null
+        SpecializationID: number
+      }
+    | null
+
+  ChangedFromTemplate:
+    | boolean
+    | null
+
+  ChangeCount:
+    | number
+    | null
+
+  Changes:
+    | TrainingPlanTemplateChange[]
+    | null
+}
+
+export function getTrainingPlanTemplates(
+  params: {
+    SpecializationID?:
+      | number
+      | string
+  } = {},
+) {
+  return apiGet<
+    TrainingPlanTemplate[]
+  >(
+    `/training-plan-templates${buildQuery(
+      params,
+    )}`,
+  )
+}
+
+export function getTrainingPlanTemplate(
+  templateId:
+    | number
+    | string,
+) {
+  return apiGet<TrainingPlanTemplate>(
+    `/training-plan-templates/${templateId}`,
+  )
+}
+
+export function getTrainingPlanTemplateReview(
+  planId:
+    | number
+    | string,
+) {
+  return apiGet<TrainingPlanTemplateReview>(
+    `/training-plans/${planId}/template-review`,
+  )
+}
+
+export function rescheduleTrainingPlan(
+  planId:
+    | number
+    | string,
+
+  startDate: string,
+) {
+  return apiPost<TrainingPlan>(
+    `/training-plans/${planId}/reschedule`,
+    {
+      StartDate:
+        startDate,
+    },
+  )
+}
+
+export function createTrainingPlanFromTemplate(
+  horseId:
+    | number
+    | string,
+) {
+  return apiPost<TrainingPlan>(
+    '/training-plans/from-template',
+    {
+      HorseID:
+        Number(horseId),
+    },
   )
 }
 

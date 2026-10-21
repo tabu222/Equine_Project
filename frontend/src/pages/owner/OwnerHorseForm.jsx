@@ -447,7 +447,7 @@ function OwnerHorseForm({ currentUser, onSaved }) {
                 <label className="form-field"><span>Tên ngựa cha *</span><input required maxLength="100" value={form.sireName} aria-invalid={Boolean(fieldErrors.sireName)} onChange={(event) => setField('sireName', event.target.value)} />{fieldErrors.sireName && <small className="field-error" role="alert">{fieldErrors.sireName}</small>}</label>
                 <label className="form-field"><span>Tên ngựa mẹ *</span><input required maxLength="100" value={form.damName} aria-invalid={Boolean(fieldErrors.damName)} onChange={(event) => setField('damName', event.target.value)} />{fieldErrors.damName && <small className="field-error" role="alert">{fieldErrors.damName}</small>}</label>
               </div>
-              <p className="form-help">Backend hiện chưa có trường lưu đặc điểm nhận dạng riêng.</p>
+              <p className="form-help">hệ thống hiện chưa có trường lưu đặc điểm nhận dạng riêng.</p>
             </section>
 
             <section className="owner-horse-card">
@@ -473,7 +473,7 @@ function OwnerHorseForm({ currentUser, onSaved }) {
                 <span>JPG, PNG hoặc WebP · tối đa 10 MB mỗi file theo cấu hình mặc định backend.</span>
                 <input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple onChange={(event) => { addFiles(event.target.files, true); event.target.value = '' }} />
               </label>
-              <p className="form-help">Ảnh được lưu cùng tài liệu đính kèm. Backend chưa có trường ảnh đại diện riêng nên chưa thể đặt ảnh đại diện.</p>
+              <p className="form-help">Ảnh được lưu cùng tài liệu đính kèm. hệ thống chưa có trường ảnh đại diện riêng nên chưa thể đặt ảnh đại diện.</p>
               {documentsError && <p className="error-message" role="alert">{documentsError}</p>}
               {pendingUploads.filter((item) => item.kind === 'image').map((item) => (
                 <UploadRow key={item.key} item={item} onRetry={() => retryUpload(item)} onRemove={() => removeUpload(item.key)} busy={uploadBusy} />
@@ -481,12 +481,11 @@ function OwnerHorseForm({ currentUser, onSaved }) {
             </section>
 
             <section className="owner-horse-card">
-              <div className="section-title"><h2>Giấy tờ đính kèm</h2><p>Loại giấy tờ phải thuộc danh sách hiện được backend chấp nhận.</p></div>
+              <div className="section-title"><h2>Giấy tờ đính kèm</h2></div>
               <div className="horse-form-grid">
                 <label className="form-field"><span>Loại giấy tờ</span><select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>{documentTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
                 <label className="file-picker-button"><span>Chọn tài liệu</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" multiple onChange={(event) => { addFiles(event.target.files, false); event.target.value = '' }} /></label>
               </div>
-              <p className="form-help">Nhận PDF và ảnh JPG/PNG/WebP, tối đa 10 MB mỗi file theo cấu hình mặc định backend. Chưa hỗ trợ ngày cấp, ngày hết hạn hoặc ghi chú.</p>
               <p className="form-help">Phả hệ, sổ tiêm phòng và hồ sơ khám/xét nghiệm chưa có loại riêng; chọn “Tài liệu khác” nếu cần đính kèm.</p>
               {pendingUploads.filter((item) => item.kind === 'document').map((item) => (
                 <UploadRow key={item.key} item={item} onRetry={() => retryUpload(item)} onRemove={() => removeUpload(item.key)} busy={uploadBusy} />
@@ -507,7 +506,7 @@ function OwnerHorseForm({ currentUser, onSaved }) {
 
             <section className="owner-horse-card owner-health-unavailable">
               <div className="section-title"><h2>Thông tin sức khỏe</h2></div>
-              <p>Backend hiện chưa có trường để Owner tự nhập thông tin sức khỏe. Nếu cần gửi hồ sơ khám/xét nghiệm, hãy đính kèm ở mục Giấy tờ với loại “Tài liệu khác”; kết luận khám do Vet thực hiện.</p>
+              <p>hệ thống hiện chưa có trường để Owner tự nhập thông tin sức khỏe. Nếu cần gửi hồ sơ khám/xét nghiệm, hãy đính kèm ở mục Giấy tờ với loại “Tài liệu khác”; kết luận khám do Vet thực hiện.</p>
             </section>
           </div>
           <div className="form-actions">
