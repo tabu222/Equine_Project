@@ -17,14 +17,15 @@ from apps.core.serializers import fmt_datetime
 from apps.horses.models import Horse
 from apps.horses.views import get_visible_horse
 
-from . import profiles, services, summaries
+from . import plan_templates, profiles, services, summaries
 from .models import (
     HorseAssessment, HorseWorkRiderPreference, Specialization, TrainerCredential, TrainerHorseAssignment, TrainerProfile,
-    TrainerRaceResult, TrainingPlan, TrainingPlanStage, TrainingReview, TrainingSession,
+    TrainerRaceResult, TrainingPlan, TrainingPlanStage, TrainingPlanTemplate, TrainingReview, TrainingSession,
 )
 from .serializers import (
     AssignTrainerSerializer, HorseAssessmentSerializer, NoteSerializer, ReasonOptionalSerializer,
-    SpecializationSerializer, StageCloseSerializer, StopSessionSerializer, SubstituteObservationSerializer,
+    FromTemplateSerializer, RescheduleSerializer, SpecializationSerializer, StageCloseSerializer, StopSessionSerializer,
+    TrainingPlanTemplateSerializer, TrainingPlanTemplateWriteSerializer, SubstituteObservationSerializer,
     TrainerCredentialSerializer, TrainerHorseAssignmentSerializer, TrainerProfileWriteSerializer,
     TrainerRaceResultSerializer, TrainerSpecializationSerializer,
     TrainingPlanCreateSerializer, TrainingPlanSerializer, TrainingPlanStageSerializer, TrainingPlanWriteSerializer,
@@ -353,6 +354,8 @@ class TrainerAssignmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         assignment = services.assign_trainer(horse, request.user, v["TrainerID"], spec, assessment,
                                              v.get("StartDate"), v.get("AssignmentNote"))
         body = TrainerHorseAssignmentSerializer(assignment).data
+        draft = getattr(assignment, "draft_plan", None)
+        body["DraftTrainingPlanID"] = draft.id if draft else None     # giáo án nháp từ mẫu gửi kèm cho trainer
         # Không chặn, chỉ nhắc Head Trainer khi giao ngựa tốt cho trainer chưa đủ kinh nghiệm
         row = trainer_row(assignment.trainer)
         check = profiles.suggestion(row, {s["SpecializationID"] for s in row["Specializations"]},
@@ -432,6 +435,8 @@ class TrainingPlanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
         "stages": ("TRAINING_PLAN_MANAGE",),
         "submit": ("TRAINING_PLAN_MANAGE",),
         "revise": ("TRAINING_PLAN_MANAGE",),
+        "reschedule": ("TRAINING_PLAN_MANAGE",),
+        "from_template": ("TRAINING_PLAN_MANAGE",),
         "approve": ("TRAINING_PLAN_APPROVE",),
         "return_plan": ("TRAINING_PLAN_APPROVE",),
         "complete": ("TRAINING_PLAN_MANAGE", "TRAINING_PLAN_APPROVE"),
@@ -482,6 +487,38 @@ class TrainingPlanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, view
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         return self._out(services.submit_plan(self.get_object(), request.user))
+
+    @action(detail=True, methods=["get"], url_path="template-review")
+    def template_review(self, request, pk=None):
+        """Giáo án mẫu đã dùng + phiếu đánh giá ngựa + những gì đã sửa so với mẫu (trainer sửa, Head Trainer duyệt)."""
+        return Response(plan_templates.template_review(self.get_object()))
+
+    @extend_schema(request=RescheduleSerializer)
+    @action(detail=True, methods=["post"])
+    def reschedule(self, request, pk=None):
+        """Đổi ngày bắt đầu giáo án nháp, mọi giai đoạn dời theo."""
+        data = RescheduleSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        return self._out(plan_templates.reschedule_plan(self.get_object(), request.user,
+                                                        data.validated_data["StartDate"]))
+
+    @extend_schema(request=FromTemplateSerializer)
+    @action(detail=False, methods=["post"], url_path="from-template")
+    def from_template(self, request):
+        """Trainer phụ trách tạo (lại) bản nháp từ giáo án mẫu của chuyên môn khi ngựa chưa có bản nháp / chờ duyệt."""
+        data = FromTemplateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        horse = staff_horse(request.user, data.validated_data["HorseID"])
+        assignment = services.active_assignment(horse)
+        if assignment is None or assignment.trainer_id != request.user.pk:
+            raise PermissionDenied("Chỉ trainer đang phụ trách ngựa mới tạo giáo án.")
+        if assignment.plans.filter(status__in=("Draft", "Pending Approval")).exists():
+            raise ValidationError({"HorseID": ["Ngựa đã có giáo án đang soạn / chờ duyệt."]})
+        template = plan_templates.template_for(horse.club, assignment.specialization)
+        if template is None:
+            raise ValidationError({"HorseID": ["Chuyên môn này chưa có giáo án mẫu đang dùng."]})
+        return self._out(plan_templates.draft_from_template(assignment, request.user, template),
+                         status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
@@ -783,4 +820,63 @@ class TrainingDashboardView(APIView):
                     "LockEndDate": fmt_datetime(lock.lock_end_date) if lock else None,
                 })
         return Response(result)
+
+
+# ---------------------------------------------------------------------------
+# Giáo án mẫu (mỗi chuyên môn 1 bản trong CLB)
+# ---------------------------------------------------------------------------
+class TrainingPlanTemplateListView(APIView):
+    """GET /api/training-plan-templates?SpecializationID= - giáo án mẫu của CLB (thiếu chuyên môn nào thì tạo bản mặc định)."""
+
+    permission_classes = [HasAnyPermission(STAFF_VIEW)]
+
+    @extend_schema(parameters=[OpenApiParameter("SpecializationID", OpenApiTypes.INT)])
+    def get(self, request):
+        plan_templates.ensure_templates(request.user.club)
+        qs = TrainingPlanTemplate.objects.filter(club_id=request.user.club_id).select_related(
+            "specialization", "updated_by").prefetch_related("stages")
+        if request.query_params.get("SpecializationID"):
+            qs = qs.filter(specialization_id=int_param(request.query_params, "SpecializationID"))
+        return Response(TrainingPlanTemplateSerializer(qs, many=True).data)
+
+
+class TrainingPlanTemplateDetailView(APIView):
+    """
+    GET   /api/training-plan-templates/<id>
+    PUT   /api/training-plan-templates/<id>   Head Trainer sửa toàn bộ (kèm Stages)
+    PATCH /api/training-plan-templates/<id>   Head Trainer sửa một phần (gửi Stages thì thay toàn bộ giai đoạn)
+    Giáo án đã tạo từ mẫu trước đó không bị đổi.
+    """
+
+    permission_classes = [HasAnyPermission(STAFF_VIEW)]
+
+    def _template(self, request, template_id):
+        template = TrainingPlanTemplate.objects.filter(pk=template_id, club_id=request.user.club_id).first()
+        if template is None:
+            raise NotFound("Không tìm thấy giáo án mẫu.")
+        return template
+
+    def get(self, request, template_id):
+        return Response(TrainingPlanTemplateSerializer(self._template(request, template_id)).data)
+
+    def _save(self, request, template_id, partial):
+        plan_templates.ensure_template_editor(request.user)
+        template = self._template(request, template_id)
+        data = TrainingPlanTemplateWriteSerializer(data=request.data, partial=partial)
+        data.is_valid(raise_exception=True)
+        values = dict(data.validated_data)
+        stages = values.pop("Stages", None)
+        if not partial and stages is None:
+            raise ValidationError({"Stages": ["Cần gửi danh sách giai đoạn."]})
+        plan_templates.update_template(template, request.user, values,
+                                       [dict(st) for st in stages] if stages is not None else None)
+        return Response(TrainingPlanTemplateSerializer(self._template(request, template_id)).data)
+
+    @extend_schema(request=TrainingPlanTemplateWriteSerializer)
+    def put(self, request, template_id):
+        return self._save(request, template_id, partial=False)
+
+    @extend_schema(request=TrainingPlanTemplateWriteSerializer)
+    def patch(self, request, template_id):
+        return self._save(request, template_id, partial=True)
 

@@ -97,3 +97,103 @@ def seed_demo(club):
                                   field_size=size, created_by=manager or trainer)
                 for i, (day, position, size) in enumerate(rows)
             ])
+    from .plan_templates import ensure_templates
+
+    ensure_templates(club)          # giáo án mẫu mặc định cho mỗi chuyên môn
+    seed_plan_demo(club)
+
+
+# ---------------------------------------------------------------------------
+# Giáo án mẫu để demo trang của Trainer / Work Rider / chủ ngựa (owner@equi.local -> ngựa Sao Mai)
+# ---------------------------------------------------------------------------
+DEMO_PLAN_HORSE = "Sao Mai"
+# (ngày so với hôm nay, trạng thái, quãng đường km, tốc độ TB, điểm, đánh giá, nhận xét trainer / lý do)
+DEMO_STAGE1_SESSIONS = [
+    (-14, "Completed", Decimal("4.0"), Decimal("35.5"), Decimal("68"), "Average", "Còn hụt hơi ở 1 km cuối."),
+    (-12, "Completed", Decimal("4.2"), Decimal("36.2"), Decimal("71"), "Good", "Nhịp chạy đều hơn buổi trước."),
+    (-10, "Cancelled", None, None, None, None, "Trời mưa to, sân trơn"),
+    (-8, "Completed", Decimal("4.5"), Decimal("37.0"), Decimal("74"), "Good", "Hồi phục nhanh, giữ tải hiện tại."),
+    (-6, "Missed", None, None, None, None, "Work Rider ốm, không có người thay"),
+    (-4, "Completed", Decimal("4.8"), Decimal("38.1"), Decimal("77"), "Good", "Sải chân tốt, có thể tăng quãng đường."),
+    (-2, "Completed", Decimal("5.0"), Decimal("38.9"), Decimal("80"), "Excellent", "Đạt mục tiêu giai đoạn nền tảng."),
+]
+
+
+def seed_plan_demo(club):
+    """Ngựa Sao Mai: phân công trainer@, 1 giáo án Active (giai đoạn 1 đã chốt, giai đoạn 2 đang chạy), buổi tập
+    đã có kết quả + đánh giá, 1 buổi hủy, 1 buổi vắng, 2 buổi sắp tới. Đã có giáo án thì bỏ qua."""
+    from datetime import datetime, time
+
+    from apps.accounts.models import User
+    from apps.core.audit import log_action
+    from apps.horses.models import Horse
+
+    from .models import (
+        HorseAssessment, Specialization, TrainerHorseAssignment, TrainingPlan, TrainingPlanStage, TrainingResult,
+        TrainingReview, TrainingSession,
+    )
+
+    horse = Horse.objects.filter(club=club, horse_name=DEMO_PLAN_HORSE, registration_status="Approved").first()
+    people = {e: User.objects.filter(email__iexact=e, club=club).first() for e in (
+        "headtrainer@equi.local", "trainer@equi.local", "rider@equi.local", "rider2@equi.local")}
+    if horse is None or None in people.values() or TrainingPlan.objects.filter(assignment__horse=horse).exists():
+        return
+    head, trainer, rider, rider2 = people.values()
+    today = date.today()
+
+    def at(days, hour=6, minute=0):   # USE_TZ = False: ngày giờ không kèm múi giờ
+        return datetime.combine(today + timedelta(days=days), time(hour, minute))
+
+    flat = Specialization.objects.get(code="FLAT_RACING")
+    assignment = TrainerHorseAssignment.objects.filter(horse=horse, status="Active").first()
+    if assignment is None:
+        assessment = HorseAssessment.objects.create(
+            horse=horse, head_trainer=head, specialization=flat, assessment_date=at(-20, 9), quality_score=86,
+            fitness_level="Good", assessment_note="Sải chân dài, hợp đua đường bằng cự ly ngắn - trung bình.")
+        assignment = TrainerHorseAssignment.objects.create(
+            horse=horse, trainer=trainer, specialization=flat, assigned_by=head, assessment=assessment,
+            start_date=today - timedelta(days=19), status="Active")
+    plan = TrainingPlan.objects.create(
+        assignment=assignment, goal="Chuẩn bị Cúp Mùa Đông (đua đường bằng 1.600 m)", start_date=today - timedelta(days=14),
+        end_date=today + timedelta(days=30), overall_intensity="Moderate", status="Active", created_at=at(-17, 10),
+        submitted_at=at(-16, 10), approved_by=head, approved_at=at(-15, 9), review_note="Đồng ý, theo dõi nhịp tim.")
+    stage1 = TrainingPlanStage.objects.create(
+        plan=plan, stage_name="Nền tảng", stage_order=1, goal="Làm quen sân, xây nền thể lực",
+        start_date=today - timedelta(days=14), end_date=today - timedelta(days=1), intensity="Low",
+        training_load=30, distance_target_km=25, surface="Turf",
+        closed_at=at(-1, 18), closed_by=trainer,
+        summary_note="Ngựa thích nghi tốt, điểm phong độ tăng đều từ 68 lên 80. Sẵn sàng tăng sức bền.")
+    stage2 = TrainingPlanStage.objects.create(
+        plan=plan, stage_name="Tăng sức bền", stage_order=2, goal="Tăng quãng đường lên 6 km/buổi",
+        start_date=today, end_date=today + timedelta(days=30), intensity="Moderate", training_load=50,
+        distance_target_km=100, surface="Turf")
+
+    def session(stage, days, status, start=(6, 0), worker=rider, seq=1):
+        return TrainingSession.objects.create(
+            stage=stage, work_rider=worker, assigned_by=trainer, session_date=today + timedelta(days=days),
+            start_time=time(*start), end_time=time(start[0], 50) if status == "Completed" else None, sequence_no=seq,
+            training_type="Canter", duration_planned_minutes=45, distance_planned_km=Decimal("5.0"),
+            target_speed_kmh=Decimal("38"), training_load=stage.training_load, surface="Turf",
+            location="Đường chạy số 2", instructions="Khởi động 10 phút, giữ nhịp đều.", status=status)
+
+    def finish(s, days, distance, speed, score, evaluation, comment):
+        TrainingResult.objects.create(
+            session=s, actual_duration_minutes=46, actual_distance_km=distance, avg_speed_kmh=speed,
+            max_speed_kmh=speed + 14, avg_heart_rate=150, max_heart_rate=200, recovery_minutes=12,
+            performance_score=score, rider_observation="Ngựa hợp tác tốt, hơi nặng chân cuối buổi.",
+            recorded_at=at(days, 7))
+        TrainingReview.objects.create(session=s, trainer=trainer, review_date=at(days, 10), evaluation=evaluation,
+                                      trainer_comment=comment)
+
+    for days, status, distance, speed, score, evaluation, note in DEMO_STAGE1_SESSIONS:
+        s = session(stage1, days, status)
+        if status == "Completed":
+            finish(s, days, distance, speed, score, evaluation, note)
+        else:
+            log_action(trainer, "CANCEL_TRAINING_SESSION" if status == "Cancelled" else "MISS_TRAINING_SESSION",
+                       s, {"Reason": note})
+    log_action(trainer, "CLOSE_PLAN_STAGE", stage1, {"TrainingPlanID": plan.id})
+    today_session = session(stage2, 0, "Completed")
+    finish(today_session, 0, Decimal("5.5"), Decimal("39.4"), Decimal("82"), "Good", "Bắt đầu tăng tải ổn định.")
+    session(stage2, 2, "Assigned")
+    session(stage2, 4, "Assigned", worker=rider2)

@@ -21,3 +21,20 @@ class AuditLog(models.Model):
         managed = False
         db_table = "AuditLog"
         ordering = ["-action_time", "-id"]
+
+
+class NotificationRead(models.Model):
+    """
+    dbo.NotificationRead: thông báo người dùng đã đọc. Thông báo vẫn được TÍNH lại mỗi lần gọi;
+    bảng này chỉ nhớ khóa (NotificationKey = Type|EntityName|EntityID|At) của thông báo đã đọc.
+    """
+
+    pk = models.CompositePrimaryKey("user", "notification_key")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, db_column="UserID",
+                             related_name="+")
+    notification_key = models.CharField(max_length=200, db_column="NotificationKey")
+    read_at = models.DateTimeField(default=timezone.now, db_column="ReadAt")
+
+    class Meta:
+        managed = False
+        db_table = "NotificationRead"

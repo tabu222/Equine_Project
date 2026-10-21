@@ -61,7 +61,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -684,11 +684,7 @@ export default function HorseAssessmentHistoryPage() {
               Các lần đánh giá
             </h2>
 
-            <p>
-              Dữ liệu được giữ nguyên theo
-              lịch sử Backend; FE chỉ đổi
-              nhãn hiển thị sang tiếng Việt.
-            </p>
+            
           </div>
         </div>
 

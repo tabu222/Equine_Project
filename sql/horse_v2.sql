@@ -72,10 +72,13 @@ DROP VIEW IF EXISTS dbo.vw_VetHealthReportQueue;
 GO
 
 /* Bảng v2 - theo thứ tự con trước, cha sau */
+DROP TABLE IF EXISTS dbo.NotificationRead;
 DROP TABLE IF EXISTS dbo.AuditLog;
 DROP TABLE IF EXISTS dbo.InventoryRequestItem;
 DROP TABLE IF EXISTS dbo.InventoryRequest;
 DROP TABLE IF EXISTS dbo.InventoryItem;
+DROP TABLE IF EXISTS dbo.HorseGroom;
+DROP TABLE IF EXISTS dbo.CareTaskRule;
 DROP TABLE IF EXISTS dbo.CareTask;
 DROP TABLE IF EXISTS dbo.DietMeal;
 DROP TABLE IF EXISTS dbo.DietPlan;
@@ -92,6 +95,8 @@ DROP TABLE IF EXISTS dbo.TrainingResult;
 DROP TABLE IF EXISTS dbo.TrainingSession;
 DROP TABLE IF EXISTS dbo.TrainingPlanStage;
 DROP TABLE IF EXISTS dbo.TrainingPlan;
+DROP TABLE IF EXISTS dbo.TrainingPlanTemplateStage;
+DROP TABLE IF EXISTS dbo.TrainingPlanTemplate;
 DROP TABLE IF EXISTS dbo.HorseWorkRiderPreference;
 DROP TABLE IF EXISTS dbo.TrainerHorseAssignment;
 DROP TABLE IF EXISTS dbo.HorseAssessment;
@@ -669,6 +674,65 @@ CREATE TABLE dbo.HorseWorkRiderPreference
 );
 GO
 
+-- Giáo án mẫu: mỗi CLB, mỗi chuyên môn 1 bản; giai đoạn mẫu tính theo "ngày thứ mấy" của giáo án
+CREATE TABLE dbo.TrainingPlanTemplate
+(
+    TemplateID INT IDENTITY(1,1) PRIMARY KEY,
+    ClubID INT NOT NULL,
+    SpecializationID INT NOT NULL,
+    TemplateName NVARCHAR(150) NOT NULL,
+    Goal NVARCHAR(1000),
+    DurationDays INT NOT NULL,
+    OverallIntensity VARCHAR(30),
+    DailyStructure NVARCHAR(2000),
+    WeeklyPattern NVARCHAR(2000),
+    Note NVARCHAR(2000),
+    IsActive BIT NOT NULL CONSTRAINT DF_TrainingPlanTemplate_Active DEFAULT 1,
+    UpdatedBy INT NULL,
+    UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_TrainingPlanTemplate_UpdatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TrainingPlanTemplate_Club FOREIGN KEY (ClubID)
+        REFERENCES dbo.Club(ClubID),
+    CONSTRAINT FK_TrainingPlanTemplate_Spec FOREIGN KEY (SpecializationID)
+        REFERENCES dbo.Specialization(SpecializationID),
+    CONSTRAINT FK_TrainingPlanTemplate_UpdatedBy FOREIGN KEY (UpdatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT UQ_TrainingPlanTemplate_Club_Spec UNIQUE (ClubID, SpecializationID),
+    CONSTRAINT CK_TrainingPlanTemplate_Duration CHECK (DurationDays > 0),
+    CONSTRAINT CK_TrainingPlanTemplate_Intensity CHECK
+    (
+        OverallIntensity IS NULL OR OverallIntensity IN ('Low', 'Moderate', 'High', 'Very High')
+    )
+);
+GO
+
+CREATE TABLE dbo.TrainingPlanTemplateStage
+(
+    TemplateStageID INT IDENTITY(1,1) PRIMARY KEY,
+    TemplateID INT NOT NULL,
+    StageOrder INT NOT NULL,
+    StageName NVARCHAR(100) NOT NULL,
+    Goal NVARCHAR(1000),
+    StartDay INT NOT NULL,
+    DurationDays INT NOT NULL,
+    Intensity VARCHAR(30),
+    TrainingLoad DECIMAL(10,2) NULL,
+    DistanceTargetKm DECIMAL(10,2) NULL,
+    Surface VARCHAR(50),
+    Note NVARCHAR(1500),
+    ExitCriteria NVARCHAR(1000),
+
+    CONSTRAINT FK_TemplateStage_Template FOREIGN KEY (TemplateID)
+        REFERENCES dbo.TrainingPlanTemplate(TemplateID),
+    CONSTRAINT UQ_TemplateStage_Order UNIQUE (TemplateID, StageOrder),
+    CONSTRAINT CK_TemplateStage_Days CHECK (StageOrder > 0 AND StartDay >= 1 AND DurationDays > 0),
+    CONSTRAINT CK_TemplateStage_Intensity CHECK
+    (
+        Intensity IS NULL OR Intensity IN ('Low', 'Moderate', 'High', 'Very High')
+    )
+);
+GO
+
 CREATE TABLE dbo.TrainingPlan
 (
     TrainingPlanID INT IDENTITY(1,1) PRIMARY KEY,
@@ -687,9 +751,12 @@ CREATE TABLE dbo.TrainingPlan
     ApprovedByHeadTrainerID INT NULL,
     ApprovedAt DATETIME2 NULL,
     ReviewNote NVARCHAR(1000),          -- lý do trả về hoặc ghi chú khi duyệt
+    TemplateID INT NULL,                -- giáo án mẫu đã dùng để tạo bản nháp (NULL = trainer tự soạn)
 
     CONSTRAINT FK_TrainingPlan_TrainerHorseAssignment FOREIGN KEY (TrainerHorseAssignmentID)
         REFERENCES dbo.TrainerHorseAssignment(TrainerHorseAssignmentID),
+    CONSTRAINT FK_TrainingPlan_Template FOREIGN KEY (TemplateID)
+        REFERENCES dbo.TrainingPlanTemplate(TemplateID),
     CONSTRAINT FK_TrainingPlan_ApprovedBy FOREIGN KEY (ApprovedByHeadTrainerID)
         REFERENCES dbo.[User](UserID),
     CONSTRAINT CK_TrainingPlan_Dates CHECK
@@ -1151,9 +1218,12 @@ CREATE TABLE dbo.DietPlan
     VetNote NVARCHAR(1500),
     CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_DietPlan_CreatedAt DEFAULT SYSDATETIME(),
     ApprovedAt DATETIME2 NULL,
+    TrainingPlanID INT NULL,            -- giáo án đang chạy lúc lập khẩu phần (khẩu phần theo cường độ tập)
 
     CONSTRAINT FK_DietPlan_Horse FOREIGN KEY (HorseID)
         REFERENCES dbo.Horse(HorseID),
+    CONSTRAINT FK_DietPlan_TrainingPlan FOREIGN KEY (TrainingPlanID)
+        REFERENCES dbo.TrainingPlan(TrainingPlanID),
     CONSTRAINT FK_DietPlan_HeadTrainer FOREIGN KEY (CreatedByHeadTrainerID)
         REFERENCES dbo.[User](UserID),
     CONSTRAINT FK_DietPlan_Vet FOREIGN KEY (ReviewedByVetID)
@@ -1191,13 +1261,15 @@ CREATE TABLE dbo.CareTask
     CareTaskID INT IDENTITY(1,1) PRIMARY KEY,
     HorseID INT NOT NULL,
     GroomID INT NOT NULL,
-    AssignedBy INT NULL,                -- người giao việc; NULL nếu Groom tự tạo
+    AssignedBy INT NULL,                -- người giao việc; NULL nếu hệ thống tự sinh theo chỉ tiêu
 
     TaskType VARCHAR(50) NOT NULL,
     ScheduledAt DATETIME2 NOT NULL,
     Status VARCHAR(20) NOT NULL CONSTRAINT DF_CareTask_Status DEFAULT 'Pending',
     CompletedAt DATETIME2 NULL,
     Note NVARCHAR(1000),
+    RuleCode VARCHAR(40) NULL,          -- chỉ tiêu đã sinh ra việc này (NULL = việc giao tay)
+    SourceKey VARCHAR(120) NULL,        -- khóa nguồn để không sinh trùng (vd FEEDING_BY_DIET:2026-10-20:15)
 
     CONSTRAINT FK_CareTask_Horse FOREIGN KEY (HorseID)
         REFERENCES dbo.Horse(HorseID),
@@ -1214,6 +1286,52 @@ CREATE TABLE dbo.CareTask
         Status IN ('Pending', 'Completed', 'Skipped')
         AND (Status <> 'Completed' OR CompletedAt IS NOT NULL)
     )
+);
+GO
+
+CREATE TABLE dbo.CareTaskRule
+(
+    CareTaskRuleID INT IDENTITY(1,1) PRIMARY KEY,
+    ClubID INT NOT NULL,
+    RuleCode VARCHAR(40) NOT NULL,
+    TaskType VARCHAR(50) NOT NULL,
+    Title NVARCHAR(150) NOT NULL,
+    TimeOfDay TIME NULL,
+    OffsetMinutes INT NULL,
+    IsActive BIT NOT NULL CONSTRAINT DF_CareTaskRule_Active DEFAULT 1,
+    UpdatedBy INT NULL,
+    UpdatedAt DATETIME2 NOT NULL CONSTRAINT DF_CareTaskRule_UpdatedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_CareTaskRule_Club FOREIGN KEY (ClubID)
+        REFERENCES dbo.Club(ClubID),
+    CONSTRAINT FK_CareTaskRule_UpdatedBy FOREIGN KEY (UpdatedBy)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT UQ_CareTaskRule_Club_Code UNIQUE (ClubID, RuleCode),
+    CONSTRAINT CK_CareTaskRule_Code CHECK
+    (
+        RuleCode IN ('FEEDING_BY_DIET', 'DAILY_CLEANING', 'BATH_AFTER_TRAINING', 'ICE_SOAK_WHEN_LOCKED')
+    ),
+    CONSTRAINT CK_CareTaskRule_Type CHECK
+    (
+        TaskType IN ('Feeding', 'Cleaning', 'Bathing', 'Ice Leg Soak')
+    ),
+    CONSTRAINT CK_CareTaskRule_Offset CHECK (OffsetMinutes IS NULL OR OffsetMinutes >= 0)
+);
+GO
+
+CREATE TABLE dbo.HorseGroom
+(
+    HorseID INT NOT NULL PRIMARY KEY,
+    GroomID INT NOT NULL,
+    AssignedBy INT NULL,
+    AssignedAt DATETIME2 NOT NULL CONSTRAINT DF_HorseGroom_AssignedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_HorseGroom_Horse FOREIGN KEY (HorseID)
+        REFERENCES dbo.Horse(HorseID),
+    CONSTRAINT FK_HorseGroom_Groom FOREIGN KEY (GroomID)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT FK_HorseGroom_AssignedBy FOREIGN KEY (AssignedBy)
+        REFERENCES dbo.[User](UserID)
 );
 GO
 
@@ -1309,6 +1427,19 @@ CREATE TABLE dbo.AuditLog
     Details NVARCHAR(MAX),
 
     CONSTRAINT FK_AuditLog_User FOREIGN KEY (UserID)
+        REFERENCES dbo.[User](UserID)
+);
+GO
+
+-- Thông báo được tính lại mỗi lần gọi API; bảng này chỉ nhớ thông báo nào người dùng đã đọc
+CREATE TABLE dbo.NotificationRead
+(
+    UserID INT NOT NULL,
+    NotificationKey NVARCHAR(200) NOT NULL,
+    ReadAt DATETIME2 NOT NULL CONSTRAINT DF_NotificationRead_ReadAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_NotificationRead PRIMARY KEY (UserID, NotificationKey),
+    CONSTRAINT FK_NotificationRead_User FOREIGN KEY (UserID)
         REFERENCES dbo.[User](UserID)
 );
 GO
@@ -1441,6 +1572,9 @@ CREATE INDEX IX_InventoryItem_ClubID_Status
 
 CREATE INDEX IX_InventoryRequest_ClubID_Status
     ON dbo.InventoryRequest(ClubID, Status);
+
+CREATE UNIQUE INDEX UX_CareTask_Source
+    ON dbo.CareTask(HorseID, SourceKey) WHERE SourceKey IS NOT NULL;
 
 CREATE INDEX IX_AuditLog_UserID_ActionTime
     ON dbo.AuditLog(UserID, ActionTime DESC);

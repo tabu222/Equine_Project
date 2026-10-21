@@ -99,7 +99,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -163,6 +163,85 @@ function statusTone(
   }
 }
 
+
+const SESSION_COLORS = ['#22b99d', '#c6ddbc', '#f2cda3', '#cad7d2']
+const SESSION_LABELS = ['Hoàn thành', 'Đã hủy hoặc dừng', 'Vắng', 'Sắp diễn ra / đang tập']
+
+function getSessionCounts(sessions) {
+  return sessions.reduce((counts, session) => {
+    const index = session.IsStopped || session.Status === 'Cancelled'
+      ? 1
+      : session.Status === 'Completed'
+        ? 0
+        : session.Status === 'Missed'
+          ? 2
+          : 3
+    counts[index] += 1
+    return counts
+  }, [0, 0, 0, 0])
+}
+
+function donutBackground(counts) {
+  const total = counts.reduce((sum, value) => sum + value, 0)
+  if (total === 0) return '#e7efeb'
+  let position = 0
+  const stops = counts.map((count, index) => {
+    const start = position
+    position += count * 100 / total
+    return `${SESSION_COLORS[index]} ${start}% ${position}%`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+}
+
+function SessionOverviewChart({ sessions, heading = 'Kết quả buổi tập' }) {
+  const counts = getSessionCounts(sessions)
+  const total = sessions.length
+  const percent = total ? Math.round(counts[0] * 100 / total) : 0
+  return (
+    <section className="training-results-overview" aria-label={heading}>
+      <div className="training-results-title">
+        <h2>{heading}</h2>
+      </div>
+      <div className="training-results-content">
+        <div className="training-results-ring" role="img"
+          aria-label={`Hoàn thành ${counts[0]} trên ${total} buổi tập`}
+          style={{ background: donutBackground(counts) }}>
+          <div className="training-results-ring-center">
+            <strong>{percent}%</strong>
+            <span>Hoàn thành</span>
+          </div>
+        </div>
+        <div className="training-results-breakdown">
+          <div className="training-results-count"><strong>{total}</strong><span>Tổng số buổi tập</span></div>
+          {SESSION_LABELS.map((label, index) => (
+            <div className="training-results-breakdown-row" key={label}>
+              <span className="training-results-key">
+                <i style={{ backgroundColor: SESSION_COLORS[index] }} />
+                {label}
+              </span>
+              <strong>{counts[index]}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function displayedDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '')
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : ''
+}
+
+function parseDisplayDate(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim())
+  if (!match) return null
+  const day = Number(match[1]); const month = Number(match[2]); const year = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCDate() !== day || date.getUTCMonth() !== month - 1 || date.getUTCFullYear() !== year) return null
+  return `${match[3]}-${match[2]}-${match[1]}`
+}
+
 export default function OwnerTrainingSessionsPage() {
   const {
     horseId,
@@ -203,6 +282,9 @@ export default function OwnerTrainingSessionsPage() {
   ] = useState(
     todayString,
   )
+
+  const [fromDisplay, setFromDisplay] = useState(() => displayedDate(daysAgo(30)))
+  const [toDisplay, setToDisplay] = useState(() => displayedDate(todayString()))
 
   const [
     statusFilter,
@@ -318,8 +400,6 @@ export default function OwnerTrainingSessionsPage() {
     }
   }, [
     horseId,
-    from,
-    to,
     loadSessions,
   ])
 
@@ -388,10 +468,16 @@ export default function OwnerTrainingSessionsPage() {
     )
 
   async function applyFilter() {
+    const parsedFrom = parseDisplayDate(fromDisplay)
+    const parsedTo = parseDisplayDate(toDisplay)
+    if (!parsedFrom || !parsedTo) {
+      setError('Nhập ngày theo định dạng dd/mm/yyyy.')
+      return
+    }
     if (
-      from &&
-      to &&
-      to < from
+      parsedFrom &&
+      parsedTo &&
+      parsedTo < parsedFrom
     ) {
       setError(
         'Ngày kết thúc phải sau ngày bắt đầu.',
@@ -400,22 +486,14 @@ export default function OwnerTrainingSessionsPage() {
       return
     }
 
-    setRefreshing(
-      true,
-    )
-
+    setRefreshing(true)
     setError('')
-
     try {
-      const rows =
-        await loadSessions(
-          from,
-          to,
-        )
+      const rows = await loadSessions(parsedFrom, parsedTo)
 
-      setSessions(
-        rows,
-      )
+      setSessions(rows)
+      setFrom(parsedFrom)
+      setTo(parsedTo)
     } catch (
       loadError
     ) {
@@ -477,10 +555,7 @@ export default function OwnerTrainingSessionsPage() {
             Kết quả huấn luyện
           </h1>
 
-          <p>
-            Theo dõi các buổi tập đã hoàn thành
-            và đánh giá từ huấn luyện viên.
-          </p>
+
         </div>
 
 <div className="owner-training-heading-actions">
@@ -516,55 +591,7 @@ export default function OwnerTrainingSessionsPage() {
         </div>
       )}
 
-      <section className="owner-training-summary-grid">
-        <article>
-          <span>
-            Tổng số buổi
-          </span>
-
-          <strong>
-            {
-              summary.total
-            }
-          </strong>
-        </article>
-
-        <article>
-          <span>
-            Hoàn thành
-          </span>
-
-          <strong>
-            {
-              summary.completed
-            }
-          </strong>
-        </article>
-
-        <article>
-          <span>
-            Đã dừng
-          </span>
-
-          <strong>
-            {
-              summary.stopped
-            }
-          </strong>
-        </article>
-
-        <article>
-          <span>
-            Vắng
-          </span>
-
-          <strong>
-            {
-              summary.missed
-            }
-          </strong>
-        </article>
-      </section>
+      {!error && <SessionOverviewChart sessions={sessions} heading="Tổng quan kết quả tập luyện" />}
 
       <section className="filter-card owner-training-filters">
         <label className="filter-field">
@@ -573,15 +600,13 @@ export default function OwnerTrainingSessionsPage() {
           </span>
 
           <input
-            type="date"
-            value={
-              from
-            }
-            onChange={(event) =>
-              setFrom(
-                event.target.value,
-              )
-            }
+            type="text"
+            inputMode="numeric"
+            maxLength={10}
+            placeholder="dd/mm/yyyy"
+            aria-label="Từ ngày, định dạng ngày/tháng/năm"
+            value={fromDisplay}
+            onChange={(event) => setFromDisplay(event.target.value)}
           />
         </label>
 
@@ -591,15 +616,13 @@ export default function OwnerTrainingSessionsPage() {
           </span>
 
           <input
-            type="date"
-            value={
-              to
-            }
-            onChange={(event) =>
-              setTo(
-                event.target.value,
-              )
-            }
+            type="text"
+            inputMode="numeric"
+            maxLength={10}
+            placeholder="dd/mm/yyyy"
+            aria-label="Đến ngày, định dạng ngày/tháng/năm"
+            value={toDisplay}
+            onChange={(event) => setToDisplay(event.target.value)}
           />
         </label>
 
@@ -652,7 +675,7 @@ export default function OwnerTrainingSessionsPage() {
         </button>
       </section>
 
-      <section className="panel owner-training-session-panel">
+      {!error && <section className="panel owner-training-session-panel">
         {filteredSessions.length ===
         0 ? (
           <div className="empty-state">
@@ -660,10 +683,7 @@ export default function OwnerTrainingSessionsPage() {
               Chưa có kết quả huấn luyện
             </h3>
 
-            <p>
-              Các buổi tập đã có đánh giá sẽ
-              được hiển thị tại đây.
-            </p>
+
           </div>
         ) : (
           <div className="owner-training-session-list">
@@ -817,7 +837,7 @@ export default function OwnerTrainingSessionsPage() {
             )}
           </div>
         )}
-      </section>
+      </section>}
     </main>
   )
 }

@@ -92,6 +92,32 @@ def account_created_by_manager(user, manager):
     ))
 
 
+def password_reset_link(user, link):
+    send_email([user.email], "Đặt lại mật khẩu", (
+        f"Chào {user.full_name},\n\n"
+        "Có yêu cầu đặt lại mật khẩu cho tài khoản EquiTrack của bạn.\n"
+        f"Bấm vào link sau trong vòng 1 giờ để đặt mật khẩu mới:\n{link}\n\n"
+        "Nếu bạn không yêu cầu, hãy bỏ qua email này; mật khẩu hiện tại vẫn giữ nguyên."
+    ))
+
+
+def password_reset_by_manager(user, manager):
+    send_email([user.email], "Mật khẩu của bạn đã được đặt lại", (
+        f"Chào {user.full_name},\n\n"
+        f"Quản lý CLB {manager.full_name} vừa đặt lại mật khẩu tài khoản EquiTrack của bạn.\n"
+        "Mật khẩu tạm sẽ được quản lý báo riêng. Đăng nhập xong hãy đổi mật khẩu ở mục Tài khoản."
+    ))
+
+
+def account_status_changed(user, locked, reason=None):
+    if locked:
+        body = (f"Chào {user.full_name},\n\nTài khoản EquiTrack của bạn đã bị tạm khóa."
+                + (f"\nLý do: {reason}" if reason else "") + "\nVui lòng liên hệ quản lý CLB nếu cần hỗ trợ.")
+    else:
+        body = f"Chào {user.full_name},\n\nTài khoản EquiTrack của bạn đã được mở khóa, bạn có thể đăng nhập lại."
+    send_email([user.email], "Tài khoản đã bị tạm khóa" if locked else "Tài khoản đã được mở khóa", body)
+
+
 # ---------------- Flow 1: hồ sơ ngựa ----------------
 def registration_submitted(horse):
     send_email(_managers_of(horse.club_id), f"Hồ sơ ngựa mới cần xác minh: {horse.horse_name}", (

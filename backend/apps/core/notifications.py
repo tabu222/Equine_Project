@@ -7,10 +7,12 @@ Database không có bảng thông báo, nên danh sách này được TÍNH từ
 Flow 1: hồ sơ chờ xác minh/tiếp nhận, khám đầu vào, phiếu nháp và yêu cầu sửa lý lịch.
 Flow 2 (khi có apps/training): giáo án chờ duyệt / bị trả về, buổi tập hôm nay, buổi tập chờ đánh giá.
 Flow 3: báo cáo sức khỏe chưa xử lý, tiêm phòng / lịch y tế sắp tới.
+Flow 4: khẩu phần chờ duyệt / bị trả về, việc chăm sóc tới hạn, yêu cầu vật tư, vật tư sắp hết.
 """
 from datetime import date, timedelta
 
 from django.db.models import Exists, OuterRef
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -82,6 +84,9 @@ def build_notifications(user):
     if flows.has_flow3():  # Flow 3: báo cáo sức khỏe, tiêm phòng, lịch y tế
         from apps.medical.notifications import medical_items
         items += medical_items(user, _item)
+    if flows.has_care():  # Flow 4: khẩu phần, việc chăm sóc, kho vật tư
+        from apps.care.notifications import care_items
+        items += care_items(user, _item)
 
     # Khẩn trước, mới trước; bỏ trùng (một người có nhiều vai trò)
     unique = {(i["Type"], i["EntityID"]): i for i in items}
@@ -95,11 +100,65 @@ def _ts(value):
     return int((digits + "0" * 14)[:14])
 
 
+def notification_key(item):
+    return f"{item['Type']}|{item['EntityName']}|{item['EntityID']}|{item['At'] or ''}"[:200]
+
+
+def with_read_state(user, items):
+    """Thêm Key, IsRead cho từng thông báo (đã đọc = có trong bảng NotificationRead)."""
+    from .models import NotificationRead
+
+    for item in items:
+        item["Key"] = notification_key(item)
+    read = set(NotificationRead.objects.filter(user=user, notification_key__in=[i["Key"] for i in items])
+               .values_list("notification_key", flat=True))
+    for item in items:
+        item["IsRead"] = item["Key"] in read
+    return items
+
+
 class NotificationView(APIView):
+    """GET /api/notifications?unread=1 - mỗi thông báo có Key, IsRead (unread=1: chỉ thông báo chưa đọc)."""
+
     def get(self, request):
-        items = build_notifications(request.user)
+        items = with_read_state(request.user, build_notifications(request.user))
+        if request.query_params.get("unread") in ("1", "true"):
+            items = [i for i in items if not i["IsRead"]]
         if is_english():  # header X-Language: en
             for item in items:
                 item["Title"] = translate_text(item["Title"])
                 item["Message"] = translate_text(item["Message"])
         return Response(items)
+
+
+class NotificationUnreadCountView(APIView):
+    """GET /api/notifications/unread-count -> {"Unread": 3, "Total": 5} (số trên chuông)."""
+
+    def get(self, request):
+        items = with_read_state(request.user, build_notifications(request.user))
+        return Response({"Unread": sum(1 for i in items if not i["IsRead"]), "Total": len(items)})
+
+
+class NotificationReadView(APIView):
+    """POST /api/notifications/read {"Keys": [...]} hoặc {"All": true} - đánh dấu đã đọc."""
+
+    def post(self, request):
+        from django.utils import timezone
+
+        from .models import NotificationRead
+
+        if request.data.get("All") in (True, "true", 1, "1"):
+            keys = [notification_key(i) for i in build_notifications(request.user)]
+        else:
+            keys = request.data.get("Keys")
+            if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+                raise ValidationError({"Keys": ["Gửi danh sách Key của thông báo, hoặc {\"All\": true}."]})
+        keys = {k[:200] for k in keys}
+        known = set(NotificationRead.objects.filter(user=request.user, notification_key__in=keys)
+                    .values_list("notification_key", flat=True))
+        NotificationRead.objects.bulk_create([NotificationRead(user=request.user, notification_key=k)
+                                              for k in sorted(keys - known)])
+        # dọn bản ghi cũ (thông báo đó đã hết từ lâu)
+        NotificationRead.objects.filter(user=request.user,
+                                        read_at__lt=timezone.now() - timedelta(days=90)).delete()
+        return Response({"Marked": len(keys - known)})

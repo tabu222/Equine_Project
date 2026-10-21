@@ -109,7 +109,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -137,7 +137,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -1233,11 +1233,7 @@ export default function TrainerProfilePage() {
               Kinh nghiệm và cấp độ
             </h2>
 
-            <p>
-              Các chỉ số cấp độ và thâm
-              niên được Backend tính từ
-              dữ liệu hồ sơ và giấy tờ.
-            </p>
+            
           </div>
         </div>
 
@@ -1386,13 +1382,7 @@ export default function TrainerProfilePage() {
               Kinh nghiệm và Rating
             </h2>
 
-            <p>
-              Head Trainer chỉ nhập ngày
-              bắt đầu sự nghiệp và Rating.
-              YearsOfExperience và
-              ExperienceLevel không nhập
-              thủ công.
-            </p>
+            
           </div>
         </div>
 
@@ -1424,10 +1414,7 @@ export default function TrainerProfilePage() {
               }
             />
 
-            <small>
-              Backend sẽ tự tính lại số năm
-              kinh nghiệm và cấp độ.
-            </small>
+            
           </label>
 
           <label className="form-field">
@@ -1610,11 +1597,7 @@ export default function TrainerProfilePage() {
           </button>
         </div>
 
-        <p className="trainer-profile-help">
-          Nếu chuyên môn đã từng được dùng
-          trong phân công ngựa, Backend có
-          thể từ chối xóa với lỗi IN_USE.
-        </p>
+        
       </section>
 
       <section className="panel trainer-profile-section">
@@ -1628,11 +1611,7 @@ export default function TrainerProfilePage() {
               Bằng cấp và chứng nhận
             </h2>
 
-            <p>
-              Degree, Certificate và
-              License được Backend dùng để
-              tính thâm niên có minh chứng.
-            </p>
+            
           </div>
 
           <button
@@ -1815,11 +1794,7 @@ export default function TrainerProfilePage() {
                 }
               />
 
-              <small>
-                Backend hiện nhận FileUrl,
-                không phải upload file ở
-                endpoint này.
-              </small>
+              
             </label>
 
             <label className="form-field trainer-profile-form-full">
@@ -2086,11 +2061,7 @@ export default function TrainerProfilePage() {
               Thành tích sự nghiệp
             </h2>
 
-            <p>
-              Các chỉ số dưới đây được
-              Backend tính từ toàn bộ kết
-              quả đua đã ghi nhận.
-            </p>
+            
           </div>
         </div>
 
@@ -2797,13 +2768,7 @@ export default function TrainerProfilePage() {
             Dữ liệu được tính tự động
           </h2>
 
-          <p>
-            Kinh nghiệm, cấp độ, seniority,
-            career win rate, recent win
-            rate, place rate và workload
-            không được chỉnh trực tiếp từ
-            giao diện.
-          </p>
+          
         </div>
       </section>
     </main>

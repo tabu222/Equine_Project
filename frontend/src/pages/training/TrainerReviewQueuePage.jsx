@@ -43,7 +43,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -472,7 +472,7 @@ export default function TrainerReviewQueuePage() {
             value={
               search
             }
-            placeholder="Tên ngựa, Work Rider, bài tập..."
+            placeholder="Tên ngựa, Nhân viên cưỡi ngựa, bài tập..."
             onChange={(event) =>
               setSearch(
                 event.target.value,

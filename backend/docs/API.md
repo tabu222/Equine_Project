@@ -2,7 +2,7 @@
 
 Documentation for the frontend team. Backend: Django REST, database `sql/horse_v2.sql`.
 
-**Current checkout supports Flow 1, Flow 2 and Flow 3.** Section 7 and the Flow 4 parts of 10 describe the larger system, not available routes in this checkout: diet plans, care tasks and inventory are unavailable; do not show those actions as working features.
+**Current checkout supports all 4 flows** (Flow 1 intake, Flow 2 training, Flow 3 medical, Flow 4 care and nutrition).
 
 ### Verified Flow 1 frontend mapping
 
@@ -33,6 +33,7 @@ Public signup ignores client roles; the backend grants only `HORSE_OWNER`. JWT/s
 | [8](#8-notifications) | Notifications (bell) for each role |
 | [9](#9-frontend-changes-flow-1) | What the frontend needs to change in the existing Flow 1 |
 | [10](#10-frontend-for-flow-24) | Suggested frontend screens for Flow 2–4 |
+| [12](#12-administration-club-manager) | **Administration** (Club Manager): accounts, roles, permission matrix, audit log, club, dashboard |
 
 ## 1. General conventions
 
@@ -151,9 +152,14 @@ Data scope: staff only see data **within their own club**; horse owners only see
 | POST | `/auth/google` | no login required | Sign in with Google: `{"Credential": "<Google ID token>"}` → existing email: `{access, refresh, User}`; unknown email: `{"SignupRequired": true, "Email", "FullName"}`. Send again with `"Phone", "Address", "ClubID"` (and optional `"FullName"`) to create a **horse owner** account → **201** `{access, refresh, User}`. Needs `GOOGLE_CLIENT_ID` in `.env` (otherwise 409 `GOOGLE_LOGIN_DISABLED`) |
 | POST | `/auth/refresh` | everyone | `{"refresh"}` → `{access}` |
 | GET | `/auth/me` | logged in | → `User` with `Roles`, `Permissions` |
-| GET | `/users?RoleCode=HORSE_OWNER` | Manager, Head Trainer, Trainer | users in the club (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments). A Trainer only gets `WORK_RIDER` / `TRAINER` / `HEAD_TRAINER` (other `RoleCode` → 403) |
+| PATCH | `/auth/me` | logged in | edit own profile `{"FullName"?, "Phone"?, "Address"?}` (email cannot change) |
+| POST | `/auth/change-password` | logged in | `{"CurrentPassword", "NewPassword" (min 6)}` → new `{access, refresh, User}`; **all old tokens stop working**. Google accounts without a password may omit `CurrentPassword` the first time |
+| POST | `/auth/password-reset` | no login required | forgot password: `{"Email"}` → always 200; if the account exists an email with a link `<FRONTEND_URL>/reset-password?uid=...&token=...` (valid 1 hour) is sent. Max 10 per hour per IP |
+| POST | `/auth/password-reset/confirm` | no login required | `{"Uid", "Token", "NewPassword"}` (values from the link) → 200; wrong / expired / already used link → 400 `Token` |
+| GET | `/users?RoleCode=&Status=&Search=` | Manager, Head Trainer, Trainer | users in the club (`Search`: name / email / phone) (`RoleCode` = `TRAINER`, `WORK_RIDER`, `GROOM`... to pick people for assignments). A Trainer only gets `WORK_RIDER` / `TRAINER` / `HEAD_TRAINER` (other `RoleCode` → 403) |
 | POST | `/users` | Manager | `{"FullName", "Email", "Phone", "Address", "RoleCode"? (default HORSE_OWNER), "Password"?}`; `Phone` = 10 digits starting with 0 or `+84` + 9 digits |
 | GET | `/users/{UserID}` | self / Manager of the same club | |
+| PATCH | `/users/{UserID}` | Manager | `{"FullName"?, "Phone"?, "Address"?}` – more account actions in section 12 |
 | GET | `/clubs` | no login required | Active clubs (picked on the sign-up form and when an Owner registers a horse) |
 
 If `POST /users` is sent without `Password`, the backend generates a temporary password and returns `TemporaryPassword` **only once**.
@@ -463,7 +469,9 @@ Each horse has only **1** `Active` responsible trainer (`ALREADY_ASSIGNED` if on
 ```
 
 `POST /trainer-assignments` also returns `TrainerExperienceLevel`, `RequiredLevel` and `LevelWarning`
-(`null`, or a sentence when the horse should go to a more experienced trainer – the assignment is still created).
+(`null`, or a sentence when the horse should go to a more experienced trainer – the assignment is still created),
+and `DraftTrainingPlanID`: the `Draft` training plan created automatically from the specialization's template (5.5.1),
+or `null` when that template is switched off.
 
 ### 5.4 Preferred work riders (familiar with the horse)
 
@@ -534,6 +542,7 @@ Returned training plan:
   "StartDate": "2026-10-12", "EndDate": "2026-12-10", "OverallIntensity": "Moderate", "Note": null,
   "Status": "Active", "CreatedAt": "2026-10-10T08:00:00", "SubmittedAt": "2026-10-10T08:05:00",
   "ApprovedByHeadTrainerID": 2, "ApprovedAt": "2026-10-10T09:00:00", "ReviewNote": "Agreed",
+  "TemplateID": 1, "TemplateName": "Chương trình chuẩn – Đua đường bằng 1.200–2.000 m",
   "Stages": [{"TrainingPlanStageID": 1, "TrainingPlanID": 1, "StageName": "Foundation", "StageOrder": 1, "Goal": null,
               "StartDate": "2026-10-12", "EndDate": "2026-11-01", "Intensity": "Low", "TrainingLoad": 30.0,
               "DistanceTargetKm": 3.0, "Surface": "Turf", "Note": null}]
@@ -542,6 +551,70 @@ Returned training plan:
 
 Specific error codes: `NOT_PLAN_OWNER` (not the currently assigned trainer), `NO_STAGES`, `DRAFT_EXISTS` (a version is already being drafted / pending approval),
 `ASSIGNMENT_ENDED`, `IN_USE` (the stage already has training sessions).
+
+### 5.5.1 Training plan templates (one per specialization)
+
+Each club has **one template per specialization** (Flat Racing 84 days / 4 stages, Steeplechase & Hurdle 98 / 5,
+Harness 84 / 4, Endurance 84 / 5, Other 56 / 3). Missing templates are created with the default content the first time
+they are read. Stages use **day numbers** (`StartDay`, `DurationDays`), not dates. Only the Head Trainer edits templates.
+
+```
+Head Trainer assigns a trainer (5.3)
+   └─> Draft training plan copied from the template, day numbers turned into dates from the assignment start (or today)
+Trainer reads it with the horse assessment (template-review), edits or keeps it, may move the start date (reschedule)
+   └─> submit ──> Head Trainer sees what changed vs. the template ──> approve ──> Active ──> schedule sessions (5.6)
+                                                                 └─> return (ReviewNote) ──> trainer edits again ...
+```
+
+| Method | URL | Used by | Notes |
+|---|---|---|---|
+| GET | `/training-plan-templates?SpecializationID=` | staff | templates of the club, with `Stages` |
+| GET | `/training-plan-templates/{TemplateID}` | staff | |
+| PUT | `/training-plan-templates/{TemplateID}` | Head Trainer | whole template, `Stages` required (replaces all stages) |
+| PATCH | `/training-plan-templates/{TemplateID}` | Head Trainer | some fields; `Stages` sent = replaces all stages. `IsActive: false` = assignments no longer create a draft |
+| GET | `/training-plans/{id}/template-review` | staff | template info + latest horse assessment + list of changes vs. the template |
+| POST | `/training-plans/{id}/reschedule` | responsible Trainer | `{"StartDate"}` – `Draft` only, every stage moves by the same number of days; past date → 400 |
+| POST | `/training-plans/from-template` | responsible Trainer | `{"HorseID"}` – new draft from the template (e.g. after it was replaced, or to adjust an `Active` plan). 400 if a `Draft` / `Pending Approval` plan exists |
+
+- Editing a template does **not** change plans already created from it.
+- If the trainer creates a plan by hand (`POST /training-plans`), the template draft that was never submitted is cancelled
+  (no two drafts for one horse).
+- The trainer edits the draft with the normal endpoints of 5.5 (`PATCH /training-plans/{id}`, stages ...). The stage `Note`
+  carries the template content plus `Điều kiện sang giai đoạn sau: ...` (exit criteria).
+- Trainer notification `PLAN_DRAFT_FROM_TEMPLATE` until the draft is submitted; returned plans show `PLAN_RETURNED` as before.
+
+Template:
+
+```json
+{"TemplateID": 1, "ClubID": 1, "SpecializationID": 4, "SpecializationName": "Endurance", "SpecializationCode": "ENDURANCE",
+ "TemplateName": "Chương trình chuẩn – Đua đường dài 80–120 km", "Goal": "...", "DurationDays": 84,
+ "OverallIntensity": "Moderate", "DailyStructure": "...", "WeeklyPattern": "...", "Note": "...", "IsActive": true,
+ "UpdatedBy": null, "UpdatedByName": null, "UpdatedAt": "2026-10-21T08:00:00",
+ "Stages": [{"TemplateStageID": 1, "StageOrder": 1, "StageName": "Làm quen & nền tảng", "Goal": "...", "StartDay": 1,
+             "DurationDays": 14, "Intensity": "Low", "TrainingLoad": 25.0, "DistanceTargetKm": 60.0,
+             "Surface": "...", "Note": "...", "ExitCriteria": "..."}]}
+```
+
+Validation: `DurationDays` > 0, at least 1 stage, no duplicate `StageOrder`, each stage inside the template
+(`StartDay` ≥ 1, `StartDay + DurationDays − 1 ≤ DurationDays` of the template).
+
+`template-review`:
+
+```json
+{"TrainingPlanID": 7, "Status": "Pending Approval", "TemplateID": 1, "TemplateName": "...",
+ "DailyStructure": "...", "WeeklyPattern": "...", "TemplateNote": "...",
+ "Assessment": {"AssessmentID": 3, "QualityScore": 78.0, "FitnessLevel": "Good", "AssessmentNote": "...", "SpecializationID": 1},
+ "ChangedFromTemplate": true, "ChangeCount": 1,
+ "Changes": [{"StageOrder": 1, "Field": "TrainingLoad", "Template": 25.0, "Plan": 20.0, "Change": "Changed"}]}
+```
+
+`Field`: `Goal`, `DurationDays`, `OverallIntensity` (whole plan, `StageOrder: null`), or per stage `StageName`, `StartDay`,
+`DurationDays`, `Intensity`, `TrainingLoad`, `DistanceTargetKm`, `Surface`, `Goal`; `Field: "Stage"` with
+`Change: "Added" / "Removed"`. Moving the whole plan (reschedule) is not a change. Plans not made from a template:
+`TemplateID`, `Changes`, `ChangedFromTemplate` are `null`.
+
+Database: on an existing database run `sql/migrations/20261021_training_plan_templates.sql` (tables `TrainingPlanTemplate`,
+`TrainingPlanTemplateStage`, column `TrainingPlan.TemplateID`). `seed_demo` creates the default templates.
 
 ### 5.6 Training sessions
 
@@ -812,6 +885,9 @@ Specific error codes: `LOCK_EXISTS`, `FOLLOW_UP_EXAM_REQUIRED`.
 
 ## 7. Flow 4 – Care and nutrition
 
+On an existing database run `sql/migrations/20261020_care_rules_diet_training.sql` (diet ↔ training plan link, generated care
+tasks, `CareTaskRule`, `HorseGroom`).
+
 ### 7.1 Diet plans
 
 ```
@@ -823,7 +899,8 @@ Head Trainer creates (Pending) ──Vet approve──> Approved ──Vet adjus
 | Method | URL | Who uses it | Notes |
 |---|---|---|---|
 | GET | `/horses/{HorseID}/diet-plans` | staff | |
-| POST | `/horses/{HorseID}/diet-plans` | Head Trainer | `{"DietDescription"?, "StartDate", "EndDate"?, "Meals": [...]}` (at least 1 meal) |
+| GET | `/horses/{HorseID}/diet-context` | staff | **what the Head Trainer looks at before writing a diet**: active training plan, current stage (intensity, load, distance target), last 14 days of training, sessions in the next 7 days, Training Lock, latest weight, current diet, `Notes` (suggestions) |
+| POST | `/horses/{HorseID}/diet-plans` | Head Trainer | `{"DietDescription"?, "StartDate", "EndDate"?, "TrainingPlanID"?, "Meals": [...]}` (at least 1 meal). Without `TrainingPlanID` the horse's `Active` training plan is linked automatically |
 | GET | `/horses/{HorseID}/current-diet` | staff | diet plan in effect today (`null` if none) – the Groom's screen |
 | GET | `/diet-plans?Status=Pending&HorseID=` | staff | Vet views diet plans awaiting approval |
 | GET | `/diet-plans/{id}` | staff | |
@@ -835,6 +912,26 @@ Head Trainer creates (Pending) ──Vet approve──> Approved ──Vet adjus
 ```json
 {"MealTime": "06:00", "FeedType": "Oats", "Quantity": 3, "Unit": "kg", "Note": null}
 ```
+
+A diet plan follows the training plan: `TrainingPlanID` = the `Active` training plan when it was written (another horse's
+plan / a plan that is not `Active` → 400). When the horse has an `Active` training plan but no diet in effect, or the diet in
+effect was written for another (older) training plan, the Head Trainer sees `DIET_REVIEW_NEEDED` in notifications.
+
+`GET /horses/{id}/diet-context`:
+
+```json
+{"HorseID": 1, "HorseName": "Sao Mai", "CurrentHealthStatus": "Healthy", "LatestWeightKg": 465.0,
+ "ActiveTrainingPlan": {"TrainingPlanID": 1, "Goal": "Winter Cup 1,600 m", "StartDate": "2026-10-06", "EndDate": "2026-11-19", "OverallIntensity": "Moderate"},
+ "CurrentStage": {"TrainingPlanStageID": 2, "StageName": "Endurance", "Intensity": "Moderate", "TrainingLoad": 50.0, "DistanceTargetKm": 100.0, "EndDate": "2026-11-19"},
+ "Last14Days": {"CompletedSessions": 6, "TotalDistanceKm": 28.0, "AvgTrainingLoad": 33.3, "AvgPerformanceScore": 75.3, "AvgRecoveryMinutes": 12.0},
+ "Next7Days": {"PlannedSessions": 2, "AvgTrainingLoad": 50.0},
+ "TrainingLock": null,
+ "CurrentDiet": {"DietPlanID": 1, "Status": "Approved", "StartDate": "2026-10-20", "EndDate": null, "TrainingPlanID": 1},
+ "Notes": []}
+```
+
+`Notes` examples: high-intensity stage → more energy and electrolytes; long recovery time; Training Lock → less energy, more fibre;
+current diet not written for the active plan / no diet yet.
 
 When a new diet plan is approved: an overlapping old plan that started earlier ends on the day before the new plan's start date;
 one that starts on the same day / later becomes `Expired`. If the new plan starts in the future, the current plan stays in use until that day.
@@ -851,22 +948,43 @@ Specific error codes: `SELF_APPROVAL`.
 
 ### 7.2 Care tasks
 
+**Grooms do not create tasks.** Daily tasks are **generated by the system from the club's rules** (`CareTaskRule`);
+the Head Trainer / Manager can still assign extra tasks by hand. The Groom completes or skips (with a reason).
+
+| Rule (`RuleCode`) | Task | When |
+|---|---|---|
+| `FEEDING_BY_DIET` | `Feeding` | every meal of the diet plan in effect, at the meal time (note = feed + quantity) |
+| `DAILY_CLEANING` | `Cleaning` | every day at `TimeOfDay` (default 07:30) for every `Approved` horse |
+| `BATH_AFTER_TRAINING` | `Bathing` | after each `Completed` training session of the day, `EndTime + OffsetMinutes` (default 30) |
+| `ICE_SOAK_WHEN_LOCKED` | `Ice Leg Soak` | every day the horse has an active Training Lock (Flow 3), at `TimeOfDay` (default 16:00) |
+
+- Tasks are generated for today up to 7 days ahead (never for past days) when the task list is opened (`GET /care-tasks`),
+  when the Groom opens notifications, with `POST /care-tasks/generate`, or with `python manage.py generate_care_tasks --days 2`.
+- No duplicates: each generated task has a `SourceKey`. When the source changes (new diet, rule turned off, lock released),
+  generated tasks that are still `Pending` and not yet due are removed.
+- Assignee: the horse's Groom in charge (`/horses/{id}/groom`); if the horse has none, the active Groom with the fewest tasks that day.
+
 | Method | URL | Who uses it | Notes |
 |---|---|---|---|
-| GET | `/care-tasks?Date=&From=&To=&HorseID=&GroomID=&Status=&mine=1` | staff | `mine=1`: tasks of the logged-in Groom |
+| GET | `/care-tasks?Date=&From=&To=&HorseID=&GroomID=&Status=&Auto=1&mine=1` | staff | `mine=1`: tasks of the logged-in Groom; `Auto=1`: generated tasks only |
 | GET | `/care-tasks/{id}` | staff | |
-| POST | `/care-tasks` | Head Trainer, Manager (assign); Groom (self-created) | `{"HorseID", "GroomID", "TaskType", "ScheduledAt", "Note"?}` – a Groom creating their own task omits `GroomID` |
-| PATCH | `/care-tasks/{id}` | assigner / Groom who created it | when `Pending`; only Head Trainer / Manager can change `GroomID` |
+| POST | `/care-tasks` | Head Trainer, Manager | extra task: `{"HorseID", "GroomID", "TaskType", "ScheduledAt", "Note"?}`. A Groom gets `403` |
+| POST | `/care-tasks/generate` | Head Trainer, Manager | `{"Date"?, "Days"? (1–8)}` → `[{"Date", "Created", "Removed", "Unassigned"}]` |
+| PATCH | `/care-tasks/{id}` | Head Trainer, Manager | when `Pending` |
 | POST | `/care-tasks/{id}/complete` | assigned Groom | `{"Note"?}` → `Completed` |
-| POST | `/care-tasks/{id}/skip` | Groom, assigner | `{"Reason"}` → `Skipped` |
+| POST | `/care-tasks/{id}/skip` | assigned Groom, Head Trainer, Manager | `{"Reason"}` → `Skipped` |
+| GET | `/care-rules` | staff | the club's rules (default rules are created automatically) |
+| PATCH | `/care-rules/{RuleCode}` | Head Trainer, Manager | `{"IsActive"?, "TimeOfDay"?, "OffsetMinutes"? (0–240), "Title"?}` – applied at once to today and already generated days |
+| GET / PUT / DELETE | `/horses/{HorseID}/groom` | staff (GET), Head Trainer / Manager | Groom in charge `{"GroomID"}`; pending generated tasks move to the new Groom |
 
-`TaskType`: `Feeding`, `Cleaning`, `Bathing`, `Ice Leg Soak`. `AssignedBy = null` means the Groom created the task themselves.
-If the horse looks abnormal during care → report it via section 6.1.
+`TaskType`: `Feeding`, `Cleaning`, `Bathing`, `Ice Leg Soak`. Generated tasks have `RuleCode` and `IsAuto: true`,
+`AssignedBy: null`. If the horse looks abnormal during care → report it via section 6.1.
 
 ```json
-{"CareTaskID": 1, "HorseID": 1, "HorseName": "Thunder", "GroomID": 7, "GroomName": "Demo Groom", "AssignedBy": 2,
- "AssignedByName": "Demo Head Trainer", "TaskType": "Ice Leg Soak", "ScheduledAt": "2026-10-12T15:00:00",
- "Status": "Pending", "CompletedAt": null, "Note": "20 minutes"}
+{"CareTaskID": 1, "HorseID": 1, "HorseName": "Thunder", "GroomID": 7, "GroomName": "Demo Groom", "AssignedBy": null,
+ "AssignedByName": null, "TaskType": "Feeding", "ScheduledAt": "2026-10-12T05:30:00",
+ "Status": "Pending", "CompletedAt": null, "Note": "Cho ăn theo khẩu phần: Yến mạch 3 kg",
+ "RuleCode": "FEEDING_BY_DIET", "IsAuto": true}
 ```
 
 Specific error codes: `NOT_TASK_OWNER`, `NOT_TASK_GROOM`.
@@ -903,8 +1021,17 @@ Specific error codes: `INSUFFICIENT_STOCK`, `NOT_REQUESTER`.
 
 ## 8. Notifications
 
-`GET /notifications` – items needing the logged-in user's attention. The database has no notifications table, so the list is
-**recomputed on every call** from current data (there is no "read" state). The frontend calls it on page load or every 1–2 minutes to show the bell.
+`GET /notifications?unread=1` – items needing the logged-in user's attention. The list is **recomputed on every call** from
+current data; the `NotificationRead` table only remembers which items the user has read. Every item has `Key` and `IsRead`.
+The frontend calls it on page load or every 1–2 minutes to show the bell.
+
+| Method | URL | Notes |
+|---|---|---|
+| GET | `/notifications?unread=1` | `unread=1`: only unread items |
+| GET | `/notifications/unread-count` | `{"Unread": 3, "Total": 5}` – the number on the bell |
+| POST | `/notifications/read` | `{"Keys": ["<Key>", ...]}` or `{"All": true}` → `{"Marked": n}` |
+
+`Key` = `Type|EntityName|EntityID|At`: a new event (new time) is a new, unread item.
 
 ```json
 [{"Type": "HEALTH_REPORT", "Priority": "High", "Title": "Health report (Urgent) - Reported",
@@ -918,10 +1045,10 @@ Sorting: `Priority = High` first, newest first. `EntityName` + `EntityID` tell w
 |---|---|
 | Club Manager | `HORSE_TO_VERIFY`, `HORSE_TO_APPROVE`, `PROFILE_CHANGE`, `INVENTORY_REQUEST`, `LOW_STOCK` |
 | Vet | `HEALTH_REPORT`, `INITIAL_EXAM`, `VACCINATION_DUE`, `MEDICAL_SCHEDULE`, `DRAFT_RECORD`, `DIET_TO_REVIEW` |
-| Head Trainer | `HEALTH_REPORT` (all horses in the club), `PLAN_TO_APPROVE`, `ADJUSTMENT_REQUIRED`, `STAGE_TO_CLOSE`, `DIET_RETURNED` |
-| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW`, `STAGE_TO_CLOSE` |
+| Head Trainer | `HEALTH_REPORT` (all horses in the club), `PLAN_TO_APPROVE`, `ADJUSTMENT_REQUIRED`, `STAGE_TO_CLOSE`, `DIET_RETURNED`, `DIET_REVIEW_NEEDED` |
+| Trainer | `HEALTH_REPORT` (horses they are in charge of), `PLAN_DRAFT_FROM_TEMPLATE`, `PLAN_RETURNED`, `SUPERVISE_TODAY`, `SUBSTITUTE_OBSERVATION`, `SESSION_TO_REVIEW`, `STAGE_TO_CLOSE` |
 | Work Rider | `RIDE_TODAY` |
-| Groom | `CARE_TASK` |
+| Groom | `CARE_TASK` (generated + assigned tasks due today / overdue) |
 | Horse Owner | `HORSE_REJECTED`, `PROFILE_CHANGE_DONE`, `OWNER_SESSIONS_REVIEWED` (new reviewed sessions, grouped per horse), `OWNER_STAGE_SUMMARY`, `OWNER_PLAN_SUMMARY`, `OWNER_PLAN_APPROVED`, `OWNER_SESSION_STOPPED` (High); Flow 3: `OWNER_TRAINING_LOCKED` (High), `OWNER_TRAINING_UNLOCKED` |
 
 ## 9. Frontend changes (Flow 1)
@@ -1085,7 +1212,8 @@ Suggested screens by role:
 | Vet | Health report queue | `GET /health-reports?open=1`, `.../take`, `.../resolve` |
 | Vet | Examination, prescribe treatments, sign, Training Lock | `POST /horses/{id}/medical-records`, `.../treatments`, `POST /medical-records/{id}/sign`, `POST /training-locks/{id}/release` |
 | Vet | Vaccinations, medical schedule, approve diet plans | `GET /vaccinations?DueWithinDays=14`, `POST /diet-plans/{id}/approve` |
-| Groom | Today's tasks, diet plan, report incidents, request inventory | `GET /care-tasks?mine=1&Date=`, `GET /horses/{id}/current-diet`, `POST /horses/{id}/health-reports`, `POST /inventory-requests` |
+| Groom | Today's tasks (generated by rules), diet plan, report incidents, request inventory | `GET /care-tasks?mine=1&Date=`, `.../complete`, `.../skip`, `GET /horses/{id}/current-diet`, `POST /horses/{id}/health-reports`, `POST /inventory-requests` |
+| Head Trainer | Write diet by training plan, care rules, Groom in charge | `GET /horses/{id}/diet-context`, `POST /horses/{id}/diet-plans`, `GET/PATCH /care-rules`, `PUT /horses/{id}/groom` |
 | Manager | Inventory, approve requests | `GET /inventory-items`, `POST /inventory-items/{id}/stock`, `POST /inventory-requests/{id}/approve` |
 | Horse Owner | Training tab of a horse: plan + stage summaries, session list, session detail | `GET /owner/horses/{id}/training-plans`, `GET /owner/training-plans/{id}`, `GET /owner/horses/{id}/training-sessions`, `GET /owner/training-sessions/{id}` |
 | All roles | Notification bell | `GET /notifications` |
@@ -1191,4 +1319,91 @@ Run commands are in the backend/frontend READMEs. Local SQL Server schema deploy
 read APIs for horse 8 were subsequently verified after fixing the initial deployment mismatch.
 SQL Server locking under simultaneous requests and production storage deployment still require
 verification in the target environment; SQLite tests cannot verify those database-specific behaviors.
+
+## 12. Administration (Club Manager)
+
+The Club Manager is the club's administrator (`RBAC_MANAGE`, `AUDIT_VIEW`, `CLUB_MANAGE`). Two levels of authorization:
+
+```
+Account ──assigned──> Role ──can do──> Permission (function)
+  PUT /users/{id}/roles      PUT /roles/{RoleCode}/permissions
+```
+
+Permissions are read from the database on every request, so changes apply **immediately** (no code change, no re-login).
+
+### 12.1 Accounts
+
+| Method | URL | Notes |
+|---|---|---|
+| PUT | `/users/{UserID}/roles` | `{"RoleCodes": ["TRAINER", "GROOM"]}` – replaces all roles of the account → `User` |
+| POST | `/users/{UserID}/lock` | `{"Reason"?}` → `Status: Suspended`; the user cannot log in and **existing tokens are rejected at once** (401); email to the user |
+| POST | `/users/{UserID}/unlock` | → `Status: Active` |
+| POST | `/users/{UserID}/reset-password` | → `User` + `TemporaryPassword` (**returned once**, give it to the person); old tokens stop working; email to the user |
+
+Rules (error `code`):
+- only people in the Manager's own club (`404` otherwise); no self-lock / self password reset / removing one's own `CLUB_MANAGER` role (`SELF_ACTION`);
+- the club keeps at least one active Manager (`LAST_MANAGER`);
+- `HORSE_OWNER` is never combined with staff roles, and staff accounts are not turned into owners (`OWNER_ROLE_EXCLUSIVE`);
+- a role is not removed / an account is not locked while the person still has pending work (`ROLE_IN_USE`, the message lists it):
+  Trainer – horses in charge or substitute sessions; Work Rider – assigned sessions; Vet – draft medical records or health
+  reports in progress; Groom – pending care tasks; Owner – owned horses. Reassign the work first.
+
+### 12.2 Permission matrix (role → functions)
+
+| Method | URL | Notes |
+|---|---|---|
+| GET | `/roles` | `{"Roles": [{RoleCode, RoleName, UserCount, IsLocked, Permissions: [...]}], "Permissions": [{PermissionCode, PermissionName, Description, Group, ExclusiveRole}], "LockedCells": [{RoleCode, PermissionCode, Reason}]}` |
+| PUT | `/roles/{RoleCode}/permissions` | `{"PermissionCodes": [...]}` – replaces the role's permissions → `{"Added", "Removed"}` + the matrix |
+| POST | `/roles/reset-defaults` | back to the default matrix of `sql/horse_v2.sql` → `{"Removed": {...}}` + the matrix |
+
+The frontend draws a table (rows = permissions grouped by `Group`, columns = roles, checkboxes) and greys out `LockedCells`.
+Safety locks:
+- exclusive permissions: `MEDICAL_MANAGE`, `MEDICAL_SIGN`, `TRAINING_LOCK_MANAGE` only `VETERINARIAN`; `RBAC_MANAGE` only `CLUB_MANAGER`
+  (always kept); `HORSE_REGISTER`, `PROFILE_EDIT_REQUEST`, `OWNER_VIEW` only `HORSE_OWNER` → `PERMISSION_LOCKED`;
+- `HORSE_OWNER` permissions cannot change (owners are outside the club) → `PERMISSION_LOCKED`;
+- every permission keeps at least one role → `PERMISSION_ORPHAN`;
+- separation of duties stays in code: nobody approves their own training plan (`SELF_APPROVAL`) or own diet plan.
+
+The matrix is **shared by all clubs** (`Role` / `RolePermission` have no `ClubID`). Every change is in the audit log.
+
+### 12.3 Audit log, club, dashboard
+
+| Method | URL | Who | Notes |
+|---|---|---|---|
+| GET | `/audit-logs?UserID=&ActionType=&EntityName=&EntityID=&From=&To=&Limit=100&Offset=0` | Manager (`AUDIT_VIEW`) | actions of people in the club, newest first → `{"Total", "Limit", "Offset", "Items": [{AuditLogID, UserID, UserName, ActionType, EntityName, EntityID, ActionTime, Details}]}` (max `Limit` 500) |
+| GET | `/clubs/mine` | logged in | own club |
+| PATCH | `/clubs/mine` | Manager (`CLUB_MANAGE`) | `{"ClubName"?, "Address"?, "Phone"?, "Email"?}` |
+| GET | `/dashboard` | Manager (`CLUB_MANAGE`) | club statistics (below) |
+
+`GET /dashboard` (`Training` / `Medical` / `Care` are `null` until that flow is installed):
+
+```json
+{"ClubID": 1, "GeneratedAt": "2026-10-20T22:04:04",
+ "Users": {"Total": 18, "ByStatus": {"Active": 18}, "ByRole": {"CLUB_MANAGER": 1, "TRAINER": 3, "GROOM": 3}},
+ "Horses": {"Total": 6, "ByRegistrationStatus": {"Approved": 3, "PendingExam": 1}, "ApprovedByHealthStatus": {"Healthy": 3},
+            "Stalls": {"Total": 6, "ByStatus": {"Occupied": 3, "Available": 3}}},
+ "Training": {"ActiveAssignments": 1, "PlansByStatus": {"Active": 1}, "SessionsToday": {"Completed": 1},
+              "SessionsThisWeek": {"Completed": 1, "Assigned": 2}, "SessionsLast30Days": {"Completed": 6, "Cancelled": 1, "Missed": 1},
+              "AvgPerformanceScore30Days": 75.3, "SessionsAwaitingReview": 0},
+ "Medical": {"OpenHealthReports": 1, "UrgentOpenHealthReports": 0, "ActiveTrainingLocks": {}, "VaccinationsDue14Days": 1,
+             "MedicalSchedulesDue14Days": 1},
+ "Care": {"DietPlansByStatus": {"Approved": 1}, "CareTasksToday": {"Pending": 8}, "OverdueCareTasks": 2,
+          "InventoryByStatus": {"Available": 4, "Low Stock": 1}, "PendingInventoryRequests": 0}}
+```
+
+### 12.4 New club and first Manager
+
+Creating a club is a system administration task done on the server (there is no system-admin role in the app):
+
+```powershell
+python manage.py create_club --name "Saigon Racing Club" --phone 0281234567 --manager-email manager@sgr.vn --manager-name "Nguyễn Văn A"
+```
+
+It prints a temporary password; the Manager logs in, changes the password and manages the club from section 12.1–12.3.
+
+### 12.5 Database
+
+On an existing database run `sql/migrations/20261020_admin_notification_read.sql` (adds `NotificationRead`). Everything else
+uses existing tables. After this version is deployed, tokens issued before it are rejected once (they do not carry the password
+check) – everyone logs in again one time.
 

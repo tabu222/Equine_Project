@@ -22,7 +22,7 @@ import {
 
 const STATUS_LABELS = {
   Draft: 'Bản nháp',
-  'Pending Approval': 'Chờ Head Trainer duyệt',
+  'Pending Approval': 'Chờ duyệt',
   Active: 'Đang áp dụng',
   Completed: 'Hoàn thành',
   Cancelled: 'Đã hủy',
@@ -72,7 +72,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -100,7 +100,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -1267,13 +1267,7 @@ export default function TrainingPlanDetailPage() {
                   Gửi giáo án duyệt?
                 </h2>
 
-                <p>
-                  Sau khi gửi, giáo án
-                  chuyển sang Chờ duyệt và
-                  Trainer không thể chỉnh
-                  sửa cho tới khi Head
-                  Trainer trả về Draft.
-                </p>
+                
 
                 <div className="training-plan-modal-actions">
                   <button
@@ -1312,12 +1306,7 @@ export default function TrainingPlanDetailPage() {
                   Tạo bản điều chỉnh?
                 </h2>
 
-                <p>
-                  Backend sẽ sao chép giáo
-                  án hiện tại thành một
-                  Draft mới để Trainer chỉnh
-                  sửa và gửi duyệt lại.
-                </p>
+                
 
                 <div className="training-plan-modal-actions">
                   <button
@@ -1356,12 +1345,7 @@ export default function TrainingPlanDetailPage() {
                   Hoàn tất giáo án?
                 </h2>
 
-                <p>
-                  Giáo án sẽ chuyển sang
-                  Completed. Các session còn
-                  Assigned sẽ được Backend
-                  xử lý theo business rule.
-                </p>
+                
 
                 <div className="training-plan-modal-actions">
                   <button
@@ -1419,7 +1403,7 @@ export default function TrainingPlanDetailPage() {
                     value={
                       cancelReason
                     }
-                    placeholder="Backend không bắt buộc, nhưng nên ghi rõ lý do..."
+                    placeholder="Nhập lý do"
                     onChange={(event) =>
                       setCancelReason(
                         event.target.value,
@@ -1510,7 +1494,7 @@ export default function TrainingPlanDetailPage() {
                 value={
                   summaryNote
                 }
-                placeholder="Nhập tổng kết Stage nếu có..."
+                placeholder="Nhập tổng kết Giai đoạn nếu có..."
                 onChange={(event) =>
                   setSummaryNote(
                     event.target.value,

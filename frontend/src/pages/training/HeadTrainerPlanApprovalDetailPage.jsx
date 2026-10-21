@@ -11,6 +11,7 @@ import {
 import {
   approveTrainingPlan,
   getTrainingPlan,
+  getTrainingPlanTemplateReview,
   returnTrainingPlan,
 } from '../../api/trainingApi.ts'
 
@@ -66,7 +67,7 @@ function formatDate(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -94,7 +95,7 @@ function formatDateTime(
   }
 
   return new Intl.DateTimeFormat(
-    'vi-VN',
+    'en-US',
     {
       day: '2-digit',
       month: '2-digit',
@@ -153,6 +154,9 @@ export default function HeadTrainerPlanApprovalDetailPage() {
     setPlan,
   ] = useState(null)
 
+  const [templateReview, setTemplateReview] = useState(null)
+  const [templateError, setTemplateError] = useState('')
+
   const [
     loading,
     setLoading,
@@ -190,6 +194,10 @@ export default function HeadTrainerPlanApprovalDetailPage() {
 
     let active = true
 
+    getTrainingPlanTemplateReview(planId)
+      .then((data) => { if (active) { setTemplateReview(data); setTemplateError('') } })
+      .catch(() => { if (active) setTemplateError('Không thể tải đối chiếu giáo án mẫu.') })
+
     getTrainingPlan(
       planId,
     )
@@ -213,7 +221,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
           setError(
             getErrorMessage(
               loadError,
-              'Không thể tải Training Plan.',
+              'Không thể tải giáo án.',
             ),
           )
         },
@@ -260,7 +268,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
       )
 
       setMessage(
-        'Đã duyệt giáo án. Training Plan hiện đã Active và có thể được dùng để xếp Training Session.',
+        'Đã duyệt giáo án. Có thể lên lịch buổi tập.',
       )
     } catch (actionError) {
       setError(
@@ -284,7 +292,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
 
     if (!note) {
       setError(
-        'Cần nhập lý do trả giáo án về Trainer.',
+        'Vui lòng nhập lý do yêu cầu chỉnh sửa.',
       )
 
       return
@@ -314,7 +322,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
       )
 
       setMessage(
-        'Đã trả giáo án về Draft. Trainer có thể chỉnh sửa và gửi duyệt lại.',
+        'Đã trả giáo án để huấn luyện viên chỉnh sửa.',
       )
     } catch (actionError) {
       setError(
@@ -339,12 +347,11 @@ export default function HeadTrainerPlanApprovalDetailPage() {
 
           <div>
             <strong>
-              Đang tải Training Plan
+              Đang tải giáo án
             </strong>
 
             <span>
-              Đang lấy thông tin Plan và
-              toàn bộ Stage để duyệt.
+              Đang tải chi tiết giáo án.
             </span>
           </div>
         </section>
@@ -360,7 +367,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
           role="alert"
         >
           {error ||
-            'Không tìm thấy Training Plan.'}
+            'Không tìm thấy giáo án.'}
         </div>
 
         <Link
@@ -407,7 +414,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
       <div className="page-heading plan-approval-page-heading">
         <div>
           <p className="eyebrow">
-            HEAD TRAINER
+            HUẤN LUYỆN VIÊN TRƯỞNG
           </p>
 
           <h1>
@@ -415,12 +422,12 @@ export default function HeadTrainerPlanApprovalDetailPage() {
           </h1>
 
           <p>
-            Training Plan #
+            Giáo án #
             {
               plan.TrainingPlanID
             }
             {' · '}
-            Trainer{' '}
+            Huấn luyện viên{' '}
             <strong>
               {
                 plan.TrainerName
@@ -488,18 +495,14 @@ export default function HeadTrainerPlanApprovalDetailPage() {
           {plan.Status ===
             'Active' && (
             <span>
-              Plan đã Active. Việc phân
-              Work Rider sẽ thực hiện khi
-              tạo từng Training Session ở
-              Phase 8.
+              Có thể bắt đầu lên lịch buổi tập.
             </span>
           )}
 
           {plan.Status ===
             'Draft' && (
             <span>
-              Plan đã được trả về Trainer
-              để chỉnh sửa.
+              Giáo án đã được trả về để chỉnh sửa.
             </span>
           )}
         </section>
@@ -518,6 +521,27 @@ export default function HeadTrainerPlanApprovalDetailPage() {
           </p>
         </section>
       )}
+
+      {templateReview?.TemplateID && (
+        <section className="panel plan-approval-overview">
+          <h2>Đối chiếu giáo án mẫu</h2>
+          <p>Giáo án mẫu: {templateReview.TemplateName || 'Không có tên'}</p>
+          {templateReview.ChangedFromTemplate === false ? (
+            <p>Huấn luyện viên giữ nguyên giáo án mẫu.</p>
+          ) : Array.isArray(templateReview.Changes) && templateReview.Changes.length > 0 ? (
+            <div className="training-template-changes">
+              {templateReview.Changes.map((change, index) => (
+                <div key={`${change.Field}-${change.StageOrder ?? 'plan'}-${index}`} className="training-template-change-row">
+                  <strong>{change.StageOrder != null ? `Giai đoạn ${change.StageOrder} · ` : ''}{({Goal:'Mục tiêu', OverallIntensity:'Cường độ', DurationDays:'Số ngày', DailyStructure:'Lịch tập hằng ngày', WeeklyPattern:'Lịch tập hằng tuần', StageName:'Tên giai đoạn', TrainingLoad:'Mức tải', DistanceTargetKm:'Cự ly mục tiêu', StartDay:'Ngày bắt đầu', Intensity:'Cường độ', Surface:'Mặt sân', Note:'Ghi chú', ExitCriteria:'Điều kiện hoàn tất', Stage:'Giai đoạn'})[change.Field] || change.Field}</strong>
+                  <div>Giáo án mẫu: {change.Template == null ? 'Không có' : String(change.Template)}</div>
+                  <div>Giáo án gửi duyệt: {change.Plan == null ? 'Không có' : String(change.Plan)}</div>
+                </div>
+              ))}
+            </div>
+          ) : <p>Chưa có dữ liệu đối chiếu.</p>}
+        </section>
+      )}
+      {templateError && <p role="status">{templateError}</p>}
 
       <section className="panel plan-approval-overview">
         <div className="plan-approval-section-head">
@@ -701,10 +725,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
               Giáo án chưa có Stage
             </h3>
 
-            <p>
-              Backend bình thường không cho
-              submit Plan không có Stage.
-            </p>
+            
           </div>
         ) : (
           <div className="plan-approval-stage-list">
@@ -863,7 +884,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
               value={
                 reviewNote
               }
-              placeholder="Nếu duyệt: nhận xét là tùy chọn. Nếu trả về Trainer: lý do là bắt buộc."
+              placeholder="Nếu duyệt: nhận xét là tùy chọn. Nếu trả về Huấn luyện viên: lý do là bắt buộc."
               onChange={(event) =>
                 setReviewNote(
                   event.target.value,
@@ -953,7 +974,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
                 </h2>
 
                 <p>
-                  Training Plan #
+                  Giáo án #
                   {
                     plan.TrainingPlanID
                   }{' '}
@@ -1034,7 +1055,7 @@ export default function HeadTrainerPlanApprovalDetailPage() {
                 </h2>
 
                 <p>
-                  Training Plan #
+                  Giáo án #
                   {
                     plan.TrainingPlanID
                   }{' '}

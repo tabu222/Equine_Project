@@ -9554,3 +9554,306 @@
     grid-template-columns: 1fr;
   }
 }
+/* Flow 2: compact, readable management views */
+.assessment-page .trainer-metrics-grid,
+.training-plan-horse-info {
+  gap: 4px 18px;
+}
+.assessment-page .trainer-metrics-grid > div,
+.training-plan-horse-info > div {
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.assessment-page .trainer-metrics-grid span,
+.training-plan-horse-info span {
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.assessment-page .trainer-metrics-grid strong,
+.training-plan-horse-info strong {
+  font-size: 13px;
+}
+.assessment-page .trainer-suggestion-card {
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.assessment-page .trainer-suggestion-card:hover,
+.assessment-page .trainer-suggestion-card.is-suggested,
+.assessment-page .trainer-suggestion-card.is-selected {
+  border-color: var(--border);
+  box-shadow: none;
+  background: transparent;
+}
+.assessment-page .trainer-suggestion-reason {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.training-template-changes {
+  margin-top: 12px;
+}
+.training-template-change-row {
+  display: grid;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.training-template-change-row:last-child { border-bottom: 0; }
+@media (max-width: 760px) {
+  .assessment-page .trainer-metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* Trang đánh giá: nội dung nối tiếp trong cùng trang, không lồng khung. */
+.assessment-inline-assignment { margin-top: 20px; }
+.assessment-inline-assignment > .panel { border: 0; box-shadow: none; background: transparent; padding: 16px 0; border-radius: 0; border-top: 1px solid var(--border, #dce5de); }
+.assessment-inline-template { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 16px 0; border-top: 1px solid var(--border, #dce5de); }
+.assessment-inline-template > div { display: flex; flex-direction: column; gap: 5px; }
+.assessment-inline-template span { color: var(--text, #536458); font-size: .87rem; }
+.assessment-inline-template strong { color: var(--text-h, #173b2d); font-size: 1rem; }
+.assessment-inline-assignment .trainer-suggestion-card { box-shadow: none; border-width: 0 0 1px 0; border-radius: 0; padding: 18px 0; background: transparent; }
+.assessment-inline-assignment .trainer-suggestion-card:last-child { border-bottom: 0; }
+.assessment-form-panel .assessment-section-kicker:empty, .assessment-form-panel .assessment-section-heading p:empty { display: none; }
+@media (max-width: 680px) { .assessment-inline-template { grid-template-columns: 1fr; } }
+
+/* Flow 2 — bố cục gọn và giảm khung lồng nhau */
+.training-session-create-page .panel,
+.training-schedule-page .panel,
+.training-session-form-section,
+.assessment-history-shortcut {
+  box-shadow: none;
+}
+.assessment-history-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.assessment-history-shortcut h2 { margin: 0; }
+.assessment-history-shortcut p { display: none; }
+.training-session-form-section {
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.training-session-form-section + .training-session-form-section { margin-top: 0; }
+.training-session-form-section-head { margin-bottom: 14px; }
+.training-session-form-section-head p { display: none; }
+.training-session-context-grid > div,
+.training-session-summary-grid > div,
+.work-rider-session-grid > div {
+  box-shadow: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 0;
+}
+@media (max-width: 760px) {
+  .assessment-history-shortcut { flex-direction: column; align-items: stretch; }
+}
+
+
+/* Bảng điều khiển huấn luyện – bố cục tinh gọn */
+.training-results-overview {
+  margin: 0 0 22px;
+  padding: 22px 26px;
+  background: #ffffff;
+  border: 1px solid #edf1ee;
+  border-radius: 14px;
+}
+.training-results-title h2 { margin: 0 0 16px; font-size: 17px; font-weight: 700; color: #204338; }
+.training-results-content { display: flex; align-items: center; gap: clamp(24px, 4.5vw, 64px); }
+.training-results-ring {
+  width: 186px;
+  height: 186px;
+  flex: 0 0 186px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  position: relative;
+}
+.training-results-ring::before {
+  content: '';
+  position: absolute;
+  inset: 24px;
+  border-radius: 50%;
+  background: #fff;
+}
+.training-results-ring-center { position: relative; z-index: 1; display: grid; gap: 1px; text-align: center; color: #21453b; }
+.training-results-ring-center strong { font-size: 32px; line-height: 1.12; font-weight: 750; }
+.training-results-ring-center span { color: #708378; font-size: 12px; }
+.training-results-breakdown { display: grid; width: min(440px, 100%); gap: 0; }
+.training-results-count { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.training-results-count strong { font-size: 23px; color: #204338; }
+.training-results-count span { font-size: 12px; color: #6a7d71; }
+.training-results-breakdown-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 9px 0; border-bottom: 1px solid #f0f3f0; }
+.training-results-breakdown-row:last-child { border-bottom: 0; }
+.training-results-breakdown-row strong { font-size: 14px; color: #204338; font-variant-numeric: tabular-nums; }
+.training-results-key { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: #4f6459; }
+.training-results-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.training-results-load-error { margin: 0 0 18px; padding: 10px 0; color: #97624a; font-size: 13px; }
+.training-dashboard-page .training-dashboard-summary {
+  margin-bottom: 18px;
+  gap: 0;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #edf1ee;
+  overflow: hidden;
+}
+.training-dashboard-page .training-dashboard-stat {
+  padding: 18px 20px;
+  border: 0;
+  border-right: 1px solid #f0f3f0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  gap: 8px;
+}
+.training-dashboard-page .training-dashboard-stat:last-child { border-right: 0; }
+.training-dashboard-page .training-dashboard-stat::before { display: none; }
+.training-dashboard-page .training-dashboard-stat strong { font-size: 27px; }
+.training-dashboard-page .training-dashboard-stat span { padding: 0; font-size: 12px; }
+.training-dashboard-page .training-dashboard-stat.needs-attention { background: #fff; }
+.training-dashboard-page .training-dashboard-filter,
+.owner-training-page .owner-training-filters { background: transparent; border: 0; padding: 0; }
+.training-dashboard-page .training-dashboard-table-card,
+.owner-training-page .owner-training-session-panel { border: 1px solid #edf1ee; border-radius: 12px; background: #fff; }
+.training-dashboard-page .training-dashboard-table .button { font-size: 11px; }
+.owner-training-page .owner-training-session-card { border: 0; padding: 18px 0; border-radius: 0; border-bottom: 1px solid #edf1ee; }
+.owner-training-page .owner-training-session-card:last-child { border-bottom: 0; }
+.owner-training-page .owner-training-session-panel { padding: 12px 22px; }
+.owner-plan-progress-visual { display: flex; align-items: center; gap: 32px; margin-top: 20px; padding: 8px 0 0; }
+.owner-plan-progress-ring { width: 150px; height: 150px; flex-basis: 150px; }
+.owner-plan-progress-ring::before { inset: 19px; }
+.owner-plan-progress-ring .training-results-ring-center strong { font-size: 28px; }
+.owner-plan-progress-details h3 { font-size: 17px; margin: 0 0 10px; color: #204338; }
+.owner-plan-progress-details p { margin: 5px 0; color: #617568; font-size: 13px; }
+.owner-plan-progress-details p strong { color: #204338; }
+@media (max-width: 700px) {
+  .training-results-overview { padding: 18px; }
+  .training-results-content { flex-direction: column; align-items: flex-start; gap: 18px; }
+  .training-results-ring { width: 156px; height: 156px; flex-basis: 156px; align-self: center; }
+  .training-results-ring::before { inset: 20px; }
+  .training-results-breakdown { width: 100%; }
+  .training-dashboard-page .training-dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .training-dashboard-page .training-dashboard-stat:nth-child(even) { border-right: 0; }
+  .training-dashboard-page .training-dashboard-stat:nth-child(-n+2) { border-bottom: 1px solid #f0f3f0; }
+  .owner-plan-progress-visual { flex-direction: column; align-items: flex-start; }
+}
+
+/* Giao diện chung theo bảng điều khiển sáng */
+.app-sidebar {
+  border-right-color: #edf2ee;
+  background: #ffffff;
+}
+.topbar {
+  background: #ffffff;
+  border-bottom-color: #edf2ee;
+}
+.side-nav a { border-color: transparent; border-radius: 8px; }
+.side-nav a.active {
+  border-color: transparent;
+  background: #e3f5ee;
+  color: #155c4d;
+}
+.side-nav a:hover { background: #eef7f2; }
+.sidebar-support {
+  border: 0;
+  background: #f2f8f4;
+  border-radius: 10px;
+}
+.panel, .table-card, .filter-card {
+  box-shadow: none;
+  border-color: #eaf0ec;
+  border-radius: 12px;
+}
+.page-heading h1 { letter-spacing: -.025em; }
+.search-field input:focus,
+.filter-field select:focus,
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus { outline: 2px solid #c1e9dc; }
+
+
+/* Kết quả tập luyện – HLV trưởng */
+.training-results-page { max-width: 1480px; }
+.training-results-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.training-results-page-heading h1 { margin: 0; }
+.training-results-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin-bottom: 22px; }
+.training-results-toolbar .form-field { width: min(300px, 100%); margin: 0; }
+.training-results-toolbar select { background: #fff; }
+.training-results-overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); align-items: stretch; gap: 20px; margin-bottom: 28px; }
+.training-results-overview-grid .training-results-overview { margin: 0; border: 0; box-shadow: none; border-radius: 14px; }
+.training-results-overview-grid .training-results-content { gap: 28px; }
+.training-results-overview-grid .training-results-ring { width: 156px; height: 156px; flex-basis: 156px; }
+.training-results-overview-grid .training-results-ring::before { inset: 20px; }
+.training-results-summary { display: grid; align-content: space-between; padding: 12px 20px; background: #fff; border-radius: 14px; }
+.training-results-summary > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0; }
+.training-results-summary > div + div { border-top: 1px solid #ecf1ed; }
+.training-results-summary span { font-size: 13px; color: #607468; }
+.training-results-summary strong { color: #1b493c; font-size: 24px; font-variant-numeric: tabular-nums; }
+.training-results-list { padding: 18px 20px; background: #fff; border-radius: 14px; }
+.training-results-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; }
+.training-results-list-heading h2 { margin: 0; font-size: 18px; color: #1b493c; }
+.training-results-list-heading span { color: #748579; font-size: 13px; }
+.training-results-table { min-width: 880px; }
+.training-results-table td, .training-results-table th { padding: 14px 12px; }
+.training-results-table td strong { color: #1b493c; }
+.training-results-state { font-size: 12px; color: #5d6f63; }
+.training-results-state-done { color: #148067; font-weight: 650; }
+.training-results-message { margin: 16px 0; color: #64796d; }
+.training-results-failure { padding: 24px 0; }
+.training-results-failure strong { color: #8b493d; }
+.training-results-failure p { margin: 10px 0 20px; color: #67786f; }
+.training-dashboard-results-preview { position: relative; }
+.training-dashboard-results-preview .training-results-overview { margin-bottom: 10px; }
+.training-results-text-link { display: inline-block; margin: 0 0 20px 8px; color: #087a61; font-size: 13px; font-weight: 650; text-decoration: none; }
+.training-results-text-link:hover { text-decoration: underline; }
+@media (max-width: 1050px) {
+  .training-results-overview-grid { grid-template-columns: 1fr; }
+  .training-results-summary { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+  .training-results-summary > div { display: grid; }
+  .training-results-summary > div + div { border-top: 0; border-left: 1px solid #ecf1ed; padding-left: 16px; }
+}
+@media (max-width: 680px) {
+  .training-results-page-heading { align-items: flex-start; }
+  .training-results-toolbar { display: grid; grid-template-columns: 1fr; }
+  .training-results-toolbar .form-field { width: 100%; }
+  .training-results-summary { grid-template-columns: 1fr; }
+  .training-results-summary > div { display: flex; }
+  .training-results-summary > div + div { border-left: 0; border-top: 1px solid #ecf1ed; padding-left: 0; }
+  .training-results-list { padding: 16px; }
+}
+
+/* Tinh gọn khu vực lịch tập và thông tin giáo án */
+.training-schedule-page .training-session-list-panel,
+.training-plan-detail-page .training-plan-detail-grid {
+  box-shadow: none;
+}
+.training-plan-detail-page .training-plan-detail-grid > *,
+.training-schedule-page .training-session-list-panel {
+  border-color: transparent;
+}
+.training-schedule-page .training-session-table {
+  border-collapse: collapse;
+}
+.training-schedule-page .training-session-table th,
+.training-schedule-page .training-session-table td {
+  border-left: 0;
+  border-right: 0;
+}
