@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -13,6 +14,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
   useParams,
 } from 'react-router-dom'
 
@@ -74,6 +76,8 @@ import VetExaminationForm from './pages/vet/VetExaminationForm.tsx'
 import VetWorkspace from './pages/vet/VetWorkspace.jsx'
 import VetMedicalProfile from './pages/vet/VetMedicalProfile.jsx'
 import { vetError } from './pages/vet/vetDomain.js'
+import VetLoading from './pages/vet/VetLoading.jsx'
+import { ClinicalNavigationGuard, hasUnsavedClinicalChanges } from './pages/vet/useClinicalWarning.js'
 import NotificationsPage from './pages/vet/NotificationsPage.jsx'
 import InventoryPage from './pages/manager/InventoryPage.jsx'
 import ManagerReports from './pages/manager/ManagerReports.jsx'
@@ -1099,6 +1103,13 @@ function OwnerCorrectionRoute({
   )
 }
 
+function VetStallsRedirect() {
+  const { search } = useLocation()
+  const params = new URLSearchParams(search)
+  params.set('view', 'stalls')
+  return <Navigate to={{ pathname: '/vet/herd', search: params.toString() }} replace />
+}
+
 function VetHorseRoute({
   currentUser,
   onRefresh,
@@ -1106,6 +1117,8 @@ function VetHorseRoute({
 }) {
   const { horseId } = useParams()
   const { search: examSearch } = useLocation()
+  const navigate = useNavigate()
+  const loadSequence = useRef(0)
   const examParams = new URLSearchParams(examSearch)
   const requestedRecordId = examParams.get('record')
   const healthReportId = examParams.get('report') || undefined
@@ -1134,6 +1147,7 @@ function VetHorseRoute({
     async (
       preserveExistingError = false,
     ) => {
+      const sequence = ++loadSequence.current
       try {
         const [
           horseResult,
@@ -1158,6 +1172,7 @@ function VetHorseRoute({
           ),
         ])
 
+        if (sequence !== loadSequence.current) return false
         setError('')
 
         setHorse({
@@ -1173,6 +1188,7 @@ function VetHorseRoute({
 
         return true
       } catch (loadError) {
+        if (sequence !== loadSequence.current) return false
         if (!preserveExistingError) {
           setError(
             vetError(loadError, 'Không thể tải hồ sơ khám. Vui lòng thử lại.'),
@@ -1181,9 +1197,7 @@ function VetHorseRoute({
 
         return false
       } finally {
-        setLoadedHorseId(
-          String(horseId),
-        )
+        if (sequence === loadSequence.current) setLoadedHorseId(String(horseId))
       }
     },
     [horseId],
@@ -1191,6 +1205,7 @@ function VetHorseRoute({
 
   useEffect(() => {
     void load()
+    return () => { loadSequence.current += 1 }
   }, [load])
 
   const loading =
@@ -1204,7 +1219,7 @@ function VetHorseRoute({
           className="panel"
           role="status"
         >
-          Đang tải hồ sơ khám...
+          <VetLoading label="Đang tải hồ sơ khám…" />
         </section>
       </main>
     )
@@ -1223,7 +1238,7 @@ function VetHorseRoute({
 
           <p>{error}</p>
 
-          <></>
+          <button className="button button-secondary" onClick={() => void load()}>Thử lại</button>
         </section>
       </main>
     )
@@ -1277,6 +1292,15 @@ function VetHorseRoute({
       <VetExaminationForm
         key={`${horse.id}:${activeRequest?.id || ''}:${examDraft?.id || ''}:${examSigned?.id || ''}:${healthReportId || ''}`}
         horse={horse}
+        records={records}
+        registrationRequestId={activeRequest?.id}
+        onDraftSaved={record => {
+          setRecords(rows => [record, ...rows.filter(r => r.id !== record.id)])
+          const next = new URLSearchParams(examSearch)
+          next.set('record', record.id)
+          next.delete('new')
+          navigate({ search: next.toString() }, { replace: true })
+        }}
         currentUser={
           currentUser
         }
@@ -1327,6 +1351,7 @@ function VetHorseRoute({
 function AppContent() {
   const location = useLocation()
   const independentManagerPage = /^\/manager\/(staff|roles)(?:\/|$)/.test(location.pathname)
+  const independentVetPage = /^\/vet\/(overview|herd|stalls|reports|calendar|intake-results|notifications|horses-needing-exam|horses\/)/.test(location.pathname)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const [
@@ -1551,6 +1576,7 @@ function AppContent() {
   }
 
   function logout() {
+    if (userRole(currentUser) === 'vet' && hasUnsavedClinicalChanges() && !window.confirm('Nội dung y tế chưa được lưu. Đăng xuất và bỏ thay đổi?')) return
     clearPendingHorseDocumentUploads()
     clearSession()
 
@@ -1755,7 +1781,8 @@ function AppContent() {
   }
 
   return (
-    <div className={`app-shell${sidebarCollapsed ? " sidebar-is-collapsed" : ""}`}>
+    <div className={`app-shell${role === 'vet' ? ' vet-shell' : ''}${sidebarCollapsed ? " sidebar-is-collapsed" : ""}`}>
+      {role === 'vet' && <ClinicalNavigationGuard />}
       <aside className="app-sidebar" aria-label="Thanh menu">
         <div className="sidebar-brand-row">
           <Link className="brand" to={home} title="EquiTrack">
@@ -1846,18 +1873,16 @@ function AppContent() {
             </>
           )}
 
-          {role === 'vet' && (
-            <NavLink
-              end
-              to="/vet/horses-needing-exam" title="Hàng đợi khám"
-            >
-              <NavIcon kind="vet" />
-
-              <span>
-                Hàng đợi khám
-              </span>
-            </NavLink>
-          )}
+          {role === 'vet' && <>
+            {currentUser.permissions.includes('HORSE_VIEW') && <>
+              <NavLink to="/vet/overview" title="Tổng quan"><NavIcon kind="overview" /><span>Tổng quan</span></NavLink>
+              <NavLink to="/vet/horses-needing-exam" title="Hàng chờ khám"><NavIcon kind="vet" /><span>Hàng chờ khám</span></NavLink>
+              <NavLink to="/vet/herd" title="Đàn ngựa và chuồng trại"><NavIcon kind="horses" /><span>Đàn ngựa và chuồng trại</span></NavLink>
+              <NavLink to="/vet/reports" title="Báo cáo sức khỏe"><NavIcon kind="requests" /><span>Báo cáo sức khỏe</span></NavLink>
+              <NavLink to="/vet/calendar" title="Lịch y tế"><NavIcon kind="schedule" /><span>Lịch y tế</span></NavLink>
+            </>}
+            <NavLink to="/vet/notifications" title="Thông báo"><NavIcon kind="activity" /><span>Thông báo</span></NavLink>
+          </>}
 
           {role === 'headTrainer' && (
             <>
@@ -2037,7 +2062,7 @@ function AppContent() {
           </div>
         </header>
 
-        {loadError && !independentManagerPage && (
+        {loadError && !independentManagerPage && !independentVetPage && (
           <div
             className="alert-banner"
             role="alert"
@@ -2053,13 +2078,12 @@ function AppContent() {
               padding: '10px 12px',
             }}
           >
-            {loadError}{' '}
-
-            <></>
+            {role === 'vet' ? 'Không thể tải dữ liệu khám. Vui lòng thử lại.' : loadError}{' '}
+            <button className="button button-secondary" onClick={retryLoad}>Thử lại</button>
           </div>
         )}
 
-        {loadingData && !independentManagerPage && (
+        {loadingData && !independentManagerPage && !independentVetPage && (
           <main className="page-content">
             <section
               className="panel"
@@ -2070,7 +2094,7 @@ function AppContent() {
           </main>
         )}
 
-        {(independentManagerPage || (!loadingData && !loadError)) && (
+        {(independentManagerPage || independentVetPage || (!loadingData && !loadError)) && (
           <Routes>
             <Route path="/manager/staff" element={role === 'manager' && currentUser.permissions.includes('RBAC_MANAGE')
               ? <StaffPage currentUser={currentUser} onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật thông tin tài khoản.')) }} />
@@ -2346,12 +2370,19 @@ function AppContent() {
   }
 />
 
+            <Route path="/vet/stalls" element={role === 'vet' && currentUser.permissions.includes('HORSE_VIEW') ? <VetStallsRedirect /> : <Navigate to={home} replace />} />
+            {['overview', 'herd', 'reports', 'calendar', 'intake-results'].map(mode => <Route key={mode} path={`/vet/${mode}`} element={role === 'vet' && currentUser.permissions.includes('HORSE_VIEW')
+              ? <VetWorkspace key={mode} currentUser={currentUser} mode={mode} initialExams={initialExams} intakeError={loadError} intakeLoading={loadingData} />
+              : <Navigate to={home} replace />} />)}
+            <Route path="/vet/notifications" element={role === 'vet' ? <NotificationsPage currentUser={currentUser} role="vet" /> : <Navigate to={home} replace />} />
             <Route
               path="/vet/horses-needing-exam"
               element={
                 role ===
                 'vet' ? (
                   <HorsesNeedingExam
+                    loading={loadingData}
+                    loadError={loadError ? 'Không tải được danh sách khám đầu vào. Vui lòng thử lại.' : ''}
                     currentUser={currentUser}
                     initialExams={
                       initialExams

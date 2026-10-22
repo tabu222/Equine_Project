@@ -2,7 +2,13 @@
 
 Frontend React + Vite cho dự án Equi. Vite chạy mặc định tại `http://localhost:5173` và proxy request `/api` sang Django REST backend tại `http://127.0.0.1:8000`.
 
-## Cập nhật Veterinarian 18/10/2026
+## Không gian Veterinarian — cập nhật 22/10/2026
+
+Đã hoàn thiện màn hình khám theo nhóm, đơn thuốc trong đúng lần khám, kiểm tra trước chốt, bệnh án chỉ đọc và đính chính; khôi phục các route/sidebar thú y, bổ sung hàng chờ khám sau tiếp nhận, công việc cần xử lý và bộ lọc. Dùng API/JWT hiện tại, không sửa backend hoặc SQL Server. Chi tiết nguồn, endpoint, yêu cầu backend/asset và bằng chứng kiểm thử mới nhất: [bàn giao 22/10/2026](../backend/docs/VET_WORKSPACE_20261022.md).
+
+Các luồng ghi được kiểm tra bằng Chrome thật và Django trên fixture SQLite riêng; 16 API đọc đã được kiểm tra trên SQL Server local. Không dùng kết quả SQLite để khẳng định trigger hoặc đồng thời SQL Server. Lịch hiện hỗ trợ tạo/sửa/hủy; nút hoàn thành đã được bỏ vì contract chưa lưu đủ thông tin thực hiện. Dữ liệu khám không lưu vào localStorage. Ảnh desktop/mobile nằm trong `artifacts/vet/`.
+
+### Ghi chú các lần tích hợp trước
 
 Cập nhật 22/10/2026: đã đồng bộ `origin/main` tới `d4e69c4`, khôi phục các route thú y bị gỡ trong bản tích hợp, nối sửa thuốc, sửa/xác nhận trạng thái lịch, thông báo có trạng thái đọc trên server; bổ sung nhân sự, RBAC, kho, báo cáo và nhật ký cho Quản lý. Xem [bàn giao Vet/Manager và giới hạn dữ liệu](../FE_VET_MANAGER_GAP_LOG.md). Lịch ngoài tiêm phòng chỉ xác nhận trạng thái hoàn thành; chưa có ngày thực hiện/kết quả riêng. Bộ browser chạy trên fixture SQLite mới, theo thứ tự `node tests/vet.browser.mjs` rồi `node tests/manager.browser.mjs`.
 

@@ -80,7 +80,7 @@ Equine_Project/
 
 ## Getting Started
 
-**Trạng thái bản tích hợp hiện tại:** Flow 1 cho Owner, Club Manager và Vet. Frontend và seed từ hai ZIP được merge có chọn lọc; phần khám đầu vào bị thiếu được khôi phục từ lịch sử Git. Chưa cài training, care/inventory hoặc y tế ngoài khám đầu vào. Xem [contract FE–BE](backend/docs/API.md) và [hướng dẫn backend](backend/README.md).
+**Trạng thái source hiện tại:** Backend đã có tiếp nhận, huấn luyện, y tế và chăm sóc; frontend có các không gian làm việc theo vai trò. Không gian thú y đã được hoàn thiện quy trình khám, đơn thuốc, bệnh án, báo cáo, khóa tập và lịch theo API hiện có. Xem [bàn giao thú y và giới hạn backend/asset](backend/docs/VET_WORKSPACE_20261022.md), [contract FE–BE](backend/docs/API.md) và [hướng dẫn backend](backend/README.md). Các bảng và kết quả tích hợp ngày 16/10 bên dưới là lịch sử, không thay thế source và báo cáo kiểm chứng mới nhất.
 
 ### Prerequisites
 

@@ -3,9 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { getVetHerd, getVetHistories, getVetStalls } from '../../api/vetApi.ts'
 import HorseAvatar from '../../components/horse/HorseAvatar.jsx'
 import { formatHorseCode } from '../../components/horse/horseDisplay.js'
-import { clubToday, dueGroup, healthLabels, latestSigned, trainingLabels, vetError } from './vetDomain.js'
+import { clubToday, dueGroup, healthLabels, latestSigned, trainingLabels, vetDate, vetError } from './vetDomain.js'
 import { LockBadge, VetCalendar, VetOperationalOverview, VetReports } from './VetOperations.jsx'
 import { useVetResource } from './useVetResource.js'
+import VetLoading from './VetLoading.jsx'
 import './VetWorkspace.css'
 
 export function Unavailable({ title, children, action }) {
@@ -55,26 +56,34 @@ function DueList({ horses, records, filter = 'all', limit }) {
     return record?.followUpDate ? [{ horse, record, group: dueGroup(record.followUpDate, today) }] : []
   }).filter(row => filter === 'all' || row.group === filter).sort((a, b) => a.record.followUpDate.localeCompare(b.record.followUpDate)).slice(0, limit)
   return rows.length ? <div className="table-wrapper"><table className="horse-table"><thead><tr><th>Ngựa</th><th>Ngày tái khám</th><th>Mốc chỉ định</th><th>Bác sĩ chỉ định</th><th>Thao tác</th></tr></thead><tbody>{rows.map(({ horse, record, group }) => <tr key={horse.id}>
-    <td><Link to={`/vet/horses/${horse.id}`}>{horse.name}</Link></td><td>{record.followUpDate}</td>
+    <td><Link to={`/vet/horses/${horse.id}`}>{horse.name}</Link></td><td>{vetDate(record.followUpDate)}</td>
     <td><span className={`vet-pill due-${group}`}>{({ overdue: 'Đã qua ngày chỉ định', today: 'Hôm nay', upcoming: 'Sắp tới' })[group]}</span></td>
     <td>{record.vetName}</td><td><Link to={`/vet/horses/${horse.id}?tab=calendar`}>Xem chỉ định</Link></td>
   </tr>)}</tbody></table></div> : <p className="vet-empty">Không có chỉ định tái khám phù hợp trong bệnh án gần nhất.</p>
 }
 
-export default function VetWorkspace({ currentUser, mode = 'overview', initialExams = [], intakeError }) {
+export default function VetWorkspace({ currentUser, mode: routeMode = 'overview', initialExams = [], intakeError, intakeLoading }) {
   const data = useVetData(currentUser.clubId)
   const locks = useVetResource('/training-locks?LockStatus=Active')
   const [params, setParams] = useSearchParams()
+  const mode = routeMode === 'herd' && params.get('view') === 'stalls' ? 'stalls' : routeMode
+  function viewLink(view) {
+    const next = new URLSearchParams(params)
+    if (view === 'stalls') next.set('view', 'stalls')
+    else next.delete('view')
+    return { pathname: '/vet/herd', search: next.toString() }
+  }
   const search = params.get('q') || ''
   const health = params.get('health') || ''
   const training = params.get('training') || ''
+  const lockFilter = params.get('lock') || ''
   const due = params.get('followup') || (['overdue', 'today', 'upcoming'].includes(params.get('due')) ? params.get('due') : 'all')
   const [page, setPage] = useState(1)
   const herd = data.horses.filter(h => mode === 'intake-results'
     ? h.initialExamSigned && ['APPROVED', 'PENDING_EXAM'].includes(h.profileStatus)
     : h.profileStatus === 'APPROVED')
   const historyComplete = !data.historyLoading && !data.historyErrors.length
-  const waitingForTrainingFilter = training && !historyComplete && ['herd', 'stalls', 'intake-results'].includes(mode)
+  const waitingForTrainingFilter = (training && !historyComplete || lockFilter && (locks.loading || locks.error)) && ['herd', 'stalls', 'intake-results'].includes(mode)
   function filter(key, value) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -82,46 +91,43 @@ export default function VetWorkspace({ currentUser, mode = 'overview', initialEx
     setParams(next)
     setPage(1)
   }
-  const filtered = herd.filter(h => (!health || h.healthStatus === health)
+  const filtered = herd.filter(h => (!lockFilter || (!locks.loading && !locks.error && locks.rows.some(l => String(l.HorseID) === h.id && (lockFilter === 'active' || l.LockLevel === lockFilter)))) && (!health || h.healthStatus === health)
     && (!search || [h.name, h.code, h.microchipNumber].some(v => v?.toLocaleLowerCase().includes(search.toLocaleLowerCase().trim())))
     && (!training || (!data.historyErrors.includes(h.id) && !data.historyLoading && (training === 'limited'
       ? ['Restricted', 'Not Eligible'].includes(latestSigned(data.records, h.id)?.trainingEligibility)
       : latestSigned(data.records, h.id)?.trainingEligibility === training))))
-  const titles = { overview: 'Tổng quan thú y', herd: 'Sức khỏe toàn đàn', 'intake-results': 'Kết quả khám đầu vào', stalls: 'Sơ đồ sức khỏe theo chuồng', calendar: 'Lịch y tế', reports: 'Báo cáo sức khỏe' }
+  const titles = { overview: 'Tổng quan thú y', herd: 'Đàn ngựa và chuồng trại', 'intake-results': 'Kết quả khám đầu vào', stalls: 'Đàn ngựa và chuồng trại', calendar: 'Lịch y tế', reports: 'Báo cáo sức khỏe' }
   const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / 20)))
   const visible = filtered.slice((currentPage - 1) * 20, currentPage * 20)
   const healthFilters = <div className="filter-card vet-filters">
     <label className="search-field"><span>Tên, mã hoặc microchip</span><input type="search" value={search} onChange={e => filter('q', e.target.value)} placeholder="Tìm ngựa trong CLB…" /></label>
     <label className="filter-field"><span>Sức khỏe</span><select value={health} onChange={e => filter('health', e.target.value)}><option value="">Tất cả sức khỏe</option>{Object.entries(healthLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
     <label className="filter-field"><span>Kết luận điều kiện tập</span><select value={training} disabled={!historyComplete} onChange={e => filter('training', e.target.value)}><option value="">Tất cả</option><option value="limited">Cấm hoặc hạn chế tập</option>{Object.entries(trainingLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-    {mode === 'stalls' && <label className="filter-field"><span>Khu chuồng</span><select disabled><option>Chưa có thông tin phân khu</option></select></label>}
-    <button className="clear-filter-button" type="button" onClick={() => { setParams({}); setPage(1) }}>Xóa bộ lọc</button>
+    <label className="filter-field"><span>Lệnh khóa tập</span><select value={lockFilter} disabled={locks.loading || !!locks.error} onChange={e => filter('lock', e.target.value)}><option value="">Tất cả</option><option value="active">Đang ghi nhận khóa</option><option value="Full">Khóa toàn bộ</option><option value="Restricted">Giới hạn cường độ</option></select></label>
+    <button className="clear-filter-button" type="button" onClick={() => { setParams(mode === 'stalls' ? { view: 'stalls' } : {}); setPage(1) }}>Xóa bộ lọc</button>
   </div>
   return <main className="page-content vet-workspace">
-    <header className="page-heading"><div><p className="eyebrow">EQUI · KHÔNG GIAN THÚ Y</p><h1>{titles[mode]}</h1><p>{mode === 'intake-results' ? 'Phiếu đã chốt cho lần đăng ký hiện tại · Bao gồm hồ sơ chờ quản lý tiếp nhận' : 'Đàn ngựa đã tiếp nhận trong CLB'} · Giờ CLB: UTC+07:00</p></div></header>
-    {data.loading ? <section className="panel" role="status">Đang tải sức khỏe đàn ngựa…</section> : data.error ? <section className="panel" role="alert"><p>{data.error}</p></section> : <>
-      {data.historyErrors.length > 0 && <p className="error-message" role="alert">Không tải được bệnh án của {data.historyErrors.length} ngựa. Chưa thể tổng hợp điều kiện tập và tái khám.</p>}
-      {waitingForTrainingFilter ? <section className="panel" role="status"><p>{data.historyLoading ? 'Đang tải kết luận để lọc theo điều kiện tập…' : 'Chưa thể xác định danh sách phù hợp vì chưa tải đủ kết luận điều kiện tập.'}</p><button className="button button-secondary" onClick={() => filter('training', '')}>Bỏ lọc điều kiện tập</button></section> : <>
+    <header className="page-heading"><div><p className="eyebrow">EQUI · KHÔNG GIAN THÚ Y</p><h1>{titles[mode]}</h1><p>{mode === 'intake-results' ? 'Phiếu đã chốt cho lần đăng ký hiện tại · Bao gồm hồ sơ chờ quản lý tiếp nhận' : 'Theo dõi sức khỏe và công việc thú y trong câu lạc bộ'} · Giờ CLB: UTC+07:00</p></div><button className="button button-secondary" type="button" disabled={data.loading} onClick={() => { data.retry(); locks.reload() }}>Làm mới</button></header>
+    {['herd', 'stalls'].includes(mode) && <nav className="vet-tabs" aria-label="Chế độ xem đàn ngựa và chuồng trại"><Link to={viewLink('herd')} aria-current={mode === 'herd' ? 'page' : undefined}>Danh sách ngựa</Link><Link to={viewLink('stalls')} aria-current={mode === 'stalls' ? 'page' : undefined}>Sơ đồ chuồng</Link></nav>}
+    {data.loading ? <section className="panel"><VetLoading label="Đang tải sức khỏe đàn ngựa…" /></section> : data.error ? <section className="panel" role="alert"><p>{data.error}</p><button className="button button-secondary" onClick={data.retry}>Thử lại</button></section> : <>
+      {data.historyErrors.length > 0 && <p className="error-message" role="alert">Không tải được bệnh án của {data.historyErrors.length} ngựa. Chưa thể tổng hợp điều kiện tập và tái khám. <button className="button button-secondary" onClick={data.retry}>Thử lại</button></p>}
+      {waitingForTrainingFilter ? <section className="panel" role="status"><p>{data.historyLoading ? 'Đang tải kết luận để lọc theo điều kiện tập…' : 'Chưa thể lọc vì chưa tải đủ kết luận hoặc lệnh khóa tập.'}</p><button className="button button-secondary" onClick={() => { const next = new URLSearchParams(params); next.delete('training'); next.delete('lock'); setParams(next) }}>Bỏ bộ lọc điều kiện tập</button></section> : <>
       {mode === 'overview' && <>
-        <VetOperationalOverview horses={herd} initialExams={initialExams} intakeError={intakeError} />
+        <VetOperationalOverview horses={herd} initialExams={initialExams} intakeError={intakeError} intakeLoading={intakeLoading} />
         <section className="vet-stats" aria-label="Bốn nhóm sức khỏe">{['ELIGIBLE', 'MONITORING', 'INJURED', 'ISOLATION'].map(key => <Link key={key} to={`/vet/herd?health=${key}`} className={`vet-stat health-${key}`}><span>{healthLabels[key]}</span><strong>{herd.filter(h => h.healthStatus === key).length}</strong><small>Xem danh sách →</small></Link>)}</section>
         <p className="vet-caption">Trạng thái sức khỏe và điều kiện huấn luyện được đánh giá riêng. <Link to="/vet/herd">Toàn đàn: {herd.length}</Link> · <Link to="/vet/herd?health=RECOVERING">Hồi phục: {herd.filter(h => h.healthStatus === 'RECOVERING').length}</Link> · <Link to="/vet/herd?health=NOT_ASSESSED">Chưa đánh giá: {herd.filter(h => h.healthStatus === 'NOT_ASSESSED').length}</Link></p>
-        <div className="vet-two-columns"><section className="panel"><h2>Cần xử lý</h2>
-          <Link className="vet-task" to="/vet/horses-needing-exam"><span>Khám đầu vào<small>Bác sĩ trực tiếp nhận khám</small></span><strong>{intakeError ? 'Chưa có số liệu' : initialExams.length} →</strong></Link>
-          <Link className="vet-task" to="/vet/calendar?due=today"><span>Tái khám theo chỉ định hôm nay<small>Đối chiếu bệnh án trước khi xử lý</small></span><strong>{historyComplete ? herd.filter(h => latestSigned(data.records, h.id)?.followUpDate === clubToday()).length : 'Chưa có số liệu'} →</strong></Link>
-        </section><section className="panel"><h2>Điều kiện huấn luyện</h2><p>Kết luận từ bệnh án đã chốt gần nhất; chưa xác nhận khóa tập hiện hành.</p>
-          {data.historyLoading ? <p role="status">Đang tải kết luận…</p> : historyComplete ? <><Link className="vet-task" to="/vet/herd?training=Not+Eligible">Không được tập <strong>{herd.filter(h => latestSigned(data.records, h.id)?.trainingEligibility === 'Not Eligible').length} →</strong></Link><Link className="vet-task" to="/vet/herd?training=Restricted">Hạn chế tập <strong>{herd.filter(h => latestSigned(data.records, h.id)?.trainingEligibility === 'Restricted').length} →</strong></Link></> : <p>Chưa có số liệu đầy đủ.</p>}
-          <Link to="/vet/herd?training=limited">Xem ngựa có kết luận hạn chế tập →</Link>
-        </section></div>
+        <section className="panel"><h2>Kết luận điều kiện huấn luyện</h2><p>Kết luận từ bệnh án đã chốt gần nhất. Lệnh khóa đang ghi nhận được theo dõi riêng ở phía trên.</p>
+          {data.historyLoading ? <VetLoading /> : historyComplete ? <div className="vet-two-columns"><Link className="vet-task" to="/vet/herd?training=Not+Eligible">Không được tập <strong>{herd.filter(h => latestSigned(data.records, h.id)?.trainingEligibility === 'Not Eligible').length} →</strong></Link><Link className="vet-task" to="/vet/herd?training=Restricted">Hạn chế tập <strong>{herd.filter(h => latestSigned(data.records, h.id)?.trainingEligibility === 'Restricted').length} →</strong></Link></div> : <p>Chưa có số liệu đầy đủ.</p>}
+        </section>
         <section className="panel"><h2>Hôm nay và sắp tới</h2><p>Ngày tái khám trên bệnh án gần nhất, chưa phải lịch đã đặt và chưa có trạng thái hoàn thành.</p>{historyComplete ? <><h3>Hôm nay</h3><DueList horses={herd} records={data.records} filter="today" limit={5} /><h3>Sắp tới · tối đa 5 mốc gần nhất</h3><DueList horses={herd} records={data.records} filter="upcoming" limit={5} /></> : <p>{data.historyLoading ? 'Đang tải chỉ định…' : 'Chưa có số liệu đầy đủ.'}</p>}<Link to="/vet/calendar">Xem các mốc tái khám →</Link></section>
       </>}
       {['herd', 'intake-results'].includes(mode) && <>{healthFilters}<section className="table-card"><div className="table-header"><h2>{filtered.length} ngựa phù hợp</h2></div><div className="table-wrapper"><table className="horse-table"><thead><tr><th>Ngựa</th><th>Sức khỏe</th><th>Điều kiện tập theo bệnh án</th><th>Ô chuồng</th>{mode === 'intake-results' && <th>Trạng thái tiếp nhận</th>}<th>Hồ sơ</th></tr></thead><tbody>{visible.map(h => <tr key={h.id}><td><HorseLink horse={h} /></td><td><HealthBadge status={h.healthStatus} /></td><td>{data.historyLoading ? 'Đang tải…' : data.historyErrors.includes(h.id) ? 'Không tải được kết luận' : <TrainingBadge record={latestSigned(data.records, h.id)} />}{locks.loading ? <small>Đang tải khóa tập…</small> : locks.error ? <small>Chưa tải được khóa tập</small> : <LockBadge lock={locks.rows.find(l => String(l.HorseID) === h.id)} />}</td><td>{h.currentStall?.StallNumber || 'Chưa xếp chuồng'}</td>{mode === 'intake-results' && <td>{h.profileStatus === 'APPROVED' ? 'Đã tiếp nhận' : 'Chờ quản lý xử lý'}</td>}<td><Link to={mode === 'intake-results' ? `/vet/horses/${h.id}/examination${h.profileStatus === 'APPROVED' ? '?intake=1' : ''}` : `/vet/horses/${h.id}`}>{mode === 'intake-results' ? 'Xem kết quả →' : 'Hồ sơ y tế →'}</Link></td></tr>)}</tbody></table></div>{!filtered.length && <p className="vet-empty">Không có ngựa phù hợp.</p>}
         {filtered.length > 20 && <nav className="pagination" aria-label="Phân trang đàn ngựa"><button className="page-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Trước</button><span>Trang {currentPage} / {Math.ceil(filtered.length / 20)}</span><button className="page-button" disabled={currentPage * 20 >= filtered.length} onClick={() => setPage(currentPage + 1)}>Tiếp</button></nav>}</section></>}
       {mode === 'stalls' && <>{healthFilters}<p className="vet-caption">Lưới các ô chuồng, chưa có vị trí thực địa hoặc dữ liệu phân khu. Sức khỏe và điều kiện tập là hai thông tin riêng.</p><div className="vet-legend" aria-label="Chú giải sức khỏe">{Object.keys(healthLabels).map(key => <HealthBadge key={key} status={key} />)}</div>
-        {data.stallError ? <section className="panel" role="alert"><p>Không tải được chuồng. Chưa thể xác định ô trống hoặc ngựa chưa xếp chuồng.</p><></></section> : data.stalls === null ? <p role="status">Đang tải chuồng…</p> : <>
+        {data.stallError ? <section className="panel" role="alert"><p>Không tải được chuồng. Chưa thể xác định ô trống hoặc ngựa chưa xếp chuồng.</p><button className="button button-secondary" onClick={data.retry}>Thử lại</button></section> : data.stalls === null ? <p role="status">Đang tải chuồng…</p> : <>
           <section className="panel"><h2>Các ô chuồng · Chưa phân khu</h2><div className="vet-stall-grid">{data.stalls.filter(stall => !stall.horseId ? !search && !health && !training : filtered.some(h => h.id === stall.horseId) || (!herd.some(h => h.id === stall.horseId) && !search && !health && !training)).map(stall => {
             const horse = data.horses.find(h => h.id === stall.horseId)
-            return <article className="vet-stall" key={stall.id}><h3>Ô {stall.number}</h3><small>{stall.type}</small>{horse ? <><Link to={`/vet/horses/${horse.id}`}><strong>{horse.name}</strong><small>{formatHorseCode(horse.code)}</small></Link><HealthBadge status={horse.healthStatus} />{data.historyLoading ? <small>Đang tải điều kiện tập…</small> : data.historyErrors.includes(horse.id) ? <small>Không tải được điều kiện tập</small> : <TrainingBadge record={latestSigned(data.records, horse.id)} />}{locks.loading ? <small>Đang tải khóa tập…</small> : locks.error ? <small>Chưa tải được khóa tập</small> : <LockBadge lock={locks.rows.find(l => String(l.HorseID) === horse.id)} />}</> : <p>{stall.horseId || stall.status === 'Occupied' ? 'Ô có ngựa · chưa đối chiếu được hồ sơ' : stall.status === 'Maintenance' ? 'Đang bảo trì' : stall.status === 'Available' ? 'Ô trống' : 'Chưa rõ trạng thái ô'}</p>}</article>
+            return <article className="vet-stall" key={stall.id}><h3>Ô {stall.number}</h3><small>{({ Standard: 'Chuồng tiêu chuẩn', Isolation: 'Chuồng cách ly', Recovery: 'Chuồng hồi phục' })[stall.type] || 'Ô chuồng'}</small>{horse ? <><Link to={`/vet/horses/${horse.id}`}><strong>{horse.name}</strong><small>{formatHorseCode(horse.code)}</small></Link><HealthBadge status={horse.healthStatus} />{data.historyLoading ? <small>Đang tải điều kiện tập…</small> : data.historyErrors.includes(horse.id) ? <small>Không tải được điều kiện tập</small> : <TrainingBadge record={latestSigned(data.records, horse.id)} />}{locks.loading ? <small>Đang tải khóa tập…</small> : locks.error ? <small>Chưa tải được khóa tập</small> : <LockBadge lock={locks.rows.find(l => String(l.HorseID) === horse.id)} />}</> : <p>{stall.horseId || stall.status === 'Occupied' ? 'Ô có ngựa · chưa đối chiếu được hồ sơ' : stall.status === 'Maintenance' ? 'Đang bảo trì' : stall.status === 'Available' ? 'Ô trống' : 'Chưa rõ trạng thái ô'}</p>}</article>
           })}</div>{!data.stalls.length && <p>Chưa có ô chuồng.</p>}</section>
           <section className="panel"><h2>Chưa xếp chuồng</h2><div className="vet-stall-grid">{filtered.filter(h => !h.currentStall && !data.stalls.some(s => s.horseId === h.id)).map(h => <article className="vet-stall" key={h.id}><HorseLink horse={h} /><HealthBadge status={h.healthStatus} />{data.historyLoading ? <small>Đang tải điều kiện tập…</small> : data.historyErrors.includes(h.id) ? <small>Không tải được điều kiện tập</small> : <TrainingBadge record={latestSigned(data.records, h.id)} />}{locks.loading ? <small>Đang tải khóa tập…</small> : locks.error ? <small>Chưa tải được khóa tập</small> : <LockBadge lock={locks.rows.find(l => String(l.HorseID) === h.id)} />}</article>)}</div>{!filtered.some(h => !h.currentStall && !data.stalls.some(s => s.horseId === h.id)) && <p>Không có ngựa chưa xếp chuồng phù hợp.</p>}</section>
         </>}

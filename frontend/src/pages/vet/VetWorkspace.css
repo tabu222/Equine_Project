@@ -1,5 +1,93 @@
 .app-shell.vet-shell .page-content { width: 100%; max-width: 1800px; }
+.vet-shell .app-main { min-width: 0; }
+.vet-shell .app-main::before { display: none; content: none; }
+.vet-shell .app-main .page-heading { padding: 0; min-height: 0; margin: 0; background: transparent; border: 0; }
+.vet-shell .page-content .page-heading h1 { max-width: none; font-size: clamp(27px, 2.3vw, 34px); overflow-wrap: anywhere; }
+.vet-shell .vet-profile-identity { flex: 1 1 auto; }
+.vet-shell .vet-profile-identity > div:last-child { min-width: 0; }
+.vet-shell .app-main .panel, .vet-shell .app-main .table-card, .vet-shell .app-main .filter-card { box-shadow: none; background: white; }
+.vet-shell .form-field, .vet-shell .search-field, .vet-shell .filter-field { font-size: 13px; }
+.vet-shell .form-field input, .vet-shell .form-field select, .vet-shell .form-field textarea, .vet-shell .search-field input, .vet-shell .filter-field select { font-size: 14px; font-weight: 400; min-height: 42px; }
+.vet-shell .horse-table th { font-size: 12px; text-transform: none; letter-spacing: 0; }
+.vet-shell .horse-table td { font-size: 14px; }
+.vet-shell .horse-table td:last-child { min-width: 165px; }
+.vet-shell .horse-table td small { display: block; font-size: 12px; margin-top: 5px; }
+.vet-shell .view-button { font-size: 13px; min-height: 36px; }
+.vet-shell .vet-details dt { font-size: 13px; }
+.vet-shell .breadcrumb-back-button { width: fit-content; padding: 0; background: none; border: 0; }
+.vet-shell .page-content { min-width: 0; }
+.vet-shell .narrow-content { max-width: 1800px; }
+.vet-shell .horse-avatar { flex-shrink: 0; }
+.vet-shell .horse-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vet-workspace .button, .vet-exam-queue-page .button { min-height: 40px; }
+.vet-workspace p { line-height: 1.65; }
+.vet-workspace .panel { padding: 24px; }
+.vet-workspace .form-field { min-width: 0; }
+.vet-workspace input, .vet-workspace select, .vet-workspace textarea { max-width: 100%; box-sizing: border-box; }
+.vet-workspace [aria-invalid="true"] { border-color: var(--danger); outline-color: var(--danger); }
+.vet-workspace button { overflow-wrap: anywhere; }
+.vet-wide { grid-column: 1 / -1; }
+.vet-danger-outline { color: var(--danger); border-color: #dbbeb9; background: white; }
+.vet-exam-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
+.vet-exam-main, .vet-exam-aside { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.vet-exam-main section[id] { scroll-margin-top: 24px; }
+.vet-exam-aside .panel { padding: 20px; }
+.vet-exam-aside .vet-details { gap: 14px; }
+.vet-exam-aside h2 { font-size: 16px; }
+.vet-exam-aside .vet-operation-form { width: 100%; }
+.vet-exam-aside .form-field { margin-bottom: 14px; }
+.vet-exam-aside .button { width: 100%; }
+.vet-exam-steps { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 16px 20px; background: #e9f2ed; border-radius: 10px; }
+.vet-exam-steps a { display: flex; align-items: center; gap: 8px; color: var(--green-dark); font-weight: 600; text-decoration: none; font-size: 13px; padding: 4px 0; }
+.vet-exam-steps a span { display: inline-grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; background: white; font-size: 12px; }
+.vet-exam-actions { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: #fff; padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; }
+.vet-exam-actions > span { color: var(--text-secondary); font-size: 13px; }
+.vet-exam-actions .form-actions { margin: 0; display: flex; gap: 10px; flex-wrap: wrap; }
+.vet-error-summary { background: #fbefed; color: #873a32; padding: 16px 20px; border-radius: 8px; }
+.vet-error-summary p { margin: 0 0 8px; }
+.vet-error-summary button { margin: 3px 8px 3px 0; background: white; border: 1px solid #dbbeb9; color: inherit; padding: 6px 10px; border-radius: 5px; cursor: pointer; }
+.vet-source-note { padding: 16px; margin: 16px 0; background: #f1f6f3; border-left: 3px solid #93b5a4; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vet-source-note small { display: block; margin-top: 8px; color: var(--text-secondary); }
+.vet-record-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.vet-clinical-section { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+.vet-clinical-section h3 { color: var(--green-dark); font-size: 17px; margin-top: 0; }
+.vet-clinical-section .vet-details { row-gap: 24px; }
+.vet-review .vet-details { margin-bottom: 24px; }
+.vet-review dd, .vet-record-details dd { line-height: 1.7; }
+.vet-prescription { border-left: 3px solid #b5cbbf; padding: 14px 18px; margin: 14px 0; background: var(--surface-soft); }
+.vet-prescription > strong { font-size: 15px; }
+.vet-prescription-section > .button { margin: 4px 8px 4px 0; }
+.vet-prescription .vet-details { margin-bottom: 0; }
+.vet-history-filters .form-field { flex: 1 1 160px; }
+.vet-history-filters .form-field:first-child { flex-basis: 250px; }
+.vet-skeleton { display: grid; gap: 14px; padding: 12px 0; width: 100%; }
+.vet-skeleton i { display: block; height: 18px; background: #e8eee9; border-radius: 6px; animation: vet-pulse 1.5s ease-in-out infinite; }
+.vet-skeleton i:first-of-type { width: 45%; height: 24px; }
+.vet-skeleton i:last-of-type { width: 75%; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@keyframes vet-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .vet-skeleton i { animation: none; } }
+@media (min-width: 1500px) { .vet-exam-layout { grid-template-columns: minmax(0, 1fr) 350px; } }
+@media (max-width: 1100px) { .vet-exam-layout { grid-template-columns: minmax(0, 1fr); } .vet-exam-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .vet-workspace .panel { padding: 18px; } .vet-exam-aside { grid-template-columns: 1fr; } .vet-exam-actions { position: static; padding: 14px; } .vet-exam-actions .form-actions { width: 100%; } .vet-exam-actions .button { flex: 1 1 100%; } .vet-exam-steps { gap: 8px 14px; } .vet-record-heading { flex-wrap: wrap; } .vet-toolbar .form-field { min-width: 0 !important; width: 100%; } }
 .vet-workspace { display: flex; flex-direction: column; gap: 20px; }
+.vet-work-stats .vet-stat { border-top: 0; }
+.vet-stat strong.vet-stat-unavailable { font-size: 17px; }
+.vet-attention-row { display: flex; justify-content: space-between; align-items: start; gap: 16px; border-top: 1px solid var(--border); padding: 18px 0; }
+.vet-attention-row:first-of-type { border-top: 0; }
+.vet-attention-row > div { min-width: 0; }
+.vet-attention-row > div:last-child { display: flex; flex-direction: column; align-items: end; gap: 12px; flex-shrink: 0; }
+.vet-attention-row p { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vet-attention-row small { color: var(--text-secondary); }
+.vet-queue-report { padding: 16px 20px; }
+.vet-exam-queue-page > .table-card { margin-block: 20px; }
+.vet-exam-queue-page .vet-queue-filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; }
+.vet-exam-queue-page .vet-queue-filters .search-field { flex: 1 1 260px; }
+.vet-exam-queue-page .vet-queue-filters .filter-field { flex: 0 1 190px; }
+.vet-exam-queue-page .vet-queue-filters .clear-filter-button { width: auto; align-self: end; }
+.vet-new-exam { align-self: flex-start; }
+.vet-queue-report p { max-width: 650px; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 680px) { .vet-attention-row { flex-wrap: wrap; } .vet-attention-row > div:last-child { flex-direction: row; align-items: center; width: 100%; } .vet-queue-report { flex-wrap: wrap; } }
 .vet-event[data-selected="true"] { outline: 2px solid var(--green-primary, #246643); outline-offset: 3px; }
 .vet-workspace .page-heading { margin-bottom: 0; }
 .vet-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
@@ -66,6 +154,8 @@
 .vet-calendar-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
 .vet-calendar-days .vet-event { margin: 0; }
 .vet-report-urgent { border-left: 4px solid #a13d35; }
+.vet-report-photo { display: flex; flex-direction: column; align-items: start; gap: 8px; margin-block: 16px; }
+.vet-report-photo img { width: min(320px, 100%); max-height: 220px; object-fit: contain; border-radius: 8px; background: var(--surface-soft); }
 .vet-preserve { white-space: pre-wrap; }
 .vet-lock-panel { scroll-margin-top: 20px; }
 .vet-lock-panel > .vet-toolbar { margin-bottom: 0; }

@@ -24,6 +24,9 @@ const browser = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu'
   '--remote-debugging-port=0', `--user-data-dir=${join(temp, 'profile')}`, 'about:blank'], { windowsHide: true, stdio: 'ignore' })
 const exceptions = []
 let socket
+let acceptDialog = false
+let dialogs = 0
+let dropResponse = false
 let nextId = 0
 const waiting = new Map()
 async function until(predicate, label, timeout = 15000) {
@@ -103,8 +106,13 @@ try {
       if (message.error) pending?.reject(new Error(message.error.message))
       else pending?.resolve(message.result)
     } else if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.text)
+    else if (message.method === 'Fetch.requestPaused') {
+      if (dropResponse) { dropResponse = false; void cdp('Fetch.failRequest', { requestId: message.params.requestId, errorReason: 'ConnectionClosed' }) }
+      else void cdp('Fetch.continueRequest', { requestId: message.params.requestId })
+    }
     else if (message.method === 'Page.javascriptDialogOpening') {
-      void cdp('Page.handleJavaScriptDialog', { accept: false })
+      dialogs += 1
+      void cdp('Page.handleJavaScriptDialog', { accept: acceptDialog })
     }
   }
   await cdp('Page.enable'); await cdp('Runtime.enable')
@@ -137,6 +145,7 @@ try {
   await login('vet@one.test')
   await waitSelector('.vet-stats')
   assert.equal(await evaluate(`document.querySelector('.vet-stat.health-ELIGIBLE strong').textContent`), '1')
+  await screenshot('vet-overview-desktop.png')
   await click('a[href="/vet/herd?health=ELIGIBLE"]')
   await waitSelector('.vet-workspace .horse-table tbody tr')
   assert.equal(await evaluate(`document.querySelectorAll('.vet-workspace .horse-table tbody tr').length`), 1)
@@ -150,18 +159,19 @@ try {
   await waitSelector('.vet-queue-table tbody tr')
   assert.ok((await evaluate(`document.querySelector('.vet-queue-table tbody').textContent`)).includes('Chờ khám'))
   assert.equal(await evaluate(`document.querySelector('.vet-queue-table .horse-table-identity small').textContent`), 'Chưa cập nhật')
+  await screenshot('vet-queue-desktop.png')
   await click(`a[href="/vet/horses/${horseId}/examination"]`)
   await waitSelector('input[type=datetime-local]')
   assert.ok(!(await evaluate(`document.querySelector('.page-heading').textContent`)).includes(`Mã ngựa #${horseId}`))
   await fill('input[type=datetime-local]', `${testDay}T09:12:45`)
   await fill('input[type=number]', '480.5')
-  await fill('textarea[maxlength="1500"]', 'Observed symptom')
+  await fill('#clinical-symptoms', 'Observed symptom')
   await fill('input[maxlength="500"]', 'Left forelimb text finding')
-  await evaluate(`(() => { const fields = document.querySelectorAll('textarea[maxlength="1500"]');
-    const set = (el, value) => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, value); el.dispatchEvent(new Event('input', { bubbles:true })); };
-    set(fields[1], 'Diagnosis entered by vet'); set(fields[2], 'Conclusion entered by vet'); set(fields[3], 'Clinical exam note'); })()`)
-  await fill('select', 'Monitor')
-  await evaluate(`(() => { const el=document.querySelectorAll('select')[1]; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'Restricted'); el.dispatchEvent(new Event('change',{bubbles:true})); })()`)
+  await fill('#clinical-diagnosis', 'Diagnosis entered by vet')
+  await fill('#clinical-conclusion', 'Conclusion entered by vet')
+  await fill('#clinical-note', 'Clinical exam note')
+  await fill('#clinical-healthStatus', 'Monitor')
+  await fill('#clinical-trainingEligibility', 'Restricted')
   await fill('textarea[maxlength="1000"]', 'Restriction entered by vet')
   await fill('input[type=date]', followUp)
   await evaluate(`Array.from(document.querySelectorAll('button')).find(el=>el.textContent==='Lưu nháp').click()`)
@@ -178,20 +188,70 @@ try {
   await api(`/horses/${horseId}/medical-records`, outside, 'GET', null, 404)
   await api(`/medical-records/${draft.MedicalRecordID}`, outside, 'GET', null, 404)
 
+  // An unfinished clinical edit must survive a declined navigation, and invalid data stays focused.
+  await fill('#clinical-symptoms', 'Unsaved observation')
+  const beforeDialogs = dialogs
+  await click('a[href="/vet/herd"]')
+  await until(() => Promise.resolve(dialogs > beforeDialogs), 'unsaved navigation warning')
+  assert.equal(await evaluate(`location.pathname`), `/vet/horses/${horseId}/examination`)
+  assert.equal(await evaluate(`document.querySelector('#clinical-symptoms').value`), 'Unsaved observation')
+  await fill('#clinical-symptoms', 'Observed symptom')
+  await fill('#clinical-weightKg', '0')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Lưu nháp').click()`)
+  await until(() => evaluate(`document.activeElement?.id === 'clinical-weightKg'`), 'invalid weight receives focus')
+  assert.equal(await evaluate(`document.querySelector('#clinical-diagnosis').value`), 'Diagnosis entered by vet')
+  await fill('#clinical-weightKg', '480.5')
+  await screenshot('vet-examination-desktop.png')
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'clinical form mobile overflow')
+  await screenshot('vet-examination-mobile.png')
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
+
+  // Lose the HTTP response AFTER Django committed. Reconciliation must never repeat POST/sign.
+  const lostId = await pending('Vet Lost Response', '985000000000084')
+  await navigate(`/vet/horses/${lostId}/examination`)
+  await waitSelector('#clinical-examDate')
+  await fill('#clinical-examDate', `${testDay}T10:00`)
+  await fill('#clinical-symptoms', 'Observation retained after lost response')
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: base + '/api/horses/' + lostId + '/medical-records', requestStage: 'Response' }] })
+  dropResponse = true
+  await evaluate(`(() => { const b=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Lưu nháp'); b.click(); b.click(); })()`)
+  await until(() => evaluate(`document.querySelector('.vet-error-summary')?.textContent.includes('Chưa xác nhận')`), 'lost draft response')
+  await cdp('Fetch.disable')
+  assert.equal((await api(`/horses/${lostId}/medical-records`, vet)).length, 1, 'double click and lost response create only one draft')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Kiểm tra trạng thái đã lưu').click()`)
+  await until(() => evaluate(`document.querySelector('.success-message')?.textContent.includes('Đã kiểm tra')`), 'draft recovery from persisted content')
+  assert.equal(await evaluate(`document.querySelector('#clinical-symptoms').value`), 'Observation retained after lost response')
+  const lostRecord = (await api(`/horses/${lostId}/medical-records`, vet))[0]
+  await fill('#clinical-healthStatus', 'Healthy')
+  await fill('#clinical-trainingEligibility', 'Eligible')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Kiểm tra và chốt').click()`)
+  await waitSelector('#exam-review')
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: base + '/api/medical-records/' + lostRecord.MedicalRecordID + '/sign', requestStage: 'Response' }] })
+  dropResponse = true
+  await evaluate(`(() => { const b=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Chốt bệnh án'); b.click(); b.click(); })()`)
+  await until(() => evaluate(`document.querySelector('.vet-error-summary')?.textContent.includes('Chưa xác nhận')`), 'lost sign response')
+  await cdp('Fetch.disable')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Kiểm tra trạng thái đã lưu').click()`)
+  await waitSelector('.intake-vet-conclusion')
+  assert.equal((await api(`/horses/${lostId}/medical-records`, vet))[0].RecordStatus, 'Signed', 'signed result recovered without resending')
+
   // Real race: another Vet opens an unclaimed form before a draft is created.
   const raceId = await pending('Vet Race Claim', '985000000000083')
   await navigate(`/vet/horses/${raceId}/examination`)
   await waitSelector('input[type=datetime-local]')
   await api(`/horses/${raceId}/medical-records`, vet2, 'POST', { ExamType: 'Initial Exam' }, 201)
   await evaluate(`Array.from(document.querySelectorAll('button')).find(el=>el.textContent==='Lưu nháp').click()`)
-  await until(() => evaluate(`document.querySelector('h1')?.textContent.includes('bác sĩ khác xử lý')`), 'competing Vet claim shown')
+  await until(() => evaluate(`document.querySelector('.vet-exam-workspace')?.textContent.includes('Phiếu nháp do bác sĩ khác xử lý')`), 'competing Vet claim shown')
   await navigate('/vet/horses-needing-exam')
   await waitSelector('.vet-queue-table')
   assert.ok((await evaluate(`document.querySelector('.vet-queue-table tbody').textContent`)).includes('Bác sĩ khác đang xử lý'))
 
   await navigate(`/vet/horses/${horseId}/examination`)
   await waitSelector('input[type=datetime-local]')
-  await click('form button[type=submit]')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Kiểm tra và chốt').click()`)
+  await waitSelector('#exam-review')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Chốt bệnh án').click()`)
   await until(() => evaluate(`document.querySelector('.intake-vet-conclusion')?.textContent.includes('Đã chốt')`), 'sign clinical record')
   const signedHorse = await api(`/horses/${horseId}`, vet)
   assert.equal(signedHorse.RegistrationStatus, 'PendingExam')
@@ -203,7 +263,7 @@ try {
   assert.ok((await evaluate(`document.querySelector('.vet-workspace .horse-table tbody').textContent`)).includes('Chờ quản lý xử lý'))
   await click(`a[href="/vet/horses/${horseId}/examination"]`)
   await waitSelector('.intake-vet-conclusion')
-  assert.equal(await evaluate(`document.querySelectorAll('form').length`), 0)
+  assert.equal(await evaluate(`document.querySelectorAll('#vet-clinical-form, #clinical-diagnosis').length`), 0)
   await navigate(`/vet/horses/${horseId}?tab=history`)
   await waitSelector('.vet-record-button')
   await click('.vet-record-button')
@@ -231,16 +291,32 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('.vet-report button')).find(b => b.textContent === 'Nhận xử lý').click()`)
   await until(() => evaluate(`document.querySelector('.vet-report')?.textContent.includes('Đang xử lý')`), 'report assigned to Vet')
   await click(`a[href="/vet/horses/${approvedId}/examination?report=${report.HealthReportID}"]`)
-  await waitSelector('.post-exam-form-panel form')
-  await fill('.post-exam-form-panel select', 'Injury Exam')
-  await evaluate(`(() => { const fields = document.querySelectorAll('.post-exam-form-panel select');
-    const set = (el, v) => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,v); el.dispatchEvent(new Event('change',{bubbles:true})); };
-    set(fields[1], 'Injured'); set(fields[2], 'Not Eligible'); })()`)
-  await fill('textarea[required]', 'Synthetic test conclusion entered by veterinarian')
+  await waitSelector('#vet-clinical-form')
+  await fill('#clinical-examType', 'Injury Exam')
+  await fill('#clinical-healthStatus', 'Injured')
+  await fill('#clinical-trainingEligibility', 'Not Eligible')
+  await fill('#clinical-conclusion', 'Synthetic test conclusion entered by veterinarian')
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Lưu nháp').click()`)
   await until(() => evaluate(`document.querySelector('.success-message')?.textContent.includes('Đã lưu')`), 'non-intake draft saved')
   const clinicalDraft = (await api(`/horses/${approvedId}/medical-records`, vet)).find(r => r.ExamType === 'Injury Exam')
   assert.equal((await api(`/health-reports/${report.HealthReportID}`, vet)).MedicalRecordID, clinicalDraft.MedicalRecordID)
+  await until(() => evaluate(`Array.from(document.querySelectorAll('#exam-prescription button')).some(b=>b.textContent==='Thêm thuốc')`), 'prescription editor in clinical workspace')
+  await evaluate(`Array.from(document.querySelectorAll('#exam-prescription button')).find(b=>b.textContent==='Thêm thuốc').click()`)
+  await fill('#drug-MedicineName', 'Integrated clinical prescription')
+  await fill('#drug-Dose', 'Test dose with veterinarian entered unit')
+  await fill('#drug-Route', 'Oral')
+  await fill('#drug-StartDate', testDay)
+  await fill('#drug-Note', 'Test-only instruction, entered by veterinarian')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Kiểm tra và chốt').click()`)
+  assert.equal(await evaluate(`!!document.querySelector('#exam-review')`), false, 'unsaved prescription blocks finalization')
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: base + '/api/medical-records/' + clinicalDraft.MedicalRecordID + '/treatments', requestStage: 'Response' }] })
+  dropResponse = true
+  await evaluate(`(() => { const form=document.querySelector('#drug-MedicineName').closest('form'); form.requestSubmit(); form.requestSubmit(); })()`)
+  await until(() => evaluate(`document.querySelector('.vet-prescription-section [role=alert]')?.textContent.includes('Chưa xác nhận')`), 'lost prescription response')
+  await cdp('Fetch.disable')
+  assert.equal((await api(`/medical-records/${clinicalDraft.MedicalRecordID}/treatments`, vet)).length, 1, 'prescription double submit creates only one treatment')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Kiểm tra kết quả lưu thuốc').click()`)
+  await until(() => evaluate(`document.querySelector('.vet-prescriptions')?.textContent.includes('Integrated clinical prescription')`), 'integrated prescription recovered from committed data')
   await navigate(`/vet/horses/${approvedId}?tab=treatments`)
   await waitSelector('input[name=MedicineName]')
   await fill('input[name=MedicineName]', 'Synthetic browser test medicine')
@@ -260,8 +336,10 @@ try {
   await evaluate(`document.querySelector('input[name=MedicineName]').closest('form').requestSubmit()`)
   await until(async () => (await api(`/horses/${approvedId}/treatments`, vet))[0]?.MedicineName === 'Updated synthetic test medicine', 'draft treatment update persisted')
   await navigate(`/vet/horses/${approvedId}/examination?record=${clinicalDraft.MedicalRecordID}`)
-  await waitSelector('.post-exam-form-panel form')
-  await click('.post-exam-form-panel form button[type=submit]')
+  await waitSelector('#vet-clinical-form')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Kiểm tra và chốt').click()`)
+  await waitSelector('#exam-review')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Chốt bệnh án').click()`)
   await waitSelector('.intake-vet-conclusion')
   await navigate(`/vet/horses/${approvedId}?tab=treatments`)
   await until(() => evaluate(`Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Cập nhật thuốc')`), 'signed treatment ready')
@@ -282,13 +360,14 @@ try {
   await evaluate(`document.querySelector('textarea[name=note]').closest('form').requestSubmit()`)
   await until(() => evaluate(`document.querySelector('.vet-lock-panel [role=alert]')?.textContent.includes('Cần tái khám')`), 'release blocked before follow-up')
   await navigate(`/vet/horses/${approvedId}/examination`)
-  await waitSelector('.post-exam-form-panel select')
-  await fill('.post-exam-form-panel select', 'Follow-up')
-  await evaluate(`(() => { const fields = document.querySelectorAll('.post-exam-form-panel select');
-    const set = (el,v) => { Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,v); el.dispatchEvent(new Event('change',{bubbles:true})); };
-    set(fields[1], 'Healthy'); set(fields[2], 'Eligible'); })()`)
-  await fill('textarea[required]', 'Synthetic follow-up conclusion entered by veterinarian')
-  await click('.post-exam-form-panel form button[type=submit]')
+  await waitSelector('#clinical-examType')
+  await fill('#clinical-examType', 'Follow-up')
+  await fill('#clinical-healthStatus', 'Healthy')
+  await fill('#clinical-trainingEligibility', 'Eligible')
+  await fill('#clinical-conclusion', 'Synthetic follow-up conclusion entered by veterinarian')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Kiểm tra và chốt').click()`)
+  await waitSelector('#exam-review')
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Chốt bệnh án').click()`)
   await waitSelector('.intake-vet-conclusion')
   assert.equal((await api(`/training-locks?HorseID=${approvedId}&LockStatus=Active`, vet)).length, 1, 'eligible conclusion alone never releases lock')
   await navigate(`/vet/horses/${approvedId}?tab=training`)
@@ -308,7 +387,7 @@ try {
   await until(() => evaluate(`document.querySelector('.vet-lock-panel')?.textContent.includes('15.5')`), 'restriction survives reload')
   await evaluate(`Array.from(document.querySelectorAll('.vet-lock-panel button')).find(b=>b.textContent==='Điều chỉnh khóa tập').click()`)
   await fill('select[name=level]', 'Full')
-  await evaluate(`document.querySelector('input[name=reason]').closest('form').requestSubmit()`)
+  await evaluate(`document.querySelector('select[name=level]').closest('form').requestSubmit()`)
   await until(async () => (await api(`/training-locks?HorseID=${approvedId}&LockStatus=Active`, vet))[0]?.LockLevel === 'Full', 'emergency lock escalation saved')
   await navigate('/vet/reports')
   await waitSelector('.vet-report')
@@ -336,16 +415,30 @@ try {
   await navigate('/vet/calendar?due=upcoming')
   await until(() => evaluate(`document.querySelector('.vet-event-list')?.textContent.includes('Chăm sóc móng')`), 'farrier schedule survives reload')
   const farrier = (await api(`/horses/${approvedId}/medical-schedules`, vet))[0]
-  await evaluate(`Array.from(document.querySelectorAll('#s-${farrier.MedicalScheduleID} button')).find(b=>b.textContent==='Xác nhận đã thực hiện').click()`)
-  await click(`#s-${farrier.MedicalScheduleID} input[type=checkbox]`)
+  await evaluate(`Array.from(document.querySelectorAll('#s-${farrier.MedicalScheduleID} button')).find(b=>b.textContent==='Sửa lịch').click()`)
+  await fill(`#s-${farrier.MedicalScheduleID} textarea[name=Note]`, 'Updated appointment instruction')
   await evaluate(`document.querySelector('#s-${farrier.MedicalScheduleID} form').requestSubmit()`)
-  await until(async () => (await api(`/horses/${approvedId}/medical-schedules`, vet))[0]?.Status === 'Completed', 'status-only completion persisted')
-  const completed = (await api(`/horses/${approvedId}/medical-schedules`, vet))[0]
-  assert.equal(completed.ScheduledDate, followUp, 'status completion preserves planned date')
-  assert.equal('PerformedDate' in completed, false, 'no invented execution date')
-  await navigate('/vet/calendar?due=completed')
-  await until(() => evaluate(`document.querySelector('.vet-event-list')?.textContent.includes('Chăm sóc móng')`), 'completed schedule filter')
+  await until(async () => (await api(`/horses/${approvedId}/medical-schedules`, vet))[0]?.Note === 'Updated appointment instruction', 'appointment edit persisted')
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('#s-${farrier.MedicalScheduleID} button')).some(b=>b.textContent==='Xác nhận đã thực hiện')`), false, 'incomplete completion contract has no fake action')
   await screenshot('vet-medical-calendar-desktop.png')
+  acceptDialog = true
+  await evaluate(`Array.from(document.querySelectorAll('#s-${farrier.MedicalScheduleID} button')).find(b=>b.textContent==='Hủy lịch').click()`)
+  await until(async () => (await api(`/horses/${approvedId}/medical-schedules`, vet))[0]?.Status === 'Cancelled', 'cancellation persisted')
+  acceptDialog = false
+  await navigate('/vet/calendar?state=Cancelled')
+  await until(() => evaluate(`document.querySelector('.vet-event-list')?.textContent.includes('Chăm sóc móng')`), 'cancelled schedule filter')
+  await screenshot('vet-medical-calendar-desktop.png')
+
+  // Tablet and phone layouts use the same live API data.
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 834, height: 1112, deviceScaleFactor: 1, mobile: false })
+  for (const path of ['/vet/overview', '/vet/horses-needing-exam', '/vet/stalls', '/vet/calendar', `/vet/horses/${approvedId}/examination`]) {
+    await navigate(path)
+    await waitSelector(path.includes('/examination') ? '#vet-clinical-form' : path.includes('horses-needing-exam') ? '.vet-queue-table' : '.vet-workspace')
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'tablet overflow ' + path)
+  }
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
+  await navigate('/vet/calendar')
+  await waitSelector('.vet-event')
 
   // Real browser offline failure cannot become healthy counts of zero.
   await cdp('Network.enable')
@@ -363,8 +456,9 @@ try {
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `mobile overflow ${path}`)
   }
   await screenshot('vet-profile-mobile.png')
+  assert.deepEqual(await evaluate('Object.keys(localStorage).sort()'), ['equi.access-token', 'equi.refresh-token'], 'clinical contents never enter localStorage')
   assert.deepEqual(exceptions, [], 'No uncaught browser errors')
-  console.log('PASS: real Vet login; herd/health/training filters; stalls; intake draft/reload/time/units; ownership; cross-club isolation; competing draft conflict; signed immutability; amendments; report/claim/exam/treatment/create/edit/field-validation/sign; signed drug update restrictions; Full lock; release refused before follow-up; eligible sign preserves lock; release after follow-up; emergency Restricted create/reload/escalate Full; deliberate report resolution; vaccine create/reload; Farrier create/reload/complete; status-only completion and completed filter; due dates; offline/retry; mobile 390px including exam and training forms.')
+  console.log('PASS: lost-after-commit draft/sign/drug responses reconcile without duplicate writes; double click guarded; unsaved navigation warning; field focus and preservation; integrated prescribing; tablet 834px; real Vet login; herd/health/training filters; stalls; intake draft/reload/time/units; ownership; cross-club isolation; competing draft conflict; signed immutability; amendments; report/claim/exam/treatment/create/edit/field-validation/sign; signed drug update restrictions; Full lock; release refused before follow-up; eligible sign preserves lock; release after follow-up; emergency Restricted create/reload/escalate Full; deliberate report resolution; vaccine create/reload; Farrier create/reload/cancel; unsupported completion absent and cancelled filter; due dates; offline/retry; mobile 390px including exam and training forms.')
   console.log(`Screenshots: ${artifacts}`)
 } finally {
   try { await cdp('Browser.close') } catch { browser.kill() }

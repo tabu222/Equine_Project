@@ -1,5 +1,7 @@
 # Veterinarian — đối chiếu source và yêu cầu còn thiếu
 
+> Cập nhật mới nhất: [bàn giao và đối chiếu source ngày 22/10/2026](VET_WORKSPACE_20261022.md). Các mục dưới là lịch sử đánh giá ngày 18/10; cần đối chiếu tài liệu mới, đặc biệt về lịch, thuốc, thao tác sau chốt và giới hạn quy tắc khóa tập. Không dùng ghi chú lịch sử để kết luận API hiện tại còn thiếu.
+
 Ngày rà soát: 18/10/2026. Phạm vi: source BE/FE hiện có trong repository. Không sửa BE, schema hoặc dữ liệu SQL Server trong lần tích hợp này. Tài liệu này được yêu cầu trực tiếp bởi prompt đính kèm.
 
 Đã đọc đầy đủ `Gop_y.docx` do người dùng bổ sung tại `C:\Users\R9000P 2022\Downloads\Gop_y.docx` và đối chiếu các mục 2, 3, 4, 5, 6 với source. File không có ảnh nhúng; ảnh giao diện riêng và asset giải phẫu vẫn chưa được cung cấp. README gốc mô tả bản tích hợp Flow 1 cũ; đánh giá dưới đây căn cứ vào source thực tế vừa pull.

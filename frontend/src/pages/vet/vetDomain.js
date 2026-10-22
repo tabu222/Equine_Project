@@ -5,10 +5,24 @@ export const healthLabels = {
 }
 export const recordHealthLabels = { Healthy: 'Khỏe mạnh', Monitor: 'Cần theo dõi', Injured: 'Chấn thương', Recovering: 'Đang hồi phục', Isolated: 'Cách ly' }
 export const trainingLabels = { Eligible: 'Đủ điều kiện tập', Restricted: 'Hạn chế tập', 'Not Eligible': 'Không được tập' }
+export const examLabels = { 'Initial Exam': 'Khám đầu vào', 'Routine Exam': 'Khám định kỳ', 'Injury Exam': 'Khám chấn thương', 'Follow-up': 'Tái khám', Emergency: 'Cấp cứu' }
+export const medicineRoutes = { Oral: 'Uống', Injection: 'Tiêm', Topical: 'Bôi ngoài da', Inhalation: 'Hít', Other: 'Khác' }
+export function vetDate(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(String(value))) return 'Chưa ghi nhận'
+  const [year, month, day] = value.slice(0, 10).split('-')
+  return `${day}/${month}/${year}`
+}
+export function vetAge(value, today = clubToday()) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value > today) return 'Chưa cập nhật'
+  const [year, month, day] = value.split('-').map(Number)
+  const [currentYear, currentMonth, currentDay] = today.split('-').map(Number)
+  const months = (currentYear - year) * 12 + currentMonth - month - (currentDay < day ? 1 : 0)
+  return months >= 12 ? `${Math.floor(months / 12)} tuổi${months % 12 ? ` ${months % 12} tháng` : ''}` : `${Math.max(0, months)} tháng tuổi`
+}
 export const scheduleTypes = { Deworming: 'Tẩy giun', Farrier: 'Chăm sóc móng', 'Routine Examination': 'Khám định kỳ' }
 export function medicalEvents(vaccinations, schedules) {
   return [...vaccinations.map(v => ({ ...v, key: `v-${v.VaccinationID}`, kind: 'vaccination', day: v.VaccinationDate, label: `Tiêm phòng · ${v.VaccineName}` })),
-    ...schedules.map(s => ({ ...s, key: `s-${s.MedicalScheduleID}`, kind: 'schedule', day: s.ScheduledDate, label: scheduleTypes[s.ScheduleType] || s.ScheduleType }))].sort((a, b) => a.day.localeCompare(b.day))
+    ...schedules.map(s => ({ ...s, key: `s-${s.MedicalScheduleID}`, kind: 'schedule', day: s.ScheduledDate, label: scheduleTypes[s.ScheduleType] || (s.ScheduleType === 'Vaccination' ? 'Tiêm phòng' : 'Công việc y tế') }))].sort((a, b) => a.day.localeCompare(b.day))
 }
 export const clubTimezone = 'Asia/Ho_Chi_Minh'
 export function vetDateTime(value) {
@@ -16,7 +30,7 @@ export function vetDateTime(value) {
   const normalized = String(value).replace(' ', 'T')
   const date = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized) ? normalized : `${normalized}+07:00`)
   if (!Number.isFinite(date.getTime())) return 'Chưa cập nhật'
-  return new Intl.DateTimeFormat('en-US', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date)
+  return new Intl.DateTimeFormat('vi-VN', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date)
 }
 export function clubToday(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: clubTimezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
