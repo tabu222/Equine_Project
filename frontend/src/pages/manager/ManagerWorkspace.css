@@ -1,0 +1,12 @@
+.manager-workspace .panel { margin-bottom: 20px; }
+.manager-workspace .vet-toolbar { align-items: end; }
+.manager-workspace fieldset { border: 1px solid #dce5df; border-radius: 12px; padding: 16px; min-width: 0; }
+.manager-choice { display: flex; align-items: center; gap: 8px; margin: 10px 0; line-height: 1.5; }
+.manager-choice input { width: 18px; height: 18px; flex-shrink: 0; }
+.manager-permissions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 4px 16px; }
+.manager-secret { padding: 16px; background: #f5f8ec; border: 1px solid #c7d6b2; border-radius: 12px; margin: 16px 0; }
+.manager-secret output { display: block; font-family: monospace; font-size: 20px; overflow-wrap: anywhere; margin: 12px 0; }
+.manager-audit-detail { max-width: 440px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.manager-workspace .button { margin: 4px 4px 4px 0; }
+.manager-workspace .form-field { min-width: 0; }
+@media (max-width: 640px) { .manager-workspace .vet-toolbar > * { width: 100%; } .manager-workspace .page-heading { flex-direction: column; align-items: stretch; } }

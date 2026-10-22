@@ -4,6 +4,8 @@ Frontend React + Vite cho dự án Equi. Vite chạy mặc định tại `http:/
 
 ## Cập nhật Veterinarian 18/10/2026
 
+Cập nhật 22/10/2026: đã đồng bộ `origin/main` tới `d4e69c4`, khôi phục các route thú y bị gỡ trong bản tích hợp, nối sửa thuốc, sửa/xác nhận trạng thái lịch, thông báo có trạng thái đọc trên server; bổ sung nhân sự, RBAC, kho, báo cáo và nhật ký cho Quản lý. Xem [bàn giao Vet/Manager và giới hạn dữ liệu](../FE_VET_MANAGER_GAP_LOG.md). Lịch ngoài tiêm phòng chỉ xác nhận trạng thái hoàn thành; chưa có ngày thực hiện/kết quả riêng. Bộ browser chạy trên fixture SQLite mới, theo thứ tự `node tests/vet.browser.mjs` rồi `node tests/manager.browser.mjs`.
+
 Đăng nhập Vet và mở `/vet/overview`. Giữ hàng chờ khám đầu vào; nối thêm báo cáo sức khỏe, phiếu khám sau tiếp nhận, thuốc trên nháp, khóa/hạn chế tập và tạo/hủy lịch y tế vào BE hiện tại. Xem [đối chiếu chức năng, contract và yêu cầu BE còn thiếu](../backend/docs/VET_BACKEND_REQUIREMENTS.md). Hoàn thành lịch, nhắc tự động và chấn thương 3D chưa đủ điều kiện triển khai; giao diện không báo lưu thành công cho các phần này.
 
 Kiểm tra: `npm.cmd run typecheck`, `npm.cmd run test:api`, `npm.cmd run lint`, `npm.cmd run build`. Browser thật với SQLite tạm: chạy fixture BE và Vite cổng 5174 theo tài liệu trên, rồi `node tests/vet.browser.mjs`. Không dùng dữ liệu SQL Server thật cho fixture.

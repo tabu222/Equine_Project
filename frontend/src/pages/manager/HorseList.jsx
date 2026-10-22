@@ -11,7 +11,7 @@ const pageSize = 10
 const validFilters = new Set(registrationFilters.map(([value]) => value))
 const healthLabels = {
   NOT_ASSESSED: 'Chưa đánh giá',
-  ELIGIBLE: 'Đủ điều kiện',
+  ELIGIBLE: 'Khỏe mạnh',
   MONITORING: 'Theo dõi',
   INJURED: 'Chấn thương',
   RECOVERING: 'Đang hồi phục',
@@ -19,14 +19,14 @@ const healthLabels = {
 }
 const healthFilters = [
   ['NOT_ASSESSED', 'Chưa đánh giá'],
-  ['ELIGIBLE', 'Đủ điều kiện'],
+  ['ELIGIBLE', 'Khỏe mạnh'],
   ['MONITORING', 'Theo dõi'],
   ['INJURED', 'Chấn thương'],
   ['RECOVERING', 'Đang hồi phục'],
   ['ISOLATION', 'Cách ly'],
 ]
 
-function HorseList({ owners = [] }) {
+function HorseList({ owners = [], canCreate = false }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlFilter = searchParams.get('status')
   const selectedFilter = validFilters.has(urlFilter) ? urlFilter : 'NeedsAction'
@@ -151,7 +151,7 @@ function HorseList({ owners = [] }) {
       <nav className="breadcrumb" aria-label="Đường dẫn">Danh sách ngựa <span aria-hidden="true">/</span> Danh sách chiến mã</nav>
       <header className="page-heading list-heading">
         <div><p className="eyebrow">QUẢN LÝ CÂU LẠC BỘ</p><h1>Danh sách ngựa</h1><p>Theo dõi hồ sơ tiếp nhận, thông tin chủ sở hữu và sức khỏe ngựa trong câu lạc bộ.</p></div>
-        <div className="horse-count"><strong>{horses.length}</strong><span>ngựa trong câu lạc bộ</span></div>
+        <div className="profile-actions">{canCreate && <Link className="button" to="/manager/horses/new">Thêm hồ sơ ngựa</Link>}<div className="horse-count"><strong>{loading || error ? '—' : horses.length}</strong><span>ngựa trong câu lạc bộ</span></div></div>
       </header>
       <section className="horse-stat-strip" aria-label="Thống kê trạng thái hồ sơ">
         {registrationFilters
@@ -161,7 +161,7 @@ function HorseList({ owners = [] }) {
               <span>{label}</span><strong>{groupCounts[value]}</strong>
             </div>
           ))}
-        {horses.length === 0 && <p>Chưa có hồ sơ ngựa trong phạm vi câu lạc bộ.</p>}
+        {!loading && !error && horses.length === 0 && <p>Chưa có hồ sơ ngựa trong phạm vi câu lạc bộ.</p>}
       </section>
       <section className="filter-card" aria-label="Tìm kiếm và lọc danh sách ngựa">
         <div className="filter-row">
@@ -185,7 +185,7 @@ function HorseList({ owners = [] }) {
         {error ? <div className="horse-list-empty" role="alert"><p className="error-message">{error}</p><button className="button" type="button" onClick={refresh}>Thử lại</button></div>
           : loading ? <p className="table-loading" role="status">Đang tải danh sách ngựa...</p>
             : filteredHorses.length === 0 ? (
-              <div className="horse-list-empty"><EmptyState title="Không tìm thấy ngựa" description={selectedFilter === 'NeedsAction' ? 'Không có hồ sơ nào cần Manager xử lý theo điều kiện hiện tại.' : 'Không có ngựa phù hợp với tìm kiếm và bộ lọc hiện tại.'} /><button className="clear-filter-button" type="button" onClick={clearFilters}>Xóa bộ lọc</button></div>
+              <div className="horse-list-empty"><EmptyState title="Không tìm thấy ngựa" description={selectedFilter === 'NeedsAction' ? 'Không có hồ sơ nào cần quản lý xử lý theo điều kiện hiện tại.' : 'Không có ngựa phù hợp với tìm kiếm và bộ lọc hiện tại.'} /><button className="clear-filter-button" type="button" onClick={clearFilters}>Xóa bộ lọc</button></div>
             ) : (
               <div className="table-wrapper"><table className="horse-table"><thead><tr><th scope="col">Ngựa</th><th scope="col">Chủ sở hữu</th><th scope="col">Giống / giới tính</th><th scope="col">Trạng thái hồ sơ</th><th scope="col">Sức khỏe</th><th scope="col">Ngày tạo hồ sơ</th><th scope="col">Thao tác</th></tr></thead>
                 <tbody>{pageHorses.map((horse) => <tr key={horse.id}>

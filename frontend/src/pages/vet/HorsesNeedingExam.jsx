@@ -47,7 +47,7 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
         <div>
           <p className="eyebrow">BÁC SĨ THÚ Y · HỒ SƠ KHÁM</p>
           <h1>Hàng chờ khám đầu vào</h1>
-          <p>Vet trực tiếp nhận khám, không cần Manager chỉ định. <Link to="/vet/intake-results">Xem kết quả khám đầu vào →</Link></p>
+          <p>Bác sĩ thú y trực tiếp nhận khám. <Link to="/vet/intake-results">Xem kết quả khám đầu vào →</Link></p>
         </div>
         <button className="button button-secondary" type="button" onClick={onRetry}>Làm mới hàng chờ</button>
       </header>
@@ -136,7 +136,7 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
                         <td>
                           {!currentUser?.permissions.includes('MEDICAL_MANAGE') ? <span>Không có quyền nhận khám</span>
                             : draftMedicalRecordId && draftVetId !== currentUser.id
-                              ? <><span>Vet khác đang xử lý</span><Link className="view-button" to={`/vet/horses/${horse.id}`}>Xem hồ sơ</Link></>
+                              ? <><span>Bác sĩ khác đang xử lý</span><Link className="view-button" to={`/vet/horses/${horse.id}`}>Xem hồ sơ</Link></>
                               : <Link className="view-button vet-queue-action" to={`/vet/horses/${horse.id}/examination`}>
                                 {draftMedicalRecordId ? 'Tiếp tục phiếu nháp' : 'Bắt đầu khám'}
                               </Link>}

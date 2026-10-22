@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import { registrationGroupLabel } from '../../components/horse/registrationGroups.js'
@@ -17,6 +17,7 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const submitting = useRef(false)
 
   if (!horse) {
     return <main className="page-content"><section className="panel"><h1>Không tìm thấy ngựa</h1><Link to="/manager/horses">Quay lại danh sách ngựa</Link></section></main>
@@ -33,12 +34,14 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
   const canArchive = permissions.includes('HORSE_ARCHIVE')
   const canEdit = canRegister && (horse.profileStatus === 'DRAFT' || horse.profileStatus === 'REJECTED')
   const approvalBlockers = []
-  if (!signed) approvalBlockers.push('Cần Vet chốt phiếu khám đầu vào.')
-  if (signed && !healthPasses) approvalBlockers.push('Kết luận sức khỏe phải là Healthy hoặc Monitor.')
-  if (signed && healthPasses && !eligibilityPasses) approvalBlockers.push('TrainingEligibility không được là Not Eligible.')
+  if (!signed) approvalBlockers.push('Cần bác sĩ thú y chốt phiếu khám đầu vào.')
+  if (signed && !healthPasses) approvalBlockers.push('Sức khỏe cần được kết luận là khỏe mạnh hoặc cần theo dõi trước khi tiếp nhận.')
+  if (signed && healthPasses && !eligibilityPasses) approvalBlockers.push('Chưa thể tiếp nhận khi kết luận không cho phép huấn luyện.')
   if (signed && healthPasses && eligibilityPasses && !horseCode.trim()) approvalBlockers.push('Cần nhập mã ngựa trước khi duyệt.')
 
   async function runAction(action, successMessage) {
+    if (submitting.current) return false
+    submitting.current = true
     setBusy(true)
     setError('')
     setMessage('')
@@ -50,6 +53,7 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
       setError(actionError instanceof Error ? actionError.message : 'Không thể hoàn tất thao tác.')
       return false
     } finally {
+      submitting.current = false
       setBusy(false)
     }
   }
@@ -131,7 +135,7 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
         {canReview && horse.profileStatus === 'SUBMITTED' && <section className="profile-section">
           <h2>Đối chiếu hồ sơ</h2>
           <p>Sau khi xác minh hồ sơ và giấy tờ, ngựa sẽ được chuyển vào hàng đợi khám.</p>
-          <button className="button" type="button" disabled={busy} onClick={() => void runAction(() => onVerifyHorse(horse.id), 'Đã xác minh hồ sơ; ngựa đang chờ Vet khám.')}>{busy ? 'Đang xử lý...' : 'Xác minh hồ sơ'}</button>
+          <button className="button" type="button" disabled={busy} onClick={() => void runAction(() => onVerifyHorse(horse.id), 'Đã xác minh hồ sơ; ngựa đang chờ bác sĩ thú y khám.')}>{busy ? 'Đang xử lý...' : 'Xác minh hồ sơ'}</button>
           <form onSubmit={reject} style={{ marginTop: 16 }}>
             <label className="form-field"><span>Lý do từ chối</span><textarea rows="3" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} maxLength={1000} required /></label>
             <button className="button button-secondary" type="submit" disabled={busy || !rejectReason.trim()}>{busy ? 'Đang xử lý...' : 'Từ chối hồ sơ'}</button>
@@ -140,7 +144,7 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
 
         {canReview && horse.profileStatus === 'PENDING_EXAM' && <section className="profile-section">
           <h2>Duyệt và hoàn tất tiếp nhận</h2>
-          {!signed && <p className="intake-blockers">Chờ Vet khám và chốt phiếu. Chưa thể duyệt hồ sơ.</p>}
+          {!signed && <p className="intake-blockers">Chờ bác sĩ thú y khám và chốt phiếu. Chưa thể duyệt hồ sơ.</p>}
           {signed && <div className="intake-vet-conclusion">
             <h3>Kết quả khám đầu vào</h3>
             <p>Sức khỏe: {health || 'Chưa có kết luận'} · Điều kiện tập: {eligibility || 'Chưa có kết luận'}</p>

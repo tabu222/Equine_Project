@@ -19,7 +19,7 @@ const statusLabels = {
   REJECTED: 'Bị từ chối',
   ARCHIVED: 'Đã lưu trữ',
   NOT_ASSESSED: 'Chưa đánh giá',
-  ELIGIBLE: 'Đủ điều kiện',
+  ELIGIBLE: 'Khỏe mạnh',
   MONITORING: 'Theo dõi',
   INJURED: 'Chấn thương',
   RECOVERING: 'Đang hồi phục',

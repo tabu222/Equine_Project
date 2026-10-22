@@ -1,5 +1,6 @@
 .app-shell.vet-shell .page-content { width: 100%; max-width: 1800px; }
 .vet-workspace { display: flex; flex-direction: column; gap: 20px; }
+.vet-event[data-selected="true"] { outline: 2px solid var(--green-primary, #246643); outline-offset: 3px; }
 .vet-workspace .page-heading { margin-bottom: 0; }
 .vet-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .vet-stat { display: flex; flex-direction: column; gap: 10px; padding: 22px; color: var(--text-primary, #203c30); background: var(--surface, white); border: 1px solid var(--border); border-top: 4px solid #3c8c67; border-radius: 14px; text-decoration: none; }

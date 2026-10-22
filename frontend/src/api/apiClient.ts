@@ -5,6 +5,15 @@ const accessTokenKey = 'equi.access-token';
 const refreshTokenKey = 'equi.refresh-token';
 
 type ApiFieldErrors = Record<string, string[]>;
+const fieldLabels: Record<string, string> = {
+  FullName: 'Họ tên', Email: 'Email', Phone: 'Số điện thoại', Address: 'Địa chỉ', Password: 'Mật khẩu',
+  HorseName: 'Tên ngựa', OwnerID: 'Chủ ngựa', ClubID: 'Câu lạc bộ', HorseCode: 'Mã ngựa',
+  Breed: 'Giống', Gender: 'Giới tính', DateOfBirth: 'Ngày sinh', CoatColor: 'Màu lông',
+  SireName: 'Ngựa cha', DamName: 'Ngựa mẹ', MicrochipNumber: 'Số microchip', PassportNumber: 'Số hộ chiếu',
+  StallID: 'Ô chuồng', Reason: 'Lý do', ManagerNote: 'Ghi chú quản lý', ReviewNote: 'Nhận xét',
+  MedicineName: 'Tên thuốc', Dose: 'Liều dùng', Route: 'Đường dùng', StartDate: 'Ngày bắt đầu',
+  EndDate: 'Ngày kết thúc', WithdrawalUntil: 'Ngưng thuốc đến', Note: 'Ghi chú',
+};
 
 export class ApiError extends Error {
   constructor(
@@ -71,7 +80,7 @@ function errorMessage(value: unknown, status: number): {
       .flatMap(([field, errors]) => {
         const values = Array.isArray(errors) ? errors : [errors];
         return values.filter((item): item is string => typeof item === 'string')
-          .map((item) => field === 'detail' ? item : `${field}: ${item}`);
+          .map((item) => fieldLabels[field] ? `${fieldLabels[field]}: ${item}` : item);
       });
     if (messages.length) return { message: messages.join(' '), code, fieldErrors };
   }
@@ -93,8 +102,8 @@ async function send(path: string, init: RequestInit, authenticated: boolean): Pr
 
   try {
     return await fetch(`${apiBaseUrl}${path}`, { ...init, headers });
-  } catch (error) {
-    throw new ApiError(error instanceof Error ? error.message : 'Không thể kết nối API.');
+  } catch {
+    throw new ApiError('Không thể kết nối máy chủ. Vui lòng thử lại.');
   }
 }
 
@@ -184,4 +193,5 @@ export const apiPost = <T>(path: string, payload: unknown) => request<T>(path, {
 export const apiPostPublic = <T>(path: string, payload: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(payload) }, false);
 export const apiPostForm = <T>(path: string, payload: FormData) => request<T>(path, { method: 'POST', body: payload });
 export const apiPatch = <T>(path: string, payload: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(payload) });
+export const apiPut = <T>(path: string, payload: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(payload) });
 export const apiDelete = <T>(path: string) => request<T>(path, { method: 'DELETE' });
