@@ -132,8 +132,11 @@ function LandingPage() {
             </div>
 
             <h1>
-              Nền tảng quản lý
-              <span>ngựa đua toàn diện.</span>
+              Nền tảng <span className="landing-hero-phrase">quản lý</span>{' '}
+              <span className="landing-hero-highlight">
+                <span className="landing-hero-phrase">ngựa đua</span>{' '}
+                <span className="landing-hero-phrase">toàn diện.</span>
+              </span>
             </h1>
 
             <p className="landing-hero-description">

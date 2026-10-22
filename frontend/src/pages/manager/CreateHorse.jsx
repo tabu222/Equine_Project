@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createHorse } from '../../api/horseApi.ts'
 import { getUsers } from '../../api/userApi.ts'
@@ -16,6 +16,7 @@ function CreateHorse() {
   const [form, setForm] = useState(initialForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const submitting = useRef(false)
 
   async function loadOwners() {
     setOwnersLoading(true)
@@ -38,6 +39,8 @@ function CreateHorse() {
 
   async function submit(event) {
     event.preventDefault()
+    if (submitting.current) return
+    submitting.current = true
     setSaving(true)
     setError('')
     try {
@@ -46,6 +49,7 @@ function CreateHorse() {
     } catch (saveError) {
       setError(saveError.message || 'Không thể tạo hồ sơ ngựa.')
     } finally {
+      submitting.current = false
       setSaving(false)
     }
   }
@@ -64,7 +68,7 @@ function CreateHorse() {
               {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.fullName} ({owner.email})</option>)}
             </select>
             {ownersError && <small role="alert">{ownersError} <button type="button" className="text-button" onClick={() => void loadOwners()}>Thử lại</button></small>}
-            {!ownersLoading && !ownersError && owners.length === 0 && <small>Chưa có tài khoản Owner hoạt động để chọn.</small>}
+            {!ownersLoading && !ownersError && owners.length === 0 && <small>Chưa có tài khoản chủ ngựa hoạt động để chọn.</small>}
           </label>
           <label className="form-field"><span>Tên ngựa <b aria-hidden="true">*</b></span><input required maxLength={100} value={form.name} onChange={(event) => update('name', event.target.value)} /></label>
           <label className="form-field"><span>Giống</span><input maxLength={100} value={form.breed} onChange={(event) => update('breed', event.target.value)} /></label>
@@ -76,7 +80,7 @@ function CreateHorse() {
           <label className="form-field"><span>Tên ngựa cha</span><input maxLength={100} value={form.sireName} onChange={(event) => update('sireName', event.target.value)} /></label>
           <label className="form-field"><span>Tên ngựa mẹ</span><input maxLength={100} value={form.damName} onChange={(event) => update('damName', event.target.value)} /></label>
         </div>
-        <p className="profile-copy">Hồ sơ được lưu ở trạng thái Draft. Ngày sinh, giới tính và microchip cần có trước khi gửi hồ sơ đăng ký.</p>
+        <p className="profile-copy">Hồ sơ được lưu ở trạng thái nháp. Ngày sinh, giới tính và microchip cần có trước khi gửi hồ sơ đăng ký.</p>
         {error && <p className="error-message" role="alert">{error}</p>}
         <div className="form-actions">
           <Link className="button button-secondary" to="/manager/horses">Hủy</Link>

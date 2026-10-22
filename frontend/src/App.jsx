@@ -71,6 +71,16 @@ import OwnerTrainingActivityPage from './pages/owner/OwnerTrainingActivityPage.j
 
 import HorsesNeedingExam from './pages/vet/HorsesNeedingExam.jsx'
 import VetExaminationForm from './pages/vet/VetExaminationForm.tsx'
+import VetWorkspace from './pages/vet/VetWorkspace.jsx'
+import VetMedicalProfile from './pages/vet/VetMedicalProfile.jsx'
+import { vetError } from './pages/vet/vetDomain.js'
+import NotificationsPage from './pages/vet/NotificationsPage.jsx'
+import StaffPage from './pages/manager/StaffPage.jsx'
+import RolesPage from './pages/manager/RolesPage.jsx'
+import InventoryPage from './pages/manager/InventoryPage.jsx'
+import ManagerReports from './pages/manager/ManagerReports.jsx'
+import AuditPage from './pages/manager/AuditPage.jsx'
+import './pages/manager/ManagerWorkspace.css'
 
 import HeadTrainerTrainingDashboard, { HeadTrainerResultsPage } from './pages/training/HeadTrainerTrainingDashboard.jsx'
 import HorseAssessmentAssignmentPage from './pages/training/HorseAssessmentAssignmentPage.jsx'
@@ -387,7 +397,7 @@ function HorseProfilePage({
                 className="button"
                 to={`/manager/horses/${horse.id}/intake`}
               >
-                Xử lý Flow 1
+                Xử lý hệ thống
               </Link>
             )}
 
@@ -1136,11 +1146,15 @@ function OwnerCorrectionRoute({
 
 function VetHorseRoute({
   currentUser,
-  initialExams,
   onRefresh,
   examination = false,
 }) {
   const { horseId } = useParams()
+  const { search: examSearch } = useLocation()
+  const examParams = new URLSearchParams(examSearch)
+  const requestedRecordId = examParams.get('record')
+  const healthReportId = examParams.get('report') || undefined
+  const [conflictNotice, setConflictNotice] = useState('')
 
   const [horse, setHorse] =
     useState(null)
@@ -1206,10 +1220,7 @@ function VetHorseRoute({
       } catch (loadError) {
         if (!preserveExistingError) {
           setError(
-            loadError instanceof
-              Error
-              ? loadError.message
-              : 'Không thể tải hồ sơ khám.',
+            vetError(loadError, 'Không thể tải hồ sơ khám. Vui lòng thử lại.'),
           )
         }
 
@@ -1277,13 +1288,6 @@ function VetHorseRoute({
     return null
   }
 
-  const pendingExam =
-    initialExams.find(
-      (item) =>
-        String(item.horse.id) ===
-        String(horse.id),
-    )
-
   const requestStatus = {
     PENDING_EXAM: 'PendingExam',
     APPROVED: 'Approved',
@@ -1299,22 +1303,9 @@ function VetHorseRoute({
         )
       : undefined
 
-  const draft =
-    pendingExam
-      ?.draftMedicalRecordId
-      ? records.find(
-          (record) =>
-            record.id ===
-              pendingExam
-                .draftMedicalRecordId &&
-            record.registrationRequestId ===
-              pendingExam.requestId &&
-            record.examType ===
-              'Initial Exam' &&
-            record.recordStatus ===
-              'Draft',
-        )
-      : undefined
+  const draft = activeRequest ? records.find(record =>
+    record.registrationRequestId === activeRequest.id
+    && record.examType === 'Initial Exam' && record.recordStatus === 'Draft') : undefined
 
   const signedRecord =
     activeRequest
@@ -1330,20 +1321,34 @@ function VetHorseRoute({
       : undefined
 
   if (examination) {
+    const approvedExam = horse.profileStatus === 'APPROVED' && examParams.get('intake') !== '1'
+    const requestedRecord = records.find(r => r.id === requestedRecordId)
+    if (requestedRecordId && (!requestedRecord || requestedRecord.horseId !== horse.id)) {
+      return <main className="page-content"><section className="panel" role="alert"><p>Không tìm thấy phiếu khám của ngựa này.</p><Link to={`/vet/horses/${horse.id}`}>Quay về hồ sơ</Link></section></main>
+    }
+    const examDraft = requestedRecord?.recordStatus === 'Draft' ? requestedRecord : approvedExam ? undefined : draft
+    const examSigned = requestedRecord?.recordStatus === 'Signed' ? requestedRecord : approvedExam ? undefined : signedRecord
     return (
       <VetExaminationForm
-        key={`${horse.id}:${activeRequest?.id || ''}:${draft?.id || ''}`}
+        key={`${horse.id}:${activeRequest?.id || ''}:${examDraft?.id || ''}:${examSigned?.id || ''}:${healthReportId || ''}`}
         horse={horse}
         currentUser={
           currentUser
         }
-        draft={draft}
+        draft={examDraft}
+        healthReportId={healthReportId}
         signedRecord={
-          signedRecord
+          examSigned
         }
-        onSaveDraft={
-          saveExaminationDraft
-        }
+        onSaveDraft={saveExaminationDraft}
+        onConflict={async () => {
+          setConflictNotice('Trạng thái ca khám đã thay đổi hoặc lần lưu chưa được xác nhận. Đã yêu cầu cập nhật hàng chờ; hãy đối chiếu dữ liệu mới nhất trước khi tiếp tục.')
+          const results = await Promise.allSettled([onRefresh(horse.id), load(true)])
+          if (results.some(result => result.status === 'rejected' || result.value === false)) {
+            throw new Error('Không thể cập nhật đầy đủ hàng chờ và hồ sơ.')
+          }
+        }}
+        conflictNotice={conflictNotice}
         onSign={
           signMedicalRecord
         }
@@ -1365,22 +1370,13 @@ function VetHorseRoute({
     )
   }
 
-  return (
-      <HorseProfilePage
-        horse={horse}
-        role="vet"
-        currentUser={currentUser}
-        registrationHistory={
-          registrationHistory
-        }
-        medicalRecords={records}
-        canVetExamine={currentUser.permissions.includes('MEDICAL_MANAGE')}
-        onRefresh={async (id) => {
-          await load()
-          await onRefresh(id)
-        }}
-      />
-  )
+  return <VetMedicalProfile horse={horse} records={records} currentUser={currentUser}
+    activeRequestId={activeRequest?.id}
+    onRefresh={async (id) => {
+      const loaded = await load()
+      if (!loaded) throw new Error('Không thể tải lại hồ sơ.')
+      await onRefresh(id)
+    }} />
 }
 
 function AppContent() {
@@ -1520,7 +1516,7 @@ function AppContent() {
           getHorses(),
 
           currentUser.role ===
-          'CLUB_MANAGER'
+          'CLUB_MANAGER' && currentUser.permissions.some(p => ['RBAC_MANAGE', 'HORSE_REGISTER_REVIEW'].includes(p))
             ? getUsers(
                 'HORSE_OWNER',
               )
@@ -1707,7 +1703,7 @@ function AppContent() {
     role === 'owner'
       ? '/owner/horses'
       : role === 'vet'
-        ? '/vet/horses-needing-exam'
+        ? currentUser?.permissions.includes('HORSE_VIEW') ? '/vet/overview' : '/vet/notifications'
         : role === 'headTrainer'
           ? '/training/dashboard'
           : role === 'trainer'
@@ -1807,8 +1803,8 @@ function AppContent() {
 
   if (!role) {
     return <main className="page-content narrow-content"><section className="panel">
-      <h1>Vai trò chưa có không gian Flow 1</h1>
-      <p>Tài khoản {currentUser.email} đã đăng nhập. Flow 1 hỗ trợ Owner, Club Manager và Vet.</p>
+      <h1>Không gian làm việc chưa khả dụng</h1>
+      <p>Tài khoản {currentUser.email} đã đăng nhập. Không gian làm việc cho vai trò này hiện chưa khả dụng.</p>
       <button className="button" type="button" onClick={logout}>Đăng xuất</button>
     </section></main>
   }
@@ -1866,7 +1862,7 @@ function AppContent() {
                 <span>
                   Danh sách ngựa
                 </span>
-              </NavLink>
+              </NavLink>}
 
               {currentUser.permissions.includes(
                 'PROFILE_EDIT_APPROVE',
@@ -2148,8 +2144,9 @@ function AppContent() {
               path="/manager/horses"
               element={
                 role ===
-                'manager' ? (
+                'manager' && currentUser.permissions.includes('HORSE_VIEW') ? (
                   <HorseList
+                    canCreate={currentUser.permissions.some(p => ['HORSE_REGISTER', 'HORSE_REGISTER_REVIEW'].includes(p))}
                     owners={
                       ownerList
                     }
@@ -2417,6 +2414,7 @@ function AppContent() {
                 role ===
                 'vet' ? (
                   <HorsesNeedingExam
+                    currentUser={currentUser}
                     initialExams={
                       initialExams
                     }

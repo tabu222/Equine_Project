@@ -71,7 +71,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
 
   if (currentSignedRecord) {
     const managerStatus = !isInitial ? 'Phiếu khám đã chốt. Có thể xem kết quả và đính chính trong hồ sơ y tế.' : horse.profileStatus === 'PENDING_EXAM'
-      ? 'Đã chốt phiếu khám, chờ Manager xử lý.'
+      ? 'Đã chốt phiếu khám, chờ quản lý xử lý.'
       : `Phiếu đã chốt. Trạng thái hồ sơ hiện tại: ${profileStatusLabels[horse.profileStatus] || horse.profileStatus}.`;
     return <main className="page-content narrow-content">
       <div className="breadcrumb"><Link to="/vet/horses-needing-exam">Hàng đợi khám</Link><span aria-hidden="true">/</span><span>Phiếu khám đã chốt</span></div>
@@ -158,7 +158,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
       const savedDraft = await saveDraft();
       const signed = await onSign(savedDraft.id);
       setJustSignedRecord(signed);
-      setMessage(isInitial ? 'Đã chốt phiếu khám, chờ Manager xử lý.' : 'Đã chốt phiếu khám.');
+      setMessage(isInitial ? 'Đã chốt phiếu khám, chờ quản lý xử lý.' : 'Đã chốt phiếu khám.');
     } catch (signError) {
       await handleFailure(signError);
       submitting.current = false;
@@ -178,7 +178,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
   async function handleFailure(failure: unknown) {
     if (!(failure instanceof ApiError) || !failure.status || failure.status >= 500 || failure.status === 409) {
       setBlocked(true);
-      setError('Chưa thể xác nhận lưu. Hồ sơ có thể đã được Vet khác nhận hoặc chốt; đang tải lại dữ liệu.');
+      setError('Chưa thể xác nhận lưu. Hồ sơ có thể đã được bác sĩ khác nhận hoặc chốt; đang tải lại dữ liệu.');
       try { await onConflict(); }
       catch { setError('Không thể xác nhận trạng thái mới nhất. Vui lòng quay lại hàng chờ và tải lại trước khi tiếp tục.'); }
     } else if (failure instanceof ApiError && failure.status === 400) {
@@ -193,9 +193,9 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
 
   if (!ownsDraft) {
     return <main className="page-content"><section className="panel">
-      <h1>Phiếu khám đang do Vet khác xử lý</h1>
+      <h1>Phiếu khám đang do bác sĩ khác xử lý</h1>
       {conflictNotice && <p className="error-message" role="alert">{conflictNotice}</p>}
-      <p>Phiếu nháp #{draft?.id} do {draft?.vetName || `Vet #${draft?.vetId}`} lập. Chỉ người lập phiếu mới có thể tiếp tục chỉnh sửa hoặc chốt phiếu.</p>
+      <p>Phiếu nháp #{draft?.id} do {draft?.vetName || `Bác sĩ #${draft?.vetId}`} lập. Chỉ người lập phiếu mới có thể tiếp tục chỉnh sửa hoặc chốt phiếu.</p>
       <Link className="button" to="/vet/horses-needing-exam">Quay lại hàng đợi</Link>
     </section></main>;
   }
@@ -219,7 +219,7 @@ function VetExaminationForm({ horse, currentUser, draft, signedRecord, onSaveDra
       {healthReportId && <p>Báo cáo sức khỏe liên quan: #{healthReportId}</p>}
       <section className="panel form-panel post-exam-form-panel">
         <h2>Phiếu {title.toLocaleLowerCase()}</h2>
-        <p>Chốt phiếu xác nhận kết luận trong hệ thống, chưa phải chữ ký số. {isInitial ? 'Manager quyết định tiếp nhận.' : 'Kết luận cấm tập sẽ tạo khóa toàn phần. Hạn chế cường độ cần áp dụng khóa tập riêng.'}</p>
+        <p>Chốt phiếu xác nhận kết luận trong hệ thống, chưa phải chữ ký số. {isInitial ? 'Quản lý quyết định tiếp nhận.' : 'Kết luận cấm tập sẽ tạo khóa toàn phần. Hạn chế cường độ cần áp dụng khóa tập riêng.'}</p>
         <form onSubmit={handleSign}>
           <fieldset disabled={saving || blocked} className="vet-form-fields">
           {!isInitial && <label className="form-field"><span>Loại khám</span><select required disabled={!!draftId} value={form.examType} onChange={e => updateField('examType', e.target.value)}><option value="">Chọn loại khám</option><option value="Routine Exam">Khám định kỳ</option><option value="Injury Exam">Khám chấn thương</option><option value="Follow-up">Tái khám</option><option value="Emergency">Cấp cứu</option></select></label>}

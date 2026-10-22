@@ -3,6 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { saveVetResource } from '../../api/vetApi.ts'
 import { clubToday, dueGroup, medicalEvents, scheduleTypes, vetDateTime, vetError } from './vetDomain.js'
 import { useVetResource } from './useVetResource.js'
+import CalendarEventEditor from './CalendarEventEditor.jsx'
+import { useAction } from '../../components/common/useOperations.js'
+import { Feedback, Field } from '../../components/common/OperationUI.jsx'
 
 export function ResourceState({ data, children }) {
   if (data.loading) return <p role="status">Đang tải dữ liệu…</p>
@@ -27,14 +30,13 @@ function useMutation(onSaved) {
     } catch (failure) {
       const messages = { FOLLOW_UP_EXAM_REQUIRED: 'Cần tái khám sau khi khóa và chốt kết luận cho phép tập trước khi mở khóa.', LOCK_EXISTS: 'Ngựa đã có khóa tập. Hãy tải lại để xem khóa hiện hành.', INVALID_STATUS: 'Trạng thái đã thay đổi; hãy tải lại trước khi tiếp tục.', NOT_RECORD_OWNER: 'Phiếu này đang do bác sĩ khác xử lý.', RECORD_SIGNED: 'Phiếu đã chốt. Hãy dùng đính chính hoặc lập lần khám mới.' }
       setError(messages[failure?.code] || vetError(failure, 'Chưa thể xác nhận thao tác. Hãy tải lại và kiểm tra dữ liệu trước khi thử lại.'))
-      onSaved?.()
       return false
     } finally { gate.current = false; setBusy(false) }
   }
   return { run, busy, feedback: <>{error && <p role="alert" className="error-message">{error}</p>}{notice && <p role="status" className="success-message">{notice}</p>}</> }
 }
 
-const lockLabel = { Full: 'Cấm tập hoàn toàn', Restricted: 'Hạn chế cường độ tập' }
+const lockLabel = { Full: 'Khóa toàn bộ', Restricted: 'Giới hạn cường độ' }
 export function LockBadge({ lock }) {
   return lock ? <span className={`vet-pill training-${lock.LockLevel === 'Full' ? 'Not-Eligible' : 'Restricted'}`}>⚑ {lockLabel[lock.LockLevel]}{lock.LockLevel === 'Restricted' ? ` · Tải tối đa ${lock.MaxIntensity}` : ''}</span> : null
 }
@@ -61,14 +63,14 @@ export function TrainingLocks({ horse, currentUser, compact = false, onChanged =
       {canManage && <button className="button vet-emergency" type="button" disabled={action.busy} onClick={() => { setLevel(active?.LockLevel || 'Full'); setOpen(!open) }}>{open ? 'Đóng biểu mẫu' : active ? 'Điều chỉnh khóa tập' : 'Khóa tập khẩn cấp'}</button>}
       {open && canManage && <form onSubmit={submit} className="vet-operation-form" key={active?.TrainingLockID || 'new'}><fieldset disabled={action.busy} className="vet-form-fields">
         <label className="form-field"><span>Lý do khóa</span><input name="reason" required maxLength={100} defaultValue={active?.Reason || ''} /></label>
-        <label className="form-field"><span>Mức hạn chế</span><select name="level" value={level} onChange={e => setLevel(e.target.value)}><option value="Full">Cấm tập hoàn toàn</option><option value="Restricted">Hạn chế cường độ</option></select></label>
+        <label className="form-field"><span>Mức hạn chế</span><select name="level" value={level} onChange={e => setLevel(e.target.value)}><option value="Full">Khóa toàn bộ</option><option value="Restricted">Giới hạn cường độ</option></select></label>
         {level === 'Restricted' && <label className="form-field"><span>Tải tập tối đa (cùng thang tải của buổi tập)</span><input name="max" type="number" min="0" max="99999999.99" step="0.01" required defaultValue={active?.MaxIntensity ?? ''} /></label>}
         <label className="form-field"><span>Ghi chú / giới hạn cụ thể</span><textarea name="details" maxLength={2000} defaultValue={active?.Details || ''} /></label>
         <p>Áp dụng ngay. Các buổi đã phân công trong phạm vi khóa có thể bị hủy; lịch sử được giữ lại.</p>
         <button className="button vet-emergency" disabled={action.busy}>{action.busy ? 'Đang áp dụng…' : 'Áp dụng khóa tập'}</button>
       </fieldset></form>}
       {active && canManage && !compact && <form className="vet-operation-form" onSubmit={async e => { e.preventDefault(); const note = new FormData(e.currentTarget).get('note').trim(); if (note) await action.run(`/training-locks/${active.TrainingLockID}/release`, { Note: note }) }}><label className="form-field"><span>Lý do mở khóa · cần kết luận tái khám hợp lệ</span><textarea name="note" maxLength={1000} required /></label><button className="button button-secondary" disabled={action.busy}>Mở khóa sau tái khám</button></form>}
-      {!compact && data.rows.filter(l => l.LockStatus === 'Released').map(l => <article className="vet-amendment" key={l.TrainingLockID}><strong>Đã mở khóa · {lockLabel[l.LockLevel]}</strong><p>{l.Reason}</p><p>Vet mở: {l.ReleasedByVetID} · {vetDateTime(l.ReleasedAt)}</p><p>{l.Details}</p></article>)}
+      {!compact && data.rows.filter(l => l.LockStatus === 'Released').map(l => <article className="vet-amendment" key={l.TrainingLockID}><strong>Đã mở khóa · {lockLabel[l.LockLevel]}</strong><p>{l.Reason}</p><p>Bác sĩ mở: {l.ReleasedByVetID} · {vetDateTime(l.ReleasedAt)}</p><p>{l.Details}</p></article>)}
     </ResourceState>{action.feedback}
   </section>
 }
@@ -82,14 +84,14 @@ export function VetCalendar({ horses, currentUser, horseId }) {
   const [creating, setCreating] = useState(false)
   const [kind, setKind] = useState('Vaccination')
   const [view, setView] = useState('list')
-  const action = useMutation(() => { vaccinations.reload(); schedules.reload() })
+  const action = useAction(() => { vaccinations.reload(); schedules.reload() })
   const canManage = currentUser.permissions.includes('MEDICAL_MANAGE')
   const rows = medicalEvents(vaccinations.rows, schedules.rows).filter(row => group === 'all' || (group === 'completed' ? row.Status === 'Completed' : ['Scheduled', 'Overdue'].includes(row.Status) && (group === 'overdue' ? row.Status === 'Overdue' || dueGroup(row.day) === 'overdue' : row.Status !== 'Overdue' && dueGroup(row.day) === group)))
   async function create(event) {
     event.preventDefault()
     const values = new FormData(event.currentTarget)
     const id = horseId || values.get('horse')
-    const body = { Status: 'Scheduled', Note: values.get('note').trim(), ...(kind === 'Vaccination' ? { VaccineName: values.get('vaccine').trim(), VaccinationDate: values.get('date') } : { ScheduleType: kind, ScheduledDate: values.get('date') }) }
+    const body = { Status: 'Scheduled', Note: values.get('Note').trim(), ...(kind === 'Vaccination' ? { VaccineName: values.get('VaccineName').trim(), VaccinationDate: values.get('VaccinationDate'), NextDueDate: values.get('NextDueDate') || null } : { ScheduleType: kind, ScheduledDate: values.get('ScheduledDate') }) }
     if (await action.run(`/horses/${id}/${kind === 'Vaccination' ? 'vaccinations' : 'medical-schedules'}`, body)) setCreating(false)
   }
   return <section className="panel">
@@ -98,17 +100,17 @@ export function VetCalendar({ horses, currentUser, horseId }) {
     {creating && <form onSubmit={create} className="vet-operation-form"><fieldset disabled={action.busy} className="vet-form-fields">
       {!horseId && <label className="form-field"><span>Ngựa</span><select name="horse" required><option value="">Chọn ngựa</option>{horses.filter(h => h.profileStatus === 'APPROVED').map(h => <option key={h.id} value={h.id}>{h.name} · {h.code || h.microchipNumber || 'Chưa cấp mã'}</option>)}</select></label>}
       <label className="form-field"><span>Loại công việc</span><select value={kind} onChange={e => setKind(e.target.value)}><option value="Vaccination">Tiêm phòng</option>{Object.entries(scheduleTypes).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      {kind === 'Vaccination' && <label className="form-field"><span>Tên vaccine theo chỉ định</span><input name="vaccine" required maxLength={150} /></label>}
-      <label className="form-field"><span>Ngày đến hạn</span><input name="date" type="date" required /></label><label className="form-field"><span>Ghi chú</span><textarea name="note" maxLength={1000} /></label><button className="button" disabled={action.busy}>Lưu lịch</button>
+      {kind === 'Vaccination' && <><Field label="Tên vắc xin theo chỉ định" name="VaccineName" action={action} required maxLength={150} /><Field label="Ngày tiêm nhắc lại theo chỉ định (không tự tạo lịch)" name="NextDueDate" type="date" action={action} /></>}
+      <Field label="Ngày đến hạn" name={kind === 'Vaccination' ? 'VaccinationDate' : 'ScheduledDate'} type="date" required action={action} /><Field label="Ghi chú" name="Note" multiline maxLength={1000} action={action} /><button className="button" disabled={action.busy}>Lưu lịch</button>
     </fieldset></form>}
-    {action.feedback}
+    <Feedback action={action} />
     <ResourceState data={vaccinations}><ResourceState data={schedules}>
       {!rows.length && <p className="vet-empty">Không có lịch phù hợp.</p>}
-      <div className={view === 'days' ? 'vet-calendar-days' : 'vet-event-list'}>{rows.map(row => <article className="vet-event" key={row.key}><time>{row.day}</time><div><Link to={`/vet/horses/${row.HorseID}?tab=calendar`}><strong>{row.HorseName}</strong></Link><p>{row.label}</p><span className={`vet-pill due-${row.Status === 'Completed' ? 'completed' : row.Status === 'Overdue' ? 'overdue' : dueGroup(row.day)}`}>{statusLabels[row.Status]}{row.Status === 'Scheduled' && dueGroup(row.day) === 'overdue' ? ' · Quá hạn' : ''}</span><p>Bác sĩ: {row.VetName || 'Chưa xác định'}</p>{row.NextDueDate && <p>Nhắc lại theo chỉ định: {row.NextDueDate}</p>}<p className="vet-preserve">{row.Note}</p></div>
-        {canManage && ['Scheduled', 'Overdue'].includes(row.Status) && <div><button type="button" className="button button-secondary" disabled title="Chưa thể ghi đầy đủ ngày thực hiện, kết quả và lịch tiếp theo tại đây">Ghi nhận hoàn thành</button><button type="button" className="button button-secondary" disabled={action.busy} onClick={() => action.run(`/${row.kind === 'vaccination' ? 'vaccinations' : 'medical-schedules'}/${row.kind === 'vaccination' ? row.VaccinationID : row.MedicalScheduleID}`, { Status: 'Cancelled' }, true)}>Hủy lịch</button></div>}
+      <div className={view === 'days' ? 'vet-calendar-days' : 'vet-event-list'}>{rows.map(row => <article className="vet-event" id={row.key} data-selected={params.get('event') === row.key || undefined} key={row.key}><time>{row.day}</time><div><Link to={`/vet/horses/${row.HorseID}?tab=calendar`}><strong>{row.HorseName}</strong></Link><p>{row.label}</p><span className={`vet-pill due-${row.Status === 'Completed' ? 'completed' : row.Status === 'Overdue' ? 'overdue' : dueGroup(row.day)}`}>{statusLabels[row.Status]}{row.Status === 'Scheduled' && dueGroup(row.day) === 'overdue' ? ' · Quá hạn' : ''}</span><p>Bác sĩ: {row.VetName || 'Chưa xác định'}</p>{row.NextDueDate && <p>Nhắc lại theo chỉ định: {row.NextDueDate}</p>}<p className="vet-preserve">{row.Note}</p></div>
+        {canManage && <CalendarEventEditor row={row} onChanged={() => { vaccinations.reload(); schedules.reload() }} />}
       </article>)}</div>
     </ResourceState></ResourceState>
-    <p className="vet-caption">Nhắc hạn xuất hiện trong mục thông báo khi tải ứng dụng. Chưa có nhắc việc tự động. Chức năng hoàn thành lịch đang chờ bổ sung thông tin ngày thực hiện và kết quả.</p>
+    <p className="vet-caption">Nhắc hạn xuất hiện trong mục thông báo khi tải ứng dụng. Chưa có nhắc việc tự động. Xác nhận hoàn thành chỉ cập nhật thông tin thể hiện trong biểu mẫu.</p>
   </section>
 }
 
@@ -118,7 +120,7 @@ export function VetReports({ horses, currentUser }) {
   const severity = params.get('severity') || ''
   const status = params.get('status') || 'open'
   const canManage = currentUser.permissions.includes('MEDICAL_MANAGE')
-  const rows = data.rows.filter(r => (!severity || r.Severity === severity) && (status === 'all' || (status === 'open' ? r.Status !== 'Resolved' : r.Status === status))).sort((a, b) => (a.Severity === 'Urgent' ? 0 : 1) - (b.Severity === 'Urgent' ? 0 : 1) || a.ReportedAt.localeCompare(b.ReportedAt))
+  const rows = data.rows.filter(r => (!params.get('report') || String(r.HealthReportID) === params.get('report')) && (!severity || r.Severity === severity) && (status === 'all' || (status === 'open' ? r.Status !== 'Resolved' : r.Status === status))).sort((a, b) => (a.Severity === 'Urgent' ? 0 : 1) - (b.Severity === 'Urgent' ? 0 : 1) || a.ReportedAt.localeCompare(b.ReportedAt))
   function filter(key, value) { const next = new URLSearchParams(params); next.set(key, value); setParams(next) }
   return <section className="panel"><h2>Tiếp nhận báo cáo sức khỏe</h2><div className="vet-toolbar"><label className="form-field"><span>Mức độ</span><select value={severity} onChange={e => filter('severity', e.target.value)}><option value="">Tất cả mức độ</option><option value="Urgent">Khẩn</option><option value="Normal">Thông thường</option></select></label><label className="form-field"><span>Tiến trình</span><select value={status} onChange={e => filter('status', e.target.value)}>{Object.entries({ open: 'Chưa xử lý xong', all: 'Tất cả', Reported: 'Chờ nhận', Reviewing: 'Đang xử lý', Resolved: 'Đã xử lý' }).map(([v, l]) => <option value={v} key={v}>{l}</option>)}</select></label><button className="button button-secondary" onClick={data.reload}>Làm mới báo cáo</button></div><ResourceState data={data}>{!rows.length && <p className="vet-empty">Không có báo cáo phù hợp.</p>}{rows.map(r => <ReportCard key={r.HealthReportID} report={r} horse={horses.find(h => String(h.id) === String(r.HorseID))} currentUser={currentUser} canManage={canManage} reload={data.reload} />)}</ResourceState></section>
 }
@@ -140,19 +142,48 @@ function ReportCard({ report: r, horse, currentUser, canManage, reload }) {
 }
 
 const routes = { Oral: 'Uống', Injection: 'Tiêm', Topical: 'Bôi ngoài da', Inhalation: 'Hít', Other: 'Khác' }
-export function VetTreatments({ horse, records, currentUser }) {
+export function VetTreatments({ horse, records, currentUser, onChanged }) {
   const data = useVetResource(`/horses/${horse.id}/treatments`)
-  const action = useMutation(data.reload)
+  const [editing, setEditing] = useState(null)
+  const [version, setVersion] = useState(0)
+  const action = useAction(() => { setEditing(null); setVersion(v => v + 1); data.reload(); onChanged?.() })
   const drafts = records.filter(r => r.recordStatus === 'Draft' && r.vetId === currentUser.id)
   const canManage = currentUser.permissions.includes('MEDICAL_MANAGE')
-  async function submit(event) {
-    event.preventDefault()
-    const form = event.currentTarget
-    const f = new FormData(form)
-    if (await action.run(`/medical-records/${f.get('record')}/treatments`, { MedicineName: f.get('medicine').trim(), Dose: f.get('dose').trim(), Route: f.get('route'), StartDate: f.get('start'), EndDate: f.get('end') || null, WithdrawalUntil: f.get('withdrawal') || null, Note: f.get('note').trim() })) form.reset()
+  function editor(treatment) {
+    const signed = treatment && records.find(r => r.id === String(treatment.MedicalRecordID))?.recordStatus === 'Signed'
+    return <form key={treatment?.TreatmentID || `new-${version}`} className="vet-operation-form" onSubmit={e => {
+      e.preventDefault()
+      const f = new FormData(e.currentTarget)
+      const body = { EndDate: f.get('EndDate') || null, WithdrawalUntil: f.get('WithdrawalUntil') || null,
+        ...(!signed ? { MedicineName: f.get('MedicineName').trim(), Dose: f.get('Dose').trim(), Route: f.get('Route'), StartDate: f.get('StartDate'), Note: f.get('Note').trim() } : {}) }
+      void action.run(treatment ? `/treatments/${treatment.TreatmentID}` : `/medical-records/${f.get('record')}/treatments`, body, treatment ? 'PATCH' : 'POST')
+    }}><h3>{treatment ? 'Cập nhật thuốc' : 'Thêm thuốc vào phiếu nháp của bạn'}</h3><fieldset className="vet-form-fields" disabled={action.busy}>
+      {!treatment && <Field label="Phiếu khám" name="record" required options={drafts.map(r => [r.id, `#${r.id} · ${r.examType}`])} />}
+      {signed ? <p>Phiếu đã chốt: chỉ cập nhật ngày kết thúc và thời gian ngưng thuốc.</p> : <>
+        <Field label="Tên thuốc" name="MedicineName" action={action} required maxLength={150} defaultValue={treatment?.MedicineName || ''} />
+        <Field label="Liều kèm đơn vị" name="Dose" action={action} required maxLength={100} defaultValue={treatment?.Dose || ''} />
+        <Field label="Đường dùng" name="Route" action={action} options={Object.entries(routes)} defaultValue={treatment?.Route || 'Oral'} />
+        <Field label="Ngày bắt đầu" name="StartDate" action={action} type="date" required defaultValue={treatment?.StartDate || ''} />
+        <Field label="Tần suất và hướng dẫn dùng thuốc" name="Note" action={action} multiline required maxLength={1000} defaultValue={treatment?.Note || ''} />
+      </>}
+      <Field label="Ngày kết thúc" name="EndDate" action={action} type="date" min={signed ? treatment.StartDate : undefined} defaultValue={treatment?.EndDate || ''} />
+      <Field label="Ngưng thuốc đến (theo chỉ định)" name="WithdrawalUntil" action={action} type="date" min={signed ? treatment.StartDate : undefined} defaultValue={treatment?.WithdrawalUntil || ''} />
+      <Feedback action={action} /><button className="button">{action.busy ? 'Đang lưu…' : treatment ? 'Lưu cập nhật thuốc' : 'Lưu thuốc vào phiếu nháp'}</button>
+      {treatment && <button className="button button-secondary" type="button" onClick={() => setEditing(null)}>Hủy chỉnh sửa</button>}
+    </fieldset></form>
   }
-  return <section className="panel"><h2>Điều trị và đơn thuốc</h2><ResourceState data={data}>{!data.rows.length && <p>Chưa có thuốc được ghi nhận.</p>}{data.rows.map(t => <article className="vet-amendment" key={t.TreatmentID}><strong>{t.MedicineName} · Phiếu #{t.MedicalRecordID} · {records.find(r => r.id === String(t.MedicalRecordID))?.recordStatus === 'Draft' ? 'Nháp' : 'Đã chốt'}</strong><p>Liều và đơn vị: {t.Dose} · Đường dùng: {routes[t.Route] || t.Route}</p><p>{t.StartDate} → {t.EndDate || 'Chưa ghi ngày kết thúc'}</p>{t.WithdrawalUntil && <p>Ngưng thuốc đến: {t.WithdrawalUntil}{t.WithdrawalActive ? ' · Còn trong thời gian ngưng thuốc' : ''}</p>}<p>{t.Note}</p></article>)}</ResourceState>
-    {canManage && drafts.length > 0 ? <form onSubmit={submit} className="vet-operation-form"><h3>Thêm thuốc vào phiếu nháp của bạn</h3><fieldset disabled={action.busy} className="vet-form-fields"><label className="form-field"><span>Phiếu khám</span><select name="record" required>{drafts.map(r => <option key={r.id} value={r.id}>#{r.id} · {r.examType}</option>)}</select></label><label className="form-field"><span>Tên thuốc</span><input name="medicine" required maxLength={150} /></label><label className="form-field"><span>Liều kèm đơn vị do bác sĩ chỉ định</span><input name="dose" required maxLength={100} /></label><label className="form-field"><span>Đường dùng</span><select name="route">{Object.entries(routes).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label><div className="horse-form-grid"><label className="form-field"><span>Ngày bắt đầu</span><input name="start" type="date" required /></label><label className="form-field"><span>Ngày kết thúc</span><input name="end" type="date" /></label><label className="form-field"><span>Ngưng thuốc đến (theo chỉ định)</span><input name="withdrawal" type="date" /></label></div><label className="form-field"><span>Tần suất và hướng dẫn dùng thuốc</span><textarea name="note" maxLength={1000} required /></label><button className="button" disabled={action.busy}>Lưu thuốc vào phiếu nháp</button></fieldset></form> : canManage && <p>Lưu một phiếu khám nháp trước khi thêm thuốc. Phiếu đã chốt được giữ nguyên.</p>}{action.feedback}<p className="vet-caption">Liều, đơn vị, tần suất và thời gian ngưng thuốc do bác sĩ nhập. Tần suất được lưu cùng hướng dẫn.</p></section>
+  return <section className="panel"><div className="vet-toolbar"><h2>Điều trị và đơn thuốc</h2><button className="button button-secondary" disabled={data.loading || action.busy} onClick={data.reload}>Làm mới đơn thuốc</button></div>
+    <ResourceState data={data}>{!data.rows.length && <p>Chưa có thuốc được ghi nhận.</p>}{data.rows.map(t => {
+      const record = records.find(r => r.id === String(t.MedicalRecordID))
+      const canEdit = canManage && record && (record.recordStatus === 'Signed' || record.vetId === currentUser.id)
+      return <article className="vet-amendment" key={t.TreatmentID}><strong>{t.MedicineName} · Phiếu #{t.MedicalRecordID} · {record?.recordStatus === 'Draft' ? 'Nháp' : record?.recordStatus === 'Signed' ? 'Đã chốt' : 'Chưa xác định trạng thái'}</strong><p>Liều và đơn vị: {t.Dose} · Đường dùng: {routes[t.Route] || t.Route}</p><p>{t.StartDate} → {t.EndDate || 'Chưa ghi ngày kết thúc'}</p>{t.WithdrawalUntil && <p>Ngưng thuốc đến: {t.WithdrawalUntil}{t.WithdrawalActive ? ' · Còn trong thời gian ngưng thuốc' : ''}</p>}<p>{t.Note}</p>
+        {canEdit && <button className="button button-secondary" disabled={action.busy} onClick={() => setEditing(t.TreatmentID)}>Cập nhật thuốc</button>}
+        {editing === t.TreatmentID && canEdit && editor(t)}
+      </article>
+    })}</ResourceState>
+    {canManage && drafts.length > 0 && !editing ? editor(null) : canManage && !drafts.length && <p>Lưu một phiếu khám nháp của bạn trước khi thêm thuốc.</p>}
+    {action.notice && <p role="status">{action.notice}</p>}<p className="vet-caption">Tần suất được lưu cùng hướng dẫn dùng thuốc.</p>
+  </section>
 }
 
 export function VetOperationalOverview({ horses, initialExams, intakeError }) {
@@ -163,5 +194,5 @@ export function VetOperationalOverview({ horses, initialExams, intakeError }) {
   const eventsReady = !vaccinations.loading && !schedules.loading && !vaccinations.error && !schedules.error
   const events = eventsReady ? medicalEvents(vaccinations.rows, schedules.rows).filter(r => ['Scheduled', 'Overdue'].includes(r.Status)) : []
   const pending = events.filter(r => r.Status === 'Overdue' || dueGroup(r.day) === 'overdue')
-  return <><div className="vet-two-columns"><section className="panel"><h2>Cần xử lý ngay</h2><Link className="vet-task" to="/vet/horses-needing-exam"><span>Khám đầu vào<small>Vet trực tiếp nhận khám</small></span><strong>{intakeError ? 'Chưa có số liệu' : initialExams.length} →</strong></Link><ResourceState data={reports}><Link className="vet-task" to="/vet/reports?severity=Urgent"><span>Báo cáo khẩn chưa hoàn tất</span><strong>{reports.rows.filter(r => r.Severity === 'Urgent').length} →</strong></Link>{reports.rows.slice(0, 3).map(r => <p key={r.HealthReportID}><Link to="/vet/reports">{r.HorseName}</Link> · {r.Severity === 'Urgent' ? 'Khẩn' : 'Thông thường'} · {r.Description.slice(0, 100)}</p>)}</ResourceState><Link className="vet-task" to="/vet/calendar?due=overdue"><span>Lịch y tế quá hạn</span><strong>{eventsReady ? pending.length : 'Chưa có số liệu'} →</strong></Link></section><section className="panel"><h2>Khóa / hạn chế tập đang ghi nhận</h2><ResourceState data={locks}>{!locks.rows.length && <p>Chưa có khóa tập đang hoạt động.</p>}{locks.rows.map(l => <div className="vet-task" key={l.TrainingLockID}><Link to={`/vet/horses/${l.HorseID}?tab=training`}>{l.HorseName || horses.find(h => h.id === String(l.HorseID))?.name}</Link><LockBadge lock={l} /></div>)}</ResourceState></section></div><section className="panel"><h2>Lịch y tế hôm nay và sắp tới</h2><ResourceState data={vaccinations}><ResourceState data={schedules}>{!events.some(r => r.Status !== 'Overdue' && r.day >= clubToday()) && <p>Không có lịch hôm nay hoặc sắp tới.</p>}{events.filter(r => r.Status !== 'Overdue' && r.day >= clubToday()).slice(0, 8).map(r => <Link className="vet-task" key={r.key} to={`/vet/horses/${r.HorseID}?tab=calendar`}><span>{r.HorseName} · {r.label}</span><time>{r.day === clubToday() ? 'Hôm nay' : r.day}</time></Link>)}</ResourceState></ResourceState><Link to="/vet/calendar">Xem toàn bộ lịch →</Link></section></>
+  return <><div className="vet-two-columns"><section className="panel"><h2>Cần xử lý ngay</h2><Link className="vet-task" to="/vet/horses-needing-exam"><span>Khám đầu vào<small>Bác sĩ trực tiếp nhận khám</small></span><strong>{intakeError ? 'Chưa có số liệu' : initialExams.length} →</strong></Link><ResourceState data={reports}><Link className="vet-task" to="/vet/reports?severity=Urgent"><span>Báo cáo khẩn chưa hoàn tất</span><strong>{reports.rows.filter(r => r.Severity === 'Urgent').length} →</strong></Link>{reports.rows.slice(0, 3).map(r => <p key={r.HealthReportID}><Link to="/vet/reports">{r.HorseName}</Link> · {r.Severity === 'Urgent' ? 'Khẩn' : 'Thông thường'} · {r.Description.slice(0, 100)}</p>)}</ResourceState><Link className="vet-task" to="/vet/calendar?due=overdue"><span>Lịch y tế quá hạn</span><strong>{eventsReady ? pending.length : 'Chưa có số liệu'} →</strong></Link></section><section className="panel"><h2>Khóa / hạn chế tập đang ghi nhận</h2><ResourceState data={locks}>{!locks.rows.length && <p>Chưa có khóa tập đang hoạt động.</p>}{locks.rows.map(l => <div className="vet-task" key={l.TrainingLockID}><Link to={`/vet/horses/${l.HorseID}?tab=training`}>{l.HorseName || horses.find(h => h.id === String(l.HorseID))?.name}</Link><LockBadge lock={l} /></div>)}</ResourceState></section></div><section className="panel"><h2>Lịch y tế hôm nay và sắp tới</h2><ResourceState data={vaccinations}><ResourceState data={schedules}>{!events.some(r => r.Status !== 'Overdue' && r.day >= clubToday()) && <p>Không có lịch hôm nay hoặc sắp tới.</p>}{events.filter(r => r.Status !== 'Overdue' && r.day >= clubToday()).slice(0, 8).map(r => <Link className="vet-task" key={r.key} to={`/vet/horses/${r.HorseID}?tab=calendar`}><span>{r.HorseName} · {r.label}</span><time>{r.day === clubToday() ? 'Hôm nay' : r.day}</time></Link>)}</ResourceState></ResourceState><Link to="/vet/calendar">Xem toàn bộ lịch →</Link></section></>
 }

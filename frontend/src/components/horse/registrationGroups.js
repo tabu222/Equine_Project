@@ -33,7 +33,7 @@ export function matchesRegistrationFilter(horse, filter) {
 
 export function registrationGroupLabel(horse) {
   const group = registrationGroup(horse)
-  if (group === 'WaitingExam') return 'Chờ Vet khám và chốt phiếu'
+  if (group === 'WaitingExam') return 'Chờ bác sĩ thú y khám và chốt phiếu'
   if (group === 'Examined') return 'Đã khám, chờ xử lý'
   if (group === 'Submitted') return 'Chờ xác minh'
   if (group === 'Approved') return 'Đã tiếp nhận'

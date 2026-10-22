@@ -1,6 +1,6 @@
 // The legacy FE name ELIGIBLE here means Healthy, never permission to train.
 export const healthLabels = {
-  ELIGIBLE: 'Đủ điều kiện sức khỏe', MONITORING: 'Cần theo dõi', INJURED: 'Chấn thương',
+  ELIGIBLE: 'Khỏe mạnh', MONITORING: 'Cần theo dõi', INJURED: 'Chấn thương',
   ISOLATION: 'Cách ly', RECOVERING: 'Đang hồi phục', NOT_ASSESSED: 'Chưa đánh giá',
 }
 export const recordHealthLabels = { Healthy: 'Khỏe mạnh', Monitor: 'Cần theo dõi', Injured: 'Chấn thương', Recovering: 'Đang hồi phục', Isolated: 'Cách ly' }
