@@ -9,5 +9,3 @@ export const permissionLabels = {
   MEDICAL_MANAGE: 'Quản lý khám và điều trị', MEDICAL_SIGN: 'Chốt phiếu khám', TRAINING_LOCK_MANAGE: 'Quản lý khóa huấn luyện',
   CARE_MANAGE: 'Quản lý chăm sóc', DIET_MANAGE: 'Quản lý khẩu phần', INVENTORY_REQUEST: 'Yêu cầu vật tư', INVENTORY_MANAGE: 'Quản lý kho', OWNER_VIEW: 'Xem thông tin ngựa sở hữu',
 }
-export const itemTypes = { Food: 'Thức ăn', Medicine: 'Vật tư y tế', 'Care Equipment': 'Dụng cụ chăm sóc' }
-export const itemStatuses = { Available: 'Còn hàng', 'Low Stock': 'Sắp hết', 'Out of Stock': 'Hết hàng', Inactive: 'Ngưng sử dụng' }

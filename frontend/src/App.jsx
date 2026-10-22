@@ -53,6 +53,9 @@ import HorseList from './pages/manager/HorseList.jsx'
 import CreateHorse from './pages/manager/CreateHorse.jsx'
 import CompleteIntake from './pages/manager/CompleteIntake.jsx'
 import ProfileChangeRequests from './pages/manager/ProfileChangeRequests.jsx'
+import StaffPage from './pages/manager/StaffPage.jsx'
+import RolesPage from './pages/manager/RolesPage.jsx'
+import './pages/manager/ManagerWorkspace.css'
 
 import OwnerHorses from './pages/owner/OwnerHorses.jsx'
 import OwnerHorseForm from './pages/owner/OwnerHorseForm.jsx'
@@ -168,6 +171,24 @@ function NavIcon({ kind }) {
     strokeLinejoin: 'round',
     'aria-hidden': true,
   }
+
+  const pathByKind = {
+    overview: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+    plan: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z" /><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20" /></>,
+    approval: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4.5h6M8.5 13l2.5 2.5 4.5-5" /></>,
+    schedule: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 10h18M8 14h3M14 14h3" /></>,
+    results: <><path d="M4 20V12M10 20V5M16 20V9M22 20V3" /></>,
+    edit: <><path d="M4 20h4l11-11-4-4L4 16zM13 7l4 4M4 4h7" /></>,
+    staff: <><circle cx="9" cy="8" r="2.5" /><path d="M4.5 18a4.5 4.5 0 0 1 9 0" /><circle cx="17" cy="9" r="2" /><path d="M15 18a3.8 3.8 0 0 1 5 0" /></>,
+    roles: <><path d="M12 3l7 3v5c0 5-3.4 8.1-7 10-3.6-1.9-7-5-7-10V6l7-3Z" /><path d="m9.5 12.2 1.7 1.7 3.4-3.9" /></>,
+    horses: <><path d="M4 20v-4l3-3 2-5 4-3 5 1 2 4-3 2-2-2-2 3 1 4v3" /><path d="M7 20v-3M15 20v-3M13 6l-1-3" /></>,
+    requests: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h3" /><path d="m15 17 2 2 3-4" /></>,
+    activity: <><path d="M3 12h4l3-6 4 12 3-6h4" /><path d="M3 21h18" /></>,
+    supervision: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2" /></>,
+    review: <><path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h4" /><path d="m15 16 1.5 1.5L20 14" /></>,
+    rider: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h8M8 13h8M8 17h5" /><circle cx="18" cy="18" r="3" /></>,
+  }
+  if (pathByKind[kind]) return <svg {...common}>{pathByKind[kind]}</svg>
 
   if (kind === 'owner') {
     return (
@@ -1360,8 +1381,8 @@ function VetHorseRoute({
 
 function AppContent() {
   const location = useLocation()
-  const independentPage = /^\/manager\/(staff|roles|inventory|reports|audit|notifications)(?:\/|$)/.test(location.pathname)
-    || /^\/vet\/(?!horses-needing-exam(?:\/|$))/.test(location.pathname)
+  const independentManagerPage = /^\/manager\/(staff|roles)(?:\/|$)/.test(location.pathname)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const [
     currentUser,
@@ -1689,7 +1710,7 @@ function AppContent() {
             ? '/training/my-plans'
             : role === 'workRider'
               ? '/training/work-rider-sessions'
-              : currentUser?.permissions.includes('HORSE_VIEW') ? '/manager/horses' : '/manager/notifications'
+              : currentUser?.permissions.includes('HORSE_VIEW') ? '/manager/horses' : '/manager/staff'
 
   const ownerList =
     useMemo(
@@ -1789,26 +1810,33 @@ function AppContent() {
   }
 
   return (
-    <div className={`app-shell${role === 'vet' ? ' vet-shell' : ''}`}>
-      <aside className="app-sidebar">
-        <Link
-          className="brand"
-          to={home}
-        >
-          <span className="brand-mark" aria-hidden="true">
-            <img src="/equitrack-mark.jpg" alt="" />
-          </span>
-
-          <span>
-            <strong>
-              EQUITRACK
-            </strong>
-
-            <small>
-              RACEHORSE PERFORMANCE
-            </small>
-          </span>
-        </Link>
+    <div className={`app-shell${sidebarCollapsed ? " sidebar-is-collapsed" : ""}`}>
+      <aside className="app-sidebar" aria-label="Thanh menu">
+        <div className="sidebar-brand-row">
+          <Link className="brand" to={home} title="EquiTrack">
+            <span className="brand-mark" aria-hidden="true">
+              <img src="/equitrack-mark.jpg" alt="" />
+            </span>
+            <span>
+              <strong>EQUITRACK</strong>
+              <small>RACEHORSE PERFORMANCE</small>
+            </span>
+          </Link>
+          <button
+            className="sidebar-collapse-button"
+            type="button"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+            aria-expanded={!sidebarCollapsed}
+            aria-label={sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+            title={sidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+              {sidebarCollapsed ? <path d="m14 9 3 3-3 3" /> : <path d="m17 9-3 3 3 3" />}
+            </svg>
+          </button>
+        </div>
 
         <p className="sidebar-label">
           KHÔNG GIAN LÀM VIỆC
@@ -1821,19 +1849,15 @@ function AppContent() {
           {role ===
             'manager' && (
             <>
-              {[
-                ['/manager/reports', 'Báo cáo câu lạc bộ', 'CLUB_MANAGE'],
-                ['/manager/staff', 'Nhân sự và tài khoản', 'RBAC_MANAGE'],
-                ['/manager/roles', 'Phân quyền vai trò', 'RBAC_MANAGE'],
-                ['/manager/inventory', 'Vật tư và thức ăn', 'INVENTORY_MANAGE'],
-                ['/manager/audit', 'Nhật ký hệ thống', 'AUDIT_VIEW'],
-              ].filter(([, , permission]) => currentUser.permissions.includes(permission)).map(([path, label]) => <NavLink key={path} to={path}><NavIcon kind="manager" /><span>{label}</span></NavLink>)}
-              <NavLink to="/manager/notifications"><NavIcon kind="manager" /><span>Thông báo</span></NavLink>
-              {currentUser.permissions.includes('HORSE_VIEW') && <NavLink
+              {currentUser.permissions.includes('RBAC_MANAGE') && <>
+                <NavLink to="/manager/staff" title="Nhân sự và tài khoản"><NavIcon kind="staff" /><span>Nhân sự và tài khoản</span></NavLink>
+                <NavLink to="/manager/roles" title="Phân quyền vai trò"><NavIcon kind="roles" /><span>Phân quyền vai trò</span></NavLink>
+              </>}
+              <NavLink
                 end
-                to="/manager/horses"
+                to="/manager/horses" title="Danh sách ngựa"
               >
-                <NavIcon kind="manager" />
+                <NavIcon kind="horses" />
 
                 <span>
                   Danh sách ngựa
@@ -1843,8 +1867,8 @@ function AppContent() {
               {currentUser.permissions.includes(
                 'PROFILE_EDIT_APPROVE',
               ) && (
-                <NavLink to="/manager/profile-change-requests">
-                  <NavIcon kind="manager" />
+                <NavLink to="/manager/profile-change-requests" title="Yêu cầu sửa hồ sơ">
+                  <NavIcon kind="requests" />
 
                   <span>
                     Yêu cầu sửa hồ sơ
@@ -1858,17 +1882,17 @@ function AppContent() {
             <>
               <NavLink
                 end
-                to="/owner/horses"
+                to="/owner/horses" title="Ngựa của tôi"
               >
-                <NavIcon kind="owner" />
+                <NavIcon kind="horses" />
 
                 <span>
                   Ngựa của tôi
                 </span>
               </NavLink>
 
-              <NavLink to="/owner/training/activity">
-                <NavIcon kind="manager" />
+              <NavLink to="/owner/training/activity" title="Hoạt động huấn luyện">
+                <NavIcon kind="activity" />
 
                 <span>
                   Hoạt động huấn luyện
@@ -1878,66 +1902,59 @@ function AppContent() {
           )}
 
           {role === 'vet' && (
-            <>
-              {[
-                ['/vet/overview', 'Tổng quan thú y'],
-                ['/vet/horses-needing-exam', 'Khám đầu vào'],
-                ['/vet/intake-results', 'Kết quả khám đầu vào'],
-                ['/vet/herd', 'Sức khỏe toàn đàn'],
-                ['/vet/stalls', 'Sức khỏe theo chuồng'],
-                ['/vet/reports', 'Báo cáo sức khỏe'],
-                ['/vet/calendar', 'Lịch y tế'],
-                ['/vet/notifications', 'Thông báo'],
-              ].map(([path, label]) => (
-                <NavLink key={path} end to={path}>
-                  <NavIcon kind="vet" />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
-            </>
+            <NavLink
+              end
+              to="/vet/horses-needing-exam" title="Hàng đợi khám"
+            >
+              <NavIcon kind="vet" />
+
+              <span>
+                Hàng đợi khám
+              </span>
+            </NavLink>
           )}
 
           {role === 'headTrainer' && (
             <>
               <NavLink
                 end
-                to="/training/dashboard"
+                to="/training/dashboard" title="Tổng quan huấn luyện"
               >
-                <NavIcon kind="manager" />
+                <NavIcon kind="overview" />
 
                 <span>
                   Tổng quan huấn luyện
                 </span>
               </NavLink>
 
-              <NavLink to="/training/plans">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/plans" title="Giáo án huấn luyện">
+                <NavIcon kind="plan" />
                 <span>Giáo án huấn luyện</span>
               </NavLink>
 
-              <NavLink to="/training/approvals">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/approvals" title="Duyệt giáo án">
+                <NavIcon kind="approval" />
 
                 <span>
                   Duyệt giáo án
                 </span>
               </NavLink>
 
-              <NavLink to="/training/schedule">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/schedule" title="Lịch tập">
+                <NavIcon kind="schedule" />
 
                 <span>
                   Lịch tập
                 </span>
               </NavLink>
 
-              <NavLink to="/training/results">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/results" title="Kết quả tập luyện">
+                <NavIcon kind="results" />
                 <span>Kết quả tập luyện</span>
               </NavLink>
 
-              <NavLink to="/training/adjustments">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/adjustments" title="Điều chỉnh giáo án">
+                <NavIcon kind="edit" />
 
                 <span>
                   Điều chỉnh giáo án
@@ -1950,32 +1967,32 @@ function AppContent() {
             <>
               <NavLink
                 end
-                to="/training/my-plans"
+                to="/training/my-plans" title="Ngựa và giáo án"
               >
-                <NavIcon kind="manager" />
+                <NavIcon kind="plan" />
 
                 <span>
                   Ngựa & giáo án
                 </span>
               </NavLink>
 
-              <NavLink to="/training/schedule">
-  <NavIcon kind="manager" />
+              <NavLink to="/training/schedule" title="Lịch tập">
+  <NavIcon kind="schedule" />
 
   <span>
     Lịch tập
   </span>
 </NavLink>
 
-              <NavLink to="/training/trainer-sessions">
-                <NavIcon kind="manager" />
+              <NavLink to="/training/trainer-sessions" title="Buổi tập giám sát">
+                <NavIcon kind="supervision" />
 
                 <span>
                   Buổi tập giám sát
                 </span>
               </NavLink>
-              <NavLink to="/training/reviews">
-  <NavIcon kind="manager" />
+              <NavLink to="/training/reviews" title="Đánh giá buổi tập">
+  <NavIcon kind="review" />
 
   <span>
     Đánh giá buổi tập
@@ -1987,9 +2004,9 @@ function AppContent() {
           {role === 'workRider' && (
             <NavLink
               end
-              to="/training/work-rider-sessions"
+              to="/training/work-rider-sessions" title="Buổi tập của tôi"
             >
-              <NavIcon kind="manager" />
+              <NavIcon kind="rider" />
 
               <span>
                 Buổi tập của tôi
@@ -2029,6 +2046,9 @@ function AppContent() {
           </div>
 
           <div className="topbar-account">
+            <time className="topbar-date" dateTime={new Date().toISOString().slice(0, 10)}>
+              {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}
+            </time>
             <div className="topbar-user">
               <span
                 className="avatar"
@@ -2072,7 +2092,7 @@ function AppContent() {
           </div>
         </header>
 
-        {loadError && !independentPage && (
+        {loadError && !independentManagerPage && (
           <div
             className="alert-banner"
             role="alert"
@@ -2101,7 +2121,7 @@ function AppContent() {
           </div>
         )}
 
-        {loadingData && !independentPage && (
+        {loadingData && !independentManagerPage && (
           <main className="page-content">
             <section
               className="panel"
@@ -2112,20 +2132,14 @@ function AppContent() {
           </main>
         )}
 
-        {(independentPage || (!loadingData && !loadError)) && (
+        {(independentManagerPage || (!loadingData && !loadError)) && (
           <Routes>
-            {[
-              ['staff', 'RBAC_MANAGE', <StaffPage key="staff" currentUser={currentUser} onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật thông tin tài khoản.')) }} />],
-              ['roles', 'RBAC_MANAGE', <RolesPage key="roles" onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật quyền. Vui lòng đăng nhập lại.')) }} />],
-              ['inventory', 'INVENTORY_MANAGE', <InventoryPage key="inventory" />],
-              ['reports', 'CLUB_MANAGE', <ManagerReports key="reports" />],
-              ['audit', 'AUDIT_VIEW', <AuditPage key="audit" />],
-            ].map(([path, permission, element]) => <Route key={path} path={`/manager/${path}`} element={role === 'manager' && currentUser.permissions.includes(permission) ? element : <Navigate to={home} replace />} />)}
-            {['manager', 'vet'].map(workspace => <Route key={`${workspace}-notifications`} path={`/${workspace}/notifications`} element={role === workspace ? <NotificationsPage currentUser={currentUser} role={role} /> : <Navigate to={home} replace />} />)}
-            {['overview', 'herd', 'intake-results', 'stalls', 'reports', 'calendar'].map(mode => <Route key={mode}
-              path={`/vet/${mode}`} element={role === 'vet' && currentUser.permissions.includes('HORSE_VIEW')
-                ? <VetWorkspace currentUser={currentUser} mode={mode} initialExams={initialExams} intakeError={loadingData || loadError} />
-                : <Navigate to={home} replace />} />)}
+            <Route path="/manager/staff" element={role === 'manager' && currentUser.permissions.includes('RBAC_MANAGE')
+              ? <StaffPage currentUser={currentUser} onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật thông tin tài khoản.')) }} />
+              : <Navigate to={home} replace />} />
+            <Route path="/manager/roles" element={role === 'manager' && currentUser.permissions.includes('RBAC_MANAGE')
+              ? <RolesPage onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật quyền. Vui lòng đăng nhập lại.')) }} />
+              : <Navigate to={home} replace />} />
             <Route
               path="/manager/horses"
               element={
