@@ -11117,3 +11117,46 @@ button {
   .app-main .topbar { min-height: 68px; padding-inline: 14px; }
   .app-main .topbar .topbar-date { font-size: 11px; padding-right: 0; }
 }
+
+/* ============================================================
+   FIX 22/10/2026: Anh ngua chi hien thi MOT LAN o banner dau trang.
+   Khac phuc nen lap / duong cat doc / con ngua xuat hien lan 2.
+   ============================================================ */
+.app-main {
+  background-color: #f4f2eb;
+}
+.app-main::before {
+  /* Ghi de cac khai bao 'repeat' va '920px auto' o phia tren. */
+  inset: 76px 0 auto 0;
+  width: 100%;
+  height: clamp(200px, 18vw, 285px);
+  opacity: 1;
+  background-color: transparent;
+  background-image:
+    linear-gradient(90deg,
+      rgba(248,247,242,.80) 0%,
+      rgba(248,247,242,.56) 34%,
+      rgba(248,247,242,.14) 75%,
+      rgba(248,247,242,.28) 100%),
+    url('/dashboard-horse.png');
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, cover;
+  background-position: center, center 47%;
+  background-attachment: scroll, scroll;
+}
+@media (max-width: 920px) {
+  .app-main::before {
+    inset: 76px 0 auto 0;
+    height: 220px;
+    background-size: 100% 100%, cover;
+    background-position: center, 62% center;
+    background-repeat: no-repeat, no-repeat;
+  }
+}
+@media (max-width: 680px) {
+  .app-main::before {
+    inset: 68px 0 auto 0;
+    height: 175px;
+    background-position: center, 68% center;
+  }
+}
