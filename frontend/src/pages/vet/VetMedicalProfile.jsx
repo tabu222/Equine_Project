@@ -53,7 +53,7 @@ function RecordDetails({ record, canAmend }) {
       ...(record.recordStatus === 'Signed' ? [['Người chốt', record.vetName], ['Thời điểm chốt', vetDateTime(record.signedAt)]] : []),
     ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Chưa ghi nhận'}</dd></div>)}</dl>
     {record.recordStatus === 'Signed' && <section className="vet-amendments"><h3>Đính chính bệnh án</h3><p>Phiếu đã chốt được giữ nguyên. Chốt phiếu là xác nhận trong hệ thống, chưa phải chữ ký số.</p>
-      {error && <p className="error-message" role="alert">{error} <button type="button" onClick={() => { setItems(null); setRetry(v => v + 1) }}>Tải lại lịch sử</button></p>}
+      {error && <p className="error-message" role="alert">{error} <></></p>}
       {!items && !error && <p role="status">Đang tải lịch sử đính chính…</p>}
       {items?.length === 0 && <p>Chưa có đính chính.</p>}
       {items?.map(item => <article className="vet-amendment" key={item.id}><strong>{item.author} · {vetDateTime(item.at)}</strong><p>Lý do: {item.reason}</p><p>{item.content}</p></article>)}
@@ -82,7 +82,7 @@ export default function VetMedicalProfile({ horse, records, currentUser, onRefre
   }
   return <main className="page-content vet-workspace">
     <Link className="breadcrumb-back-button" to="/vet/herd">← Sức khỏe toàn đàn</Link>
-    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div><div className="profile-actions"><button className="button button-secondary" disabled={refreshing} onClick={refresh}>{refreshing ? 'Đang tải…' : 'Tải lại hồ sơ'}</button><a className="button vet-emergency" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div></header>
+    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div><div className="profile-actions"><a className="button vet-emergency" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div></header>
     <div id="vet-emergency-lock"><TrainingLocks key={horse.id} horse={horse} currentUser={currentUser} compact={tab !== 'training'} onChanged={() => { void refresh() }} /></div>
     {refreshError && <p className="error-message" role="alert">{refreshError}</p>}
     <div className="vet-profile-badges"><HealthBadge status={horse.healthStatus} /><TrainingBadge record={latest} /></div>

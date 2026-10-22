@@ -9,3 +9,18 @@ export const permissionLabels = {
   MEDICAL_MANAGE: 'Quản lý khám và điều trị', MEDICAL_SIGN: 'Chốt phiếu khám', TRAINING_LOCK_MANAGE: 'Quản lý khóa huấn luyện',
   CARE_MANAGE: 'Quản lý chăm sóc', DIET_MANAGE: 'Quản lý khẩu phần', INVENTORY_REQUEST: 'Yêu cầu vật tư', INVENTORY_MANAGE: 'Quản lý kho', OWNER_VIEW: 'Xem thông tin ngựa sở hữu',
 }
+
+// Mã loại vật tư và trạng thái trùng khớp lựa chọn từ backend/apps/care/models.py.
+// Không thay đổi giá trị (key) vì API lưu và lọc theo các mã này.
+export const itemTypes = {
+  Food: 'Thức ăn',
+  Medicine: 'Thuốc',
+  'Care Equipment': 'Dụng cụ chăm sóc',
+}
+
+export const itemStatuses = {
+  Available: 'Còn hàng',
+  'Low Stock': 'Sắp hết hàng',
+  'Out of Stock': 'Hết hàng',
+  Inactive: 'Ngừng sử dụng',
+}

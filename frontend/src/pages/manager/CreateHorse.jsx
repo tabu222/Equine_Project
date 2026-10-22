@@ -67,7 +67,7 @@ function CreateHorse() {
               <option value="">{ownersLoading ? 'Đang tải chủ ngựa...' : 'Chọn chủ ngựa'}</option>
               {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.fullName} ({owner.email})</option>)}
             </select>
-            {ownersError && <small role="alert">{ownersError} <button type="button" className="text-button" onClick={() => void loadOwners()}>Thử lại</button></small>}
+            {ownersError && <small role="alert">{ownersError}</small>}
             {!ownersLoading && !ownersError && owners.length === 0 && <small>Chưa có tài khoản chủ ngựa hoạt động để chọn.</small>}
           </label>
           <label className="form-field"><span>Tên ngựa <b aria-hidden="true">*</b></span><input required maxLength={100} value={form.name} onChange={(event) => update('name', event.target.value)} /></label>

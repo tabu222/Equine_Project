@@ -67,7 +67,7 @@ function ProfileChangeRequests({ onHorseRefresh }) {
           <p>So sánh thông tin, ảnh và tài liệu Owner đề nghị. Duyệt sẽ áp dụng toàn bộ thay đổi trong yêu cầu.</p>
         </div>
       </header>
-      {error && <section className="panel" role="alert"><p>{error}</p>{requests.length === 0 && <button className="button" type="button" onClick={() => { setLoading(true); setReloadCount((count) => count + 1) }}>Thử lại</button>}</section>}
+      {error && <section className="panel" role="alert"><p>{error}</p>{requests.length === 0 && <></>}</section>}
       {requests.length === 0 ? (
         <section className="panel"><p>Chưa có yêu cầu sửa hồ sơ.</p></section>
       ) : (

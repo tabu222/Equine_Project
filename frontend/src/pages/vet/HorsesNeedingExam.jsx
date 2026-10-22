@@ -49,14 +49,14 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
           <h1>Hàng chờ khám đầu vào</h1>
           <p>Bác sĩ thú y trực tiếp nhận khám. <Link to="/vet/intake-results">Xem kết quả khám đầu vào →</Link></p>
         </div>
-        <button className="button button-secondary" type="button" onClick={onRetry}>Làm mới hàng chờ</button>
+        <></>
       </header>
       <p className="vet-caption">Thời gian chờ hiện tính từ lúc gửi hồ sơ tiếp nhận. Chưa có mốc riêng cho lúc chuyển sang chờ khám.</p>
 
       {loadError && (
         <section className="panel" role="alert">
           <p>{loadError}</p>
-          <button className="button" type="button" onClick={onRetry}>Thử lại</button>
+          <></>
         </section>
       )}
 

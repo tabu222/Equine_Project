@@ -221,20 +221,7 @@ export default function HeadTrainerAdjustmentsPage() {
           </p>
         </div>
 
-        <button
-          className="button button-secondary"
-          type="button"
-          disabled={
-            refreshing
-          }
-          onClick={() =>
-            void refresh()
-          }
-        >
-          {refreshing
-            ? 'Đang làm mới...'
-            : 'Làm mới'}
-        </button>
+        <></>
       </div>
 
       {error && (

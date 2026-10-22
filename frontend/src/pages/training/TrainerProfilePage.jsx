@@ -1044,15 +1044,7 @@ export default function TrainerProfilePage() {
             {error}
           </p>
 
-          <button
-            className="button"
-            type="button"
-            onClick={() =>
-              void refresh()
-            }
-          >
-            Thử lại
-          </button>
+          <></>
         </section>
       </main>
     )
@@ -1095,21 +1087,7 @@ export default function TrainerProfilePage() {
         </div>
 
         <div className="trainer-profile-heading-actions">
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={
-              refreshing ||
-              busy
-            }
-            onClick={() =>
-              void refresh()
-            }
-          >
-            {refreshing
-              ? 'Đang làm mới...'
-              : 'Làm mới'}
-          </button>
+          <></>
 
           <Link
             className="button button-secondary"

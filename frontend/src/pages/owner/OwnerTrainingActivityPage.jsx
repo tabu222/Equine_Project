@@ -511,20 +511,7 @@ export default function OwnerTrainingActivityPage() {
           </p>
         </div>
 
-        <button
-          className="button button-secondary"
-          type="button"
-          disabled={
-            refreshing
-          }
-          onClick={() =>
-            void refresh()
-          }
-        >
-          {refreshing
-            ? 'Đang tải...'
-            : 'Tải lại'}
-        </button>
+        <></>
       </div>
 
       {error && (

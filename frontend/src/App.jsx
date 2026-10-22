@@ -75,12 +75,9 @@ import VetWorkspace from './pages/vet/VetWorkspace.jsx'
 import VetMedicalProfile from './pages/vet/VetMedicalProfile.jsx'
 import { vetError } from './pages/vet/vetDomain.js'
 import NotificationsPage from './pages/vet/NotificationsPage.jsx'
-import StaffPage from './pages/manager/StaffPage.jsx'
-import RolesPage from './pages/manager/RolesPage.jsx'
 import InventoryPage from './pages/manager/InventoryPage.jsx'
 import ManagerReports from './pages/manager/ManagerReports.jsx'
 import AuditPage from './pages/manager/AuditPage.jsx'
-import './pages/manager/ManagerWorkspace.css'
 
 import HeadTrainerTrainingDashboard, { HeadTrainerResultsPage } from './pages/training/HeadTrainerTrainingDashboard.jsx'
 import HorseAssessmentAssignmentPage from './pages/training/HorseAssessmentAssignmentPage.jsx'
@@ -107,8 +104,6 @@ import HorseProfile from './components/horse/HorseProfile.jsx'
 import {
   registrationGroupLabel,
 } from './components/horse/registrationGroups.js'
-
-
 
 import StatusBadge from './components/common/StatusBadge.jsx'
 import LandingPage from './pages/landing/LandingPage.jsx'
@@ -548,15 +543,7 @@ function HorseProfilePage({
       />
 
       {horse && (
-        <button
-          className="button button-secondary"
-          type="button"
-          onClick={() =>
-            void onRefresh(horse.id)
-          }
-        >
-          Tải lại hồ sơ
-        </button>
+        <></>
       )}
     </main>
   )
@@ -701,17 +688,7 @@ function HorseProfileRoute({
 
           <p>{error}</p>
 
-          <button
-            className="button"
-            type="button"
-            onClick={() => {
-              setError('')
-              setLoadedHorseId('')
-              void load()
-            }}
-          >
-            Thử lại
-          </button>
+          <></>
         </section>
       </main>
     )
@@ -920,16 +897,7 @@ function ManagerIntakeRoute({
               'Không tìm thấy hồ sơ ngựa.'}
           </p>
 
-          <button
-            className="button"
-            type="button"
-            onClick={() => {
-              setLoadedId('')
-              void loadHorse()
-            }}
-          >
-            Thử lại
-          </button>
+          <></>
         </section>
       </main>
     )
@@ -1108,20 +1076,7 @@ function OwnerCorrectionRoute({
 
           <p>{error}</p>
 
-          <button
-            className="button"
-            type="button"
-            onClick={() => {
-              setLoading(true)
-
-              setReloadCount(
-                (count) =>
-                  count + 1,
-              )
-            }}
-          >
-            Thử lại
-          </button>
+          <></>
         </section>
       </main>
     )
@@ -1268,17 +1223,7 @@ function VetHorseRoute({
 
           <p>{error}</p>
 
-          <button
-            className="button"
-            type="button"
-            onClick={() => {
-              setError('')
-              setLoadedHorseId('')
-              void load()
-            }}
-          >
-            Thử lại
-          </button>
+          <></>
         </section>
       </main>
     )
@@ -1862,7 +1807,7 @@ function AppContent() {
                 <span>
                   Danh sách ngựa
                 </span>
-              </NavLink>}
+              </NavLink>
 
               {currentUser.permissions.includes(
                 'PROFILE_EDIT_APPROVE',
@@ -2110,14 +2055,7 @@ function AppContent() {
           >
             {loadError}{' '}
 
-            <button
-              type="button"
-              onClick={
-                retryLoad
-              }
-            >
-              Thử lại
-            </button>
+            <></>
           </div>
         )}
 

@@ -26,7 +26,7 @@ export default function StaffPage({ currentUser, onIdentityChanged }) {
     const values = Object.fromEntries(new FormData(event.currentTarget))
     await action.run('/users', values)
   }
-  return <main className="page-content manager-workspace"><header className="page-heading"><div><p className="eyebrow">QUẢN LÝ CÂU LẠC BỘ</p><h1>Nhân sự và tài khoản</h1><p>Nhân sự nội bộ và chủ ngựa được quản lý riêng.</p></div><button className="button button-secondary" onClick={data.reload} disabled={data.loading}>Làm mới</button></header>
+  return <main className="page-content manager-workspace"><header className="page-heading"><div><p className="eyebrow">QUẢN LÝ CÂU LẠC BỘ</p><h1>Nhân sự và tài khoản</h1><p>Nhân sự nội bộ và chủ ngựa được quản lý riêng.</p></div><></></header>
     <section className="panel"><div className="vet-toolbar"><Field label="Tìm theo tên, email hoặc điện thoại" name="search" type="search" value={search} onChange={e => setSearch(e.target.value)} />
       <Field label="Nhóm tài khoản" name="group" value={group} onChange={e => { setGroup(e.target.value); setRole('') }} options={[["staff", 'Nhân sự nội bộ'], ['owners', 'Chủ ngựa']]} />
       <Field label="Vai trò" name="filter-role" value={role} onChange={e => setRole(e.target.value)} options={[["", 'Tất cả'], ...roleOptions]} />

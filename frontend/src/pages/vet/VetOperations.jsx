@@ -9,7 +9,7 @@ import { Feedback, Field } from '../../components/common/OperationUI.jsx'
 
 export function ResourceState({ data, children }) {
   if (data.loading) return <p role="status">Đang tải dữ liệu…</p>
-  if (data.error) return <div role="alert"><p>{data.error}</p><button type="button" className="button button-secondary" onClick={data.reload}>Thử lại</button></div>
+  if (data.error) return <div role="alert"><p>{data.error}</p><></></div>
   return children
 }
 
@@ -122,7 +122,7 @@ export function VetReports({ horses, currentUser }) {
   const canManage = currentUser.permissions.includes('MEDICAL_MANAGE')
   const rows = data.rows.filter(r => (!params.get('report') || String(r.HealthReportID) === params.get('report')) && (!severity || r.Severity === severity) && (status === 'all' || (status === 'open' ? r.Status !== 'Resolved' : r.Status === status))).sort((a, b) => (a.Severity === 'Urgent' ? 0 : 1) - (b.Severity === 'Urgent' ? 0 : 1) || a.ReportedAt.localeCompare(b.ReportedAt))
   function filter(key, value) { const next = new URLSearchParams(params); next.set(key, value); setParams(next) }
-  return <section className="panel"><h2>Tiếp nhận báo cáo sức khỏe</h2><div className="vet-toolbar"><label className="form-field"><span>Mức độ</span><select value={severity} onChange={e => filter('severity', e.target.value)}><option value="">Tất cả mức độ</option><option value="Urgent">Khẩn</option><option value="Normal">Thông thường</option></select></label><label className="form-field"><span>Tiến trình</span><select value={status} onChange={e => filter('status', e.target.value)}>{Object.entries({ open: 'Chưa xử lý xong', all: 'Tất cả', Reported: 'Chờ nhận', Reviewing: 'Đang xử lý', Resolved: 'Đã xử lý' }).map(([v, l]) => <option value={v} key={v}>{l}</option>)}</select></label><button className="button button-secondary" onClick={data.reload}>Làm mới báo cáo</button></div><ResourceState data={data}>{!rows.length && <p className="vet-empty">Không có báo cáo phù hợp.</p>}{rows.map(r => <ReportCard key={r.HealthReportID} report={r} horse={horses.find(h => String(h.id) === String(r.HorseID))} currentUser={currentUser} canManage={canManage} reload={data.reload} />)}</ResourceState></section>
+  return <section className="panel"><h2>Tiếp nhận báo cáo sức khỏe</h2><div className="vet-toolbar"><label className="form-field"><span>Mức độ</span><select value={severity} onChange={e => filter('severity', e.target.value)}><option value="">Tất cả mức độ</option><option value="Urgent">Khẩn</option><option value="Normal">Thông thường</option></select></label><label className="form-field"><span>Tiến trình</span><select value={status} onChange={e => filter('status', e.target.value)}>{Object.entries({ open: 'Chưa xử lý xong', all: 'Tất cả', Reported: 'Chờ nhận', Reviewing: 'Đang xử lý', Resolved: 'Đã xử lý' }).map(([v, l]) => <option value={v} key={v}>{l}</option>)}</select></label><></></div><ResourceState data={data}>{!rows.length && <p className="vet-empty">Không có báo cáo phù hợp.</p>}{rows.map(r => <ReportCard key={r.HealthReportID} report={r} horse={horses.find(h => String(h.id) === String(r.HorseID))} currentUser={currentUser} canManage={canManage} reload={data.reload} />)}</ResourceState></section>
 }
 
 function ReportCard({ report: r, horse, currentUser, canManage, reload }) {

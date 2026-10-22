@@ -6,7 +6,7 @@ import { permissionLabels, roleLabels } from './managerLabels.js'
 export default function RolesPage({ onIdentityChanged }) {
   const data = useResource('/roles')
   const reset = useAction(() => { data.reload(); onIdentityChanged?.() })
-  return <main className="page-content manager-workspace"><header className="page-heading"><div><h1>Phân quyền vai trò</h1><p>Quyền của vai trò dùng chung cho mọi câu lạc bộ. Thay đổi có hiệu lực ngay sau khi lưu.</p></div><button className="button button-secondary" onClick={data.reload} disabled={data.loading || reset.busy}>Làm mới</button></header><Feedback action={reset} /><button className="button button-secondary" disabled={data.loading || !!data.error || reset.busy} onClick={() => { if (window.confirm('Khôi phục quyền mặc định cho tất cả vai trò, áp dụng cho mọi câu lạc bộ?')) void reset.run('/roles/reset-defaults') }}>Khôi phục quyền mặc định</button><DataState data={data}>
+  return <main className="page-content manager-workspace"><header className="page-heading"><div><h1>Phân quyền vai trò</h1><p>Quyền của vai trò dùng chung cho mọi câu lạc bộ. Thay đổi có hiệu lực ngay sau khi lưu.</p></div><></></header><Feedback action={reset} /><button className="button button-secondary" disabled={data.loading || !!data.error || reset.busy} onClick={() => { if (window.confirm('Khôi phục quyền mặc định cho tất cả vai trò, áp dụng cho mọi câu lạc bộ?')) void reset.run('/roles/reset-defaults') }}>Khôi phục quyền mặc định</button><DataState data={data}>
     {data.value?.Roles.map(role => <RolePermissions key={`${role.RoleCode}:${role.Permissions.join(',')}`} role={role} matrix={data.value} onChanged={() => { data.reload(); onIdentityChanged?.() }} />)}
   </DataState></main>
 }

@@ -633,21 +633,7 @@ export default function TrainerSessionsPage() {
           </p>
         </div>
 
-        <button
-          className="button button-secondary"
-          type="button"
-          disabled={
-            refreshing ||
-            busy
-          }
-          onClick={() =>
-            void refresh()
-          }
-        >
-          {refreshing
-            ? 'Đang làm mới...'
-            : 'Làm mới'}
-        </button>
+        <></>
       </div>
 
       {error && (

@@ -170,7 +170,7 @@ function HorseList({ owners = [], canCreate = false }) {
           <label className="filter-field" htmlFor="status-filter"><span>Trạng thái hồ sơ</span><select id="status-filter" value={selectedFilter} onChange={(event) => selectFilter(event.target.value)}>{registrationFilters.map(([value, label]) => <option key={value} value={value}>{label} ({groupCounts[value]})</option>)}</select></label>
           <label className="filter-field" htmlFor="health-filter"><span>Tình trạng sức khỏe</span><select id="health-filter" value={selectedHealth} onChange={(event) => { setSelectedHealth(event.target.value); setPage(1) }}><option value="All">Tất cả tình trạng</option>{healthFilters.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <button className="clear-filter-button" type="button" onClick={clearFilters}>Xóa bộ lọc</button>
-          <button className="button button-secondary" type="button" onClick={refresh} disabled={loading}>{loading ? 'Đang tải...' : 'Làm mới'}</button>
+          <></>
         </div>
         <div className="horse-group-counts" aria-label="Số hồ sơ theo trạng thái">
           {registrationFilters.filter(([value]) => value !== 'All' && value !== 'NeedsAction').map(([value, label]) => (
@@ -182,7 +182,7 @@ function HorseList({ owners = [], canCreate = false }) {
       </section>
       <section className="table-card" aria-label="Danh sách ngựa">
         <div className="table-header"><div><h2>{filterLabel}</h2><p>Đang hiển thị {firstResult}–{lastResult} trong {filteredHorses.length} ngựa</p></div></div>
-        {error ? <div className="horse-list-empty" role="alert"><p className="error-message">{error}</p><button className="button" type="button" onClick={refresh}>Thử lại</button></div>
+        {error ? <div className="horse-list-empty" role="alert"><p className="error-message">{error}</p><></></div>
           : loading ? <p className="table-loading" role="status">Đang tải danh sách ngựa...</p>
             : filteredHorses.length === 0 ? (
               <div className="horse-list-empty"><EmptyState title="Không tìm thấy ngựa" description={selectedFilter === 'NeedsAction' ? 'Không có hồ sơ nào cần quản lý xử lý theo điều kiện hiện tại.' : 'Không có ngựa phù hợp với tìm kiếm và bộ lọc hiện tại.'} /><button className="clear-filter-button" type="button" onClick={clearFilters}>Xóa bộ lọc</button></div>

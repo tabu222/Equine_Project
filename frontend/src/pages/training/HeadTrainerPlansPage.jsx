@@ -76,10 +76,7 @@ export default function HeadTrainerPlansPage() {
           <h1>Giáo án huấn luyện</h1>
           <p>Xem giáo án, các giai đoạn và bài tập của ngựa trong câu lạc bộ.</p>
         </div>
-        <button type="button" className="button button-secondary" disabled={loading || refreshing}
-          onClick={() => void load(true)}>
-          {refreshing ? 'Đang tải...' : 'Làm mới'}
-        </button>
+        <></>
       </div>
 
       <section className="panel" style={{ marginBottom: 16 }}>

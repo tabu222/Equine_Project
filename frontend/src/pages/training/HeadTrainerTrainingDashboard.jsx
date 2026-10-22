@@ -493,14 +493,7 @@ export default function HeadTrainerTrainingDashboard() {
           
         </div>
 
-        <button
-          className="button button-secondary"
-          type="button"
-          disabled={refreshing}
-          onClick={refresh}
-        >
-          {refreshing ? 'Đang tải...' : 'Làm mới'}
-        </button>
+        <></>
       </div>
 
       {error && (
@@ -518,14 +511,7 @@ export default function HeadTrainerTrainingDashboard() {
             </span>
           </div>
 
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={refreshing}
-            onClick={refresh}
-          >
-            Thử lại
-          </button>
+          <></>
         </div>
       )}
 
@@ -1110,14 +1096,7 @@ export function HeadTrainerResultsPage() {
 
       <div className="page-heading training-results-page-heading">
         <h1>Kết quả tập luyện</h1>
-        <button
-          className="button button-secondary"
-          type="button"
-          disabled={loading}
-          onClick={() => setReload((value) => value + 1)}
-        >
-          {loading ? 'Đang tải...' : 'Làm mới'}
-        </button>
+        <></>
       </div>
 
       {loading ? (
@@ -1126,9 +1105,7 @@ export function HeadTrainerResultsPage() {
         <div className="training-results-failure" role="alert">
           <strong>Không thể tải kết quả tập luyện</strong>
           <p>{error}</p>
-          <button className="button button-secondary" type="button" onClick={() => setReload((value) => value + 1)}>
-            Thử lại
-          </button>
+          <></>
         </div>
       ) : (
         <>

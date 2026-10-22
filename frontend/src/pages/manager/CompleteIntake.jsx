@@ -159,7 +159,7 @@ function CompleteIntake({ horses, horse: horseOverride, stalls = [], stallError 
                 <option value="">Không xếp chuồng lúc tiếp nhận</option>
                 {stalls.map((stall) => <option key={stall.id} value={stall.id}>{stall.stallNumber} · #{stall.id}</option>)}
               </select>
-              {stallError && <span className="error-message" role="alert">{stallError} <button type="button" className="button button-secondary" onClick={onRetryStalls}>Tải lại chuồng</button></span>}
+              {stallError && <span className="error-message" role="alert">{stallError} <></></span>}
               {!stallError && stalls.length === 0 && <span>Không có chuồng trống; có thể tiếp nhận mà chưa xếp chuồng.</span>}
             </label>
             <label className="form-field"><span>Ghi chú quản lý</span><textarea rows="3" value={managerNote} onChange={(event) => setManagerNote(event.target.value)} maxLength={1000} /></label>

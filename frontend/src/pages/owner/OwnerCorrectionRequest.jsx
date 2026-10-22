@@ -174,7 +174,7 @@ export default function OwnerCorrectionRequest({ horse: initialHorse, requests: 
   }
 
   if (loading) return <section className="correction-page panel" role="status">Đang tải hồ sơ và danh mục tài liệu…</section>
-  if (!horse || !options) return <section className="correction-page panel" role="alert"><p>{error || 'Không tìm thấy hồ sơ ngựa.'}</p><button className="button" onClick={() => { setLoading(true); setReload((n) => n + 1) }}>Thử lại</button></section>
+  if (!horse || !options) return <section className="correction-page panel" role="alert"><p>{error || 'Không tìm thấy hồ sơ ngựa.'}</p><></></section>
   return <section className="page-content correction-page">
     <Link className="correction-page__back" to={`/owner/horses/${horseId}`}>← Hồ sơ ngựa / {horse.name}</Link>
     <header className="correction-page__header"><div><p className="correction-page__eyebrow">HỒ SƠ NGỰA</p><h1>Yêu cầu cập nhật hồ sơ</h1><p className="correction-page__subtitle">Chọn thông tin muốn thay đổi. Hồ sơ hiện tại được giữ nguyên cho đến khi yêu cầu được duyệt.</p></div></header>

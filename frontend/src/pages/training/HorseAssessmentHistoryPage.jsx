@@ -481,18 +481,7 @@ export default function HorseAssessmentHistoryPage() {
         </div>
 
         <div className="assessment-history-heading-actions">
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={refreshing}
-            onClick={() =>
-              void refresh()
-            }
-          >
-            {refreshing
-              ? 'Đang làm mới...'
-              : 'Làm mới'}
-          </button>
+          <></>
 
           <Link
             className="button"
@@ -518,16 +507,7 @@ export default function HorseAssessmentHistoryPage() {
             </span>
           </div>
 
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={refreshing}
-            onClick={() =>
-              void refresh()
-            }
-          >
-            Thử lại
-          </button>
+          <></>
         </div>
       )}
 

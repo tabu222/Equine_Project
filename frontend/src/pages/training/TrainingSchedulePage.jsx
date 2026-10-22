@@ -692,18 +692,7 @@ export default function TrainingSchedulePage({
         </div>
 
         <div className="training-schedule-heading-actions">
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={refreshing}
-            onClick={() =>
-              void loadRange()
-            }
-          >
-            {refreshing
-              ? 'Đang làm mới...'
-              : 'Làm mới'}
-          </button>
+          <></>
 
           {plans.length >
             0 && (

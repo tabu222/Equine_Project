@@ -1,6 +1,6 @@
 export function DataState({ data, children }) {
   if (data.loading) return <p role="status">Đang tải dữ liệu…</p>
-  if (data.error) return <div role="alert"><p>{data.error}</p><button type="button" className="button button-secondary" onClick={data.reload}>Thử lại</button></div>
+  if (data.error) return <div role="alert"><p>{data.error}</p><></></div>
   return children
 }
 
