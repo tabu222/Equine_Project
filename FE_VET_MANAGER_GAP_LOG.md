@@ -1,5 +1,7 @@
 # Bàn giao frontend Bác sĩ thú y và Quản lý câu lạc bộ
 
+> Phần Veterinarian đã có lượt hoàn thiện mới: [bàn giao source/UI/kiểm thử 22/10/2026](backend/docs/VET_WORKSPACE_20261022.md). Báo cáo bên dưới giữ làm lịch sử tích hợp; nội dung lịch chỉ xác nhận trạng thái hoàn thành không còn là hành vi UI hiện tại. Lượt mới không sửa các màn hình Quản lý hay đồng bộ GitHub.
+
 Ngày đối chiếu: 22/10/2026. Backend làm căn cứ: `d4e69c4` từ `origin/main`.
 
 ## Đồng bộ GitHub và phạm vi thay đổi

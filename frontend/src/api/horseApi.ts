@@ -544,6 +544,7 @@ function mapMedicalRecord(value: unknown): MedicalRecord {
     registrationRequestId: record.RegistrationRequestID == null
       ? undefined
       : String(record.RegistrationRequestID),
+    trainingSessionId: record.TrainingSessionID == null ? undefined : String(record.TrainingSessionID),
     examType: typeof record.ExamType === 'string' ? record.ExamType : '',
     examDate: typeof record.ExamDate === 'string' ? record.ExamDate : '',
     weightKg: record.WeightKg == null || !Number.isFinite(Number(record.WeightKg)) ? undefined : Number(record.WeightKg),

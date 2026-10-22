@@ -1,72 +1,26 @@
-import { vetDateTime } from './vetDomain.js'
-import { useEffect, useRef, useState } from 'react'
+import { examLabels, recordHealthLabels, trainingLabels, vetDate, vetDateTime } from './vetDomain.js'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { addMedicalAmendment, getMedicalAmendments } from '../../api/vetApi.ts'
+import RecordDetails from './VetRecordDetails.jsx'
 import HorseAvatar from '../../components/horse/HorseAvatar.jsx'
 import { formatHorseCode } from '../../components/horse/horseDisplay.js'
 import { HealthBadge, TrainingBadge, Unavailable } from './VetWorkspace.jsx'
-import { latestSigned, recordHealthLabels, trainingLabels, vetError } from './vetDomain.js'
+import { latestSigned } from './vetDomain.js'
 
 import { TrainingLocks, VetCalendar, VetTreatments } from './VetOperations.jsx'
 
-const tabs = { overview: 'Tổng quan sức khỏe', history: 'Lịch sử khám', treatments: 'Điều trị và đơn thuốc', injuries: 'Chấn thương và phục hồi', training: 'Điều kiện huấn luyện', calendar: 'Lịch y tế' }
-
-function RecordDetails({ record, canAmend }) {
-  const [items, setItems] = useState(null)
-  const [error, setError] = useState('')
-  const [reason, setReason] = useState('')
-  const [content, setContent] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const [retry, setRetry] = useState(0)
-  const submitting = useRef(false)
-  useEffect(() => {
-    if (record.recordStatus !== 'Signed') return undefined
-    let active = true
-    getMedicalAmendments(record.id).then(rows => { if (active) { setItems(rows); setError('') } })
-      .catch(e => { if (active) setError(vetError(e, 'Không thể tải lịch sử đính chính.')) })
-    return () => { active = false }
-  }, [record.id, record.recordStatus, retry])
-  async function submit(event) {
-    event.preventDefault()
-    if (submitting.current || !reason.trim() || !content.trim()) return
-    submitting.current = true
-    setBusy(true); setError(''); setMessage('')
-    try {
-      const result = await addMedicalAmendment(record.id, reason, content)
-      setItems(rows => rows ? [...rows, result] : null)
-      setRetry(v => v + 1)
-      setReason(''); setContent(''); setMessage('Đã lưu đính chính; bệnh án gốc được giữ nguyên.')
-    } catch (e) { setError(vetError(e, 'Chưa xác nhận lưu đính chính. Hãy tải lại lịch sử trước khi gửi lại.')) }
-    finally { submitting.current = false; setBusy(false) }
-  }
-  return <div className="vet-record-details">
-    <dl className="vet-details">{[
-      ['Loại khám', record.examType], ['Thời điểm khám (giờ CLB)', vetDateTime(record.examDate)],
-      ['Bác sĩ', record.vetName], ['Hồ sơ tiếp nhận liên quan', record.registrationRequestId ? `#${record.registrationRequestId}` : 'Không có'],
-      ['Cân nặng', record.weightKg == null ? 'Chưa ghi' : `${record.weightKg} kg`], ['Chiều cao', record.heightCm == null ? 'Chưa ghi' : `${record.heightCm} cm`],
-      ['Triệu chứng', record.symptoms], ['Chẩn đoán', record.diagnosis], ['Vị trí chấn thương ghi nhận', record.injuryLocation],
-      ['Hướng điều trị', record.treatmentPlan], ['Kết luận', record.conclusion], ['Sức khỏe', recordHealthLabels[record.healthStatus]],
-      ['Điều kiện tập', trainingLabels[record.trainingEligibility]], ['Hạn chế cụ thể', record.restrictionNote],
-      ['Ngày tái khám', record.followUpDate], ['Ghi chú', record.note],
-      ['Trạng thái phiếu', record.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'],
-      ...(record.recordStatus === 'Signed' ? [['Người chốt', record.vetName], ['Thời điểm chốt', vetDateTime(record.signedAt)]] : []),
-    ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Chưa ghi nhận'}</dd></div>)}</dl>
-    {record.recordStatus === 'Signed' && <section className="vet-amendments"><h3>Đính chính bệnh án</h3><p>Phiếu đã chốt được giữ nguyên. Chốt phiếu là xác nhận trong hệ thống, chưa phải chữ ký số.</p>
-      {error && <p className="error-message" role="alert">{error} <></></p>}
-      {!items && !error && <p role="status">Đang tải lịch sử đính chính…</p>}
-      {items?.length === 0 && <p>Chưa có đính chính.</p>}
-      {items?.map(item => <article className="vet-amendment" key={item.id}><strong>{item.author} · {vetDateTime(item.at)}</strong><p>Lý do: {item.reason}</p><p>{item.content}</p></article>)}
-      {canAmend && <form onSubmit={submit}><label className="form-field"><span>Lý do đính chính</span><input required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label><label className="form-field"><span>Nội dung đính chính</span><textarea required rows={3} value={content} onChange={e => setContent(e.target.value)} /></label><button className="button" disabled={busy || !items || !!error || !reason.trim() || !content.trim()}>{busy ? 'Đang lưu…' : 'Thêm đính chính'}</button></form>}
-      {message && <p className="success-message" role="status">{message}</p>}
-    </section>}
-  </div>
-}
+const tabs = { overview: 'Tổng quan sức khỏe', history: 'Bệnh án', treatments: 'Điều trị và đơn thuốc', injuries: 'Chấn thương và phục hồi', training: 'Điều kiện huấn luyện', calendar: 'Lịch y tế' }
 
 export default function VetMedicalProfile({ horse, records, currentUser, onRefresh, activeRequestId }) {
   const [params, setParams] = useSearchParams()
   const tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'overview'
-  const [selected, setSelected] = useState('')
+  const selected = params.get('record') || ''
+  function setSelected(id) { const next = new URLSearchParams(params); next.set('tab', 'history'); if (id) next.set('record', id); else next.delete('record'); setParams(next) }
+  function filter(key, value) { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); setParams(next) }
+  const filtered = records.filter(r => (!params.get('type') || r.examType === params.get('type')) && (!params.get('status') || r.recordStatus === params.get('status')) &&
+    (!params.get('from') || r.examDate.slice(0, 10) >= params.get('from')) && (!params.get('to') || r.examDate.slice(0, 10) <= params.get('to')) &&
+    (!params.get('q') || [r.id, r.diagnosis, r.symptoms, r.vetName].some(v => v?.toLocaleLowerCase().includes(params.get('q').toLocaleLowerCase().trim()))))
+
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState('')
   const latest = latestSigned(records, horse.id)
@@ -82,17 +36,23 @@ export default function VetMedicalProfile({ horse, records, currentUser, onRefre
   }
   return <main className="page-content vet-workspace">
     <Link className="breadcrumb-back-button" to="/vet/herd">← Sức khỏe toàn đàn</Link>
-    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div><div className="profile-actions"><a className="button vet-emergency" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div></header>
+    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div>{horse.profileStatus === 'APPROVED' && currentUser.permissions.includes('TRAINING_LOCK_MANAGE') && <div className="profile-actions"><a className="button button-secondary vet-danger-outline" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div>}</header>
     <div id="vet-emergency-lock"><TrainingLocks key={horse.id} horse={horse} currentUser={currentUser} compact={tab !== 'training'} onChanged={() => { void refresh() }} /></div>
     {refreshError && <p className="error-message" role="alert">{refreshError}</p>}
     <div className="vet-profile-badges"><HealthBadge status={horse.healthStatus} /><TrainingBadge record={latest} /></div>
-    {horse.profileStatus === 'APPROVED' && canManage && <Link className="button" to={`/vet/horses/${horse.id}/examination`}>Lập phiếu khám mới</Link>}
-    <nav className="vet-tabs" aria-label="Các phần hồ sơ y tế">{Object.entries(tabs).map(([key, label]) => <Link key={key} to={`?tab=${key}`} aria-current={tab === key ? 'page' : undefined} onClick={() => setSelected('')}>{label}</Link>)}</nav>
+    {horse.profileStatus === 'APPROVED' && canManage && <Link className="button vet-new-exam" to={`/vet/horses/${horse.id}/examination?new=1`}>Lập phiếu khám mới</Link>}
+    <nav className="vet-tabs" aria-label="Các phần hồ sơ y tế">{Object.entries(tabs).map(([key, label]) => <Link key={key} to={`?tab=${key}`} aria-current={tab === key ? 'page' : undefined} >{label}</Link>)}</nav>
     {tab === 'overview' && <div className="vet-two-columns"><section className="panel"><h2>Sức khỏe hiện tại</h2><HealthBadge status={horse.healthStatus} /><p>Cập nhật: {vetDateTime(horse.updatedAt)}</p><h3>Kết luận đã chốt gần nhất</h3>{latest ? <><p>{latest.conclusion || 'Chưa ghi kết luận'}</p><p>{latest.vetName} · {vetDateTime(latest.examDate)}</p><button className="button button-secondary" onClick={() => { setParams({ tab: 'history' }); setSelected(latest.id) }}>Xem kết quả</button></> : <p>Chưa có bệnh án đã chốt.</p>}</section><section className="panel"><h2>Khám đầu vào</h2><p>Trạng thái hồ sơ đăng ký: {({ PENDING_EXAM: 'Chờ khám / xử lý tiếp nhận', APPROVED: 'Đã tiếp nhận', REJECTED: 'Bị từ chối', ARCHIVED: 'Đã lưu trữ', SUBMITTED: 'Chờ xác minh', DRAFT: 'Nháp đăng ký' })[horse.profileStatus] || 'Chưa xác định'}</p><p>Phiếu khám: {currentExam ? currentExam.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp' : 'Chưa có phiếu cho lần đăng ký hiện tại'}</p>
       {currentExam?.recordStatus === 'Signed' ? <button className="button" onClick={() => { setParams({ tab: 'history' }); setSelected(currentExam.id) }}>Xem kết quả</button> : horse.profileStatus === 'PENDING_EXAM' && canManage ? currentExam && currentExam.vetId !== currentUser.id ? <p>Phiếu nháp đang do {currentExam.vetName} xử lý.</p> : <Link className="button" to={`/vet/horses/${horse.id}/examination`}>{currentExam ? 'Tiếp tục phiếu nháp' : 'Bắt đầu khám'}</Link> : null}<p>Bác sĩ thú y đưa kết luận; quản lý quyết định tiếp nhận.</p></section></div>}
-    {tab === 'history' && <section className="panel"><h2>Lịch sử khám · {records.length} phiếu</h2>{!records.length && <p>Chưa có phiếu khám.</p>}<div className="vet-record-list">{records.map(record => <button key={record.id} className={`vet-record-button${selected === record.id ? ' selected' : ''}`} onClick={() => setSelected(record.id)}><strong>Phiếu #{record.id} · {record.examType}</strong><span>{vetDateTime(record.examDate)} · {record.vetName}</span><span className="vet-pill">{record.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'}</span></button>)}</div>{selectedRecord?.recordStatus === 'Draft' && selectedRecord.vetId === currentUser.id && <Link className="button" to={`/vet/horses/${horse.id}/examination?record=${selectedRecord.id}`}>Tiếp tục phiếu nháp</Link>}{selectedRecord && <RecordDetails key={selectedRecord.id} record={selectedRecord} canAmend={canManage} />}</section>}
+    {tab === 'history' && <section className="panel"><h2>Bệnh án · {records.length} phiếu</h2><div className="vet-toolbar vet-history-filters">
+      <label className="form-field"><span>Tìm bệnh án</span><input type="search" value={params.get('q') || ''} placeholder="Số phiếu, triệu chứng, chẩn đoán, bác sĩ" onChange={e => filter('q', e.target.value)} /></label>
+      <label className="form-field"><span>Loại khám</span><select value={params.get('type') || ''} onChange={e => filter('type', e.target.value)}><option value="">Tất cả loại khám</option>{Object.entries(examLabels).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label className="form-field"><span>Trạng thái</span><select value={params.get('status') || ''} onChange={e => filter('status', e.target.value)}><option value="">Tất cả</option><option value="Draft">Đang khám</option><option value="Signed">Đã chốt</option></select></label>
+      <label className="form-field"><span>Từ ngày</span><input type="date" value={params.get('from') || ''} max={params.get('to') || undefined} onChange={e => filter('from', e.target.value)} /></label>
+      <label className="form-field"><span>Đến ngày</span><input type="date" value={params.get('to') || ''} min={params.get('from') || undefined} onChange={e => filter('to', e.target.value)} /></label>
+    </div>{records.length > 0 && !filtered.length && <p className="vet-empty">Không có bệnh án phù hợp bộ lọc.</p>}{selected && !selectedRecord && <p className="error-message" role="alert">Không tìm thấy bệnh án đã chọn trong hồ sơ ngựa này.</p>}{!records.length && <p>Chưa có phiếu khám.</p>}<div className="vet-record-list">{filtered.map(record => <button key={record.id} className={`vet-record-button${selected === record.id ? ' selected' : ''}`} onClick={() => setSelected(record.id)}><strong>Phiếu #{record.id} · {examLabels[record.examType] || 'Lần khám'}</strong><span>{vetDateTime(record.examDate)} · {record.vetName}</span><span className="vet-pill">{record.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'}</span></button>)}</div>{selectedRecord?.recordStatus === 'Draft' && selectedRecord.vetId === currentUser.id && <Link className="button" to={`/vet/horses/${horse.id}/examination?record=${selectedRecord.id}`}>Tiếp tục phiếu nháp</Link>}{selectedRecord && <RecordDetails key={selectedRecord.id} record={selectedRecord} canAmend={canManage} />}</section>}
     {tab === 'treatments' && <><section className="panel"><h2>Hướng điều trị ghi trong bệnh án</h2>{records.filter(r => r.treatmentPlan).map(r => <article className="vet-amendment" key={r.id}><strong>Phiếu #{r.id} · {r.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'} · {vetDateTime(r.examDate)}</strong><p>{r.treatmentPlan}</p></article>)}{!records.some(r => r.treatmentPlan) && <p>Chưa ghi hướng điều trị.</p>}</section><VetTreatments key={horse.id} horse={horse} records={records} currentUser={currentUser} /></>}
-    {tab === 'injuries' && <><section className="panel"><h2>Vị trí chấn thương đã ghi nhận</h2>{injuries.map(r => <article className="vet-amendment" key={r.id}><strong>Phiếu #{r.id} · {r.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'} · {vetDateTime(r.examDate)}</strong><p>{r.injuryLocation}</p></article>)}{!injuries.length && <p>Chưa ghi vị trí chấn thương trong bệnh án.</p>}</section><Unavailable title="Theo dõi chấn thương và phục hồi" action="Tạo dấu chấn thương">Chức năng đánh dấu 3D chưa khả dụng. Vị trí chấn thương được ghi bằng chữ trong phiếu khám.</Unavailable></>}
+    {tab === 'injuries' && <><section className="panel"><h2>Vị trí chấn thương đã ghi nhận</h2>{injuries.map(r => <article className="vet-amendment" key={r.id}><strong>{examLabels[r.examType]} · {r.recordStatus === 'Signed' ? 'Đã chốt' : 'Đang khám'} · {vetDateTime(r.examDate)}</strong><p>Bác sĩ: {r.vetName}</p><dl className="vet-details"><div><dt>Vị trí</dt><dd>{r.injuryLocation}</dd></div><div><dt>Chẩn đoán</dt><dd>{r.diagnosis || 'Chưa ghi nhận'}</dd></div><div><dt>Hướng điều trị</dt><dd>{r.treatmentPlan || 'Chưa ghi nhận'}</dd></div><div><dt>Sức khỏe / điều kiện tập</dt><dd>{recordHealthLabels[r.healthStatus] || 'Chưa đánh giá'} · {trainingLabels[r.trainingEligibility] || 'Chưa kết luận'}</dd></div>{r.followUpDate && <div><dt>Chỉ định tái khám</dt><dd>{vetDate(r.followUpDate)}</dd></div>}</dl><Link to={'?tab=history&record=' + r.id}>Xem bệnh án #{r.id}</Link></article>)}{!injuries.length && <p>Chưa ghi vị trí chấn thương trong bệnh án.</p>}</section><Unavailable title="Theo dõi chấn thương và phục hồi">Chức năng đánh dấu 3D chưa khả dụng. Vị trí chấn thương được ghi bằng chữ trong phiếu khám.</Unavailable></>}
     {tab === 'training' && <><section className="panel"><h2>Điều kiện tập theo kết luận gần nhất</h2><TrainingBadge record={latest} /><p>{latest?.restrictionNote || 'Chưa ghi hạn chế cụ thể.'}</p>{latest && <p>{latest.vetName} · {vetDateTime(latest.signedAt)} · Phiếu #{latest.id}</p>}<p>Sức khỏe và điều kiện tập được kết luận riêng. Không tự mở hạn chế theo ngày dự kiến.</p></section><a href="#vet-emergency-lock">Xem và điều chỉnh khóa tập ở đầu hồ sơ ↑</a></>}
     {tab === 'calendar' && <><section className="panel"><h2>Ngày tái khám theo kết luận gần nhất</h2><p>{latest?.followUpDate || 'Chưa có chỉ định ngày tái khám.'}</p><p>Đây là ngày chỉ định trên bệnh án, chưa phải lịch đã đặt; chưa xác nhận đã hoàn thành tái khám.</p><Link to="/vet/calendar">Xem các mốc tái khám của đàn →</Link></section><VetCalendar key={horse.id} horses={[horse]} horseId={horse.id} currentUser={currentUser} /></>}
   </main>

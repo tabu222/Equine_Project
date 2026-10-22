@@ -1193,8 +1193,10 @@ becomes: `HealthStatus` is `Healthy`/`Monitor` **and** `TrainingEligibility !== 
 
 ## 10. Frontend for Flow 2–4
 
-The frontend has no Flow 2–4 screens yet. When building them, add API files per sections 5–8
-(e.g. `src/api/trainingApi.ts`, `medicalApi.ts`, `careApi.ts`) in the same style as `horseApi.ts`.
+The table below is historical screen guidance. The current frontend already has training and
+veterinary workspaces; API support must be checked against current routes, serializers and services.
+For the implemented Vet screens, connected endpoints and remaining rules/assets, see
+[Vet workspace handoff, 22/10/2026](VET_WORKSPACE_20261022.md).
 
 Suggested screens by role:
 

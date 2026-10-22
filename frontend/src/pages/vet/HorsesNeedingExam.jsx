@@ -7,12 +7,16 @@ import HorseAvatar from '../../components/horse/HorseAvatar.jsx'
 import { formatHorseCode, valueOrMissing } from '../../components/horse/horseDisplay.js'
 import { formatHorseGender } from '../../components/horse/horseLabels.js'
 
+import VetClinicalQueue from './VetClinicalQueue.jsx'
+import VetLoading from './VetLoading.jsx'
+
 const pageSize = 10
 
-function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadError, onRetry }) {
+function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadError, onRetry, loading = false }) {
   const [search, setSearch] = useState('')
   const [examStatus, setExamStatus] = useState('All')
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('oldest')
   const horseById = useMemo(
     () => new Map(horses.map((horse) => [String(horse.id), horse])),
     [horses],
@@ -30,8 +34,8 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
         || (examStatus === 'Draft' && Boolean(draftMedicalRecordId))
         || (examStatus === 'NotStarted' && !draftMedicalRecordId)
       return matchesSearch && matchesStatus
-    })
-  }, [examStatus, horseById, initialExams, search])
+    }).sort((a,b) => sort === 'name' ? a.horse.name.localeCompare(b.horse.name, 'vi') : sort === 'newest' ? b.requestDate.localeCompare(a.requestDate) : a.requestDate.localeCompare(b.requestDate))
+  }, [examStatus, horseById, initialExams, search, sort])
 
   const pageCount = Math.max(1, Math.ceil(filteredExams.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -46,24 +50,26 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
       <header className="page-heading">
         <div>
           <p className="eyebrow">BÁC SĨ THÚ Y · HỒ SƠ KHÁM</p>
-          <h1>Hàng chờ khám đầu vào</h1>
-          <p>Bác sĩ thú y trực tiếp nhận khám. <Link to="/vet/intake-results">Xem kết quả khám đầu vào →</Link></p>
+          <h1>Hàng chờ khám</h1>
+          <p>Theo dõi khám đầu vào và các ca khám sau tiếp nhận. <Link to="/vet/intake-results">Xem kết quả khám đầu vào →</Link></p>
         </div>
-        <></>
+        <button className="button button-secondary" disabled={loading} onClick={onRetry}>Làm mới hàng chờ</button>
       </header>
-      <p className="vet-caption">Thời gian chờ hiện tính từ lúc gửi hồ sơ tiếp nhận. Chưa có mốc riêng cho lúc chuyển sang chờ khám.</p>
+      <p className="vet-caption">Thời gian trong danh sách khám đầu vào tính từ lúc gửi hồ sơ tiếp nhận, không phải thời gian từ lúc được chuyển sang chờ khám.</p>
 
       {loadError && (
         <section className="panel" role="alert">
           <p>{loadError}</p>
-          <></>
+          <button className="button button-secondary" onClick={onRetry}>Thử lại</button>
         </section>
       )}
 
-      {!loadError && (
+      <VetClinicalQueue currentUser={currentUser} query={search} />
+      {loading && <section className="panel"><VetLoading label="Đang tải khám đầu vào…" /></section>}
+      {!loadError && !loading && (
         <>
           <section className="horse-stat-strip vet-queue-stats" aria-label="Tổng quan hàng chờ khám">
-            <div className="horse-stat-item horse-stat-total"><span>Đang chờ khám</span><strong>{initialExams.length}</strong></div>
+            <div className="horse-stat-item horse-stat-total"><span>Khám đầu vào đang chờ</span><strong>{initialExams.length}</strong></div>
             <div className="horse-stat-item"><span>Đã có phiếu nháp</span><strong>{draftCount}</strong></div>
             <div className="horse-stat-item"><span>Chưa bắt đầu</span><strong>{initialExams.length - draftCount}</strong></div>
           </section>
@@ -87,6 +93,7 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
                 <option value="Draft">Đang có phiếu nháp</option>
               </select>
             </label>
+            <label className="filter-field"><span>Sắp xếp hồ sơ</span><select value={sort} onChange={e => setSort(e.target.value)}><option value="oldest">Gửi sớm nhất</option><option value="newest">Gửi gần nhất</option><option value="name">Tên ngựa</option></select></label>
             <button className="clear-filter-button" type="button" onClick={() => { setSearch(''); setExamStatus('All'); setPage(1) }}>Xóa bộ lọc</button>
           </section>
 
@@ -102,7 +109,7 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
           ) : (
             <section className="table-card vet-queue-table-card" aria-label="Danh sách hồ sơ cần khám">
               <div className="table-header">
-                <div><h2>Hồ sơ khám đầu vào</h2><p>Đang hiển thị {firstResult}–{lastResult} trong {filteredExams.length} hồ sơ phù hợp.</p></div>
+                <div><h2>Khám đầu vào</h2><p>Đang hiển thị {firstResult}–{lastResult} trong {filteredExams.length} hồ sơ phù hợp.</p></div>
               </div>
               <div className="table-wrapper">
                 <table className="horse-table vet-queue-table">
@@ -110,15 +117,15 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
                     <tr>
                       <th scope="col">Ngựa</th>
                       <th scope="col">Nhận diện</th>
-                      <th scope="col">Trạng thái hồ sơ</th>
+                      <th scope="col">Nguồn khám</th>
                       <th scope="col">Tiến độ khám</th>
-                      <th scope="col">Gửi vào hàng chờ tiếp nhận</th>
-                      <th scope="col">Thời gian chờ</th>
+                      <th scope="col">Ngày gửi hồ sơ</th>
+                      <th scope="col">Thời gian từ lúc gửi</th>
                       <th scope="col">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pageExams.map(({ horse, requestDate, waitingHours, draftMedicalRecordId, draftVetId }) => {
+                    {pageExams.map(({ horse, requestId, requestDate, waitingHours, draftMedicalRecordId, draftVetId }) => {
                       const code = horse.code || horseById.get(String(horse.id))?.code || ''
                       return (
                       <tr key={horse.id} className={waitingHours >= 24 ? 'vet-wait-long' : undefined}>
@@ -129,10 +136,10 @@ function HorsesNeedingExam({ initialExams = [], horses = [], currentUser, loadEr
                           </div>
                         </td>
                         <td>{valueOrMissing(horse.breed)}<small>{horse.sex === 'UNKNOWN' ? 'Chưa cập nhật giới tính' : formatHorseGender(horse.sex)}</small><small>Microchip: {valueOrMissing(horse.microchipNumber)}</small></td>
-                        <td><StatusBadge status={horse.profileStatus} type="registration" /></td>
+                        <td>Khám đầu vào<small>Hồ sơ tiếp nhận #{requestId}</small><StatusBadge status={horse.profileStatus} type="registration" /></td>
                         <td><StatusBadge status={draftMedicalRecordId ? 'DRAFT' : 'PENDING'} type="exam" label={draftMedicalRecordId ? `Đang khám · phiếu #${draftMedicalRecordId}` : 'Chưa bắt đầu'} /></td>
                         <td>{vetDateTime(requestDate)}</td>
-                        <td>{typeof waitingHours === 'number' && Number.isFinite(waitingHours) ? `${waitingHours} giờ${waitingHours >= 24 ? ' · Chờ lâu' : ''}` : 'Chưa cập nhật'}</td>
+                        <td>{typeof waitingHours === 'number' && Number.isFinite(waitingHours) ? `${waitingHours} giờ${waitingHours >= 24 ? ' · Đã gửi hơn một ngày' : ''}` : 'Chưa cập nhật'}</td>
                         <td>
                           {!currentUser?.permissions.includes('MEDICAL_MANAGE') ? <span>Không có quyền nhận khám</span>
                             : draftMedicalRecordId && draftVetId !== currentUser.id
