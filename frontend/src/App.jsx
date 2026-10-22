@@ -53,6 +53,9 @@ import HorseList from './pages/manager/HorseList.jsx'
 import CreateHorse from './pages/manager/CreateHorse.jsx'
 import CompleteIntake from './pages/manager/CompleteIntake.jsx'
 import ProfileChangeRequests from './pages/manager/ProfileChangeRequests.jsx'
+import StaffPage from './pages/manager/StaffPage.jsx'
+import RolesPage from './pages/manager/RolesPage.jsx'
+import './pages/manager/ManagerWorkspace.css'
 
 import OwnerHorses from './pages/owner/OwnerHorses.jsx'
 import OwnerHorseForm from './pages/owner/OwnerHorseForm.jsx'
@@ -1380,6 +1383,7 @@ function VetHorseRoute({
 
 function AppContent() {
   const location = useLocation()
+  const independentManagerPage = /^\/manager\/(staff|roles)(?:\/|$)/.test(location.pathname)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const [
@@ -1708,7 +1712,7 @@ function AppContent() {
             ? '/training/my-plans'
             : role === 'workRider'
               ? '/training/work-rider-sessions'
-              : '/manager/horses'
+              : currentUser?.permissions.includes('HORSE_VIEW') ? '/manager/horses' : '/manager/staff'
 
   const ownerList =
     useMemo(
@@ -1847,6 +1851,10 @@ function AppContent() {
           {role ===
             'manager' && (
             <>
+              {currentUser.permissions.includes('RBAC_MANAGE') && <>
+                <NavLink to="/manager/staff" title="Nhân sự và tài khoản"><NavIcon kind="manager" /><span>Nhân sự và tài khoản</span></NavLink>
+                <NavLink to="/manager/roles" title="Phân quyền vai trò"><NavIcon kind="manager" /><span>Phân quyền vai trò</span></NavLink>
+              </>}
               <NavLink
                 end
                 to="/manager/horses" title="Danh sách ngựa"
@@ -2086,7 +2094,7 @@ function AppContent() {
           </div>
         </header>
 
-        {loadError && (
+        {loadError && !independentManagerPage && (
           <div
             className="alert-banner"
             role="alert"
@@ -2115,7 +2123,7 @@ function AppContent() {
           </div>
         )}
 
-        {loadingData && (
+        {loadingData && !independentManagerPage && (
           <main className="page-content">
             <section
               className="panel"
@@ -2126,9 +2134,14 @@ function AppContent() {
           </main>
         )}
 
-        {!loadingData &&
-          !loadError && (
+        {(independentManagerPage || (!loadingData && !loadError)) && (
           <Routes>
+            <Route path="/manager/staff" element={role === 'manager' && currentUser.permissions.includes('RBAC_MANAGE')
+              ? <StaffPage currentUser={currentUser} onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật thông tin tài khoản.')) }} />
+              : <Navigate to={home} replace />} />
+            <Route path="/manager/roles" element={role === 'manager' && currentUser.permissions.includes('RBAC_MANAGE')
+              ? <RolesPage onIdentityChanged={() => { void getCurrentUser().then(setCurrentUser).catch(() => setAuthError('Không thể cập nhật quyền. Vui lòng đăng nhập lại.')) }} />
+              : <Navigate to={home} replace />} />
             <Route
               path="/manager/horses"
               element={

@@ -184,4 +184,5 @@ export const apiPost = <T>(path: string, payload: unknown) => request<T>(path, {
 export const apiPostPublic = <T>(path: string, payload: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(payload) }, false);
 export const apiPostForm = <T>(path: string, payload: FormData) => request<T>(path, { method: 'POST', body: payload });
 export const apiPatch = <T>(path: string, payload: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(payload) });
+export const apiPut = <T>(path: string, payload: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(payload) });
 export const apiDelete = <T>(path: string) => request<T>(path, { method: 'DELETE' });
