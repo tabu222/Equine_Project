@@ -9,15 +9,14 @@
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",
     "test:api": "node --test tests/api.test.mjs",
-    "test:injury": "node --test tests/injury.test.mjs",
+    "test:injury": "node --test tests/injury.test.mjs tests/injuryDiagram.test.mjs",
     "test:training-status": "node --test tests/effectiveTraining.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4",
-    "three": "^0.186.1"
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
