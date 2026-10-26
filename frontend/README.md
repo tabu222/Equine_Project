@@ -4,6 +4,22 @@ Frontend React + Vite cho dự án Equi. Vite chạy mặc định tại `http:/
 
 ## Không gian Veterinarian — cập nhật 22/10/2026
 
+### Danh sách ngựa — trạng thái huấn luyện hiệu lực (26/10/2026)
+
+Bảng `/vet/herd` và `/vet/intake-results` dùng `VetHorseTable.jsx`: tên ngựa nổi bật, mã/microchip là chữ phụ, sức khỏe và trạng thái tập thành hai cột, nút hồ sơ có icon và bảng cuộn ngang trên màn hình hẹp. Card `/vet/stalls`, bộ lọc và thống kê trạng thái ở tổng quan dùng cùng kết quả.
+
+`components/horse/effectiveTraining.js` chỉ tính trạng thái hiển thị, không ghi đè dữ liệu bệnh án hoặc khóa tập. Một dòng chỉ có một badge: **Khóa toàn bộ**, **Giới hạn tập**, **Được phép tập** hoặc **Chưa xác định**. Badge hỗ trợ hover/focus/click, xem lý do, bác sĩ và ngày áp dụng khi có dữ liệu; Escape, click ngoài hoặc chuyển focus đóng phần chi tiết.
+
+Lệnh `Active/Full` được ưu tiên cao nhất, tiếp theo là giới hạn đang hoạt động. Chỉ hiển thị cho phép khi hồ sơ `APPROVED`, bệnh án `Signed` gần nhất có kết luận `Eligible` và dữ liệu khóa đã tải đầy đủ, không còn hạn chế. Không tự mở khóa theo `LockEndDate`; chỉ `Released` được coi là đã mở. Thiếu dữ liệu, trạng thái lạ, thiếu phê duyệt hoặc mâu thuẫn giữa kết luận và lệnh khóa hiển thị chưa xác định. Kết luận `Restricted` đã chốt vẫn được giữ làm giới hạn ngay cả khi chưa có lệnh riêng. Nếu một ngựa có nhiều lệnh giới hạn, phần chi tiết hiển thị tất cả thay vì tùy ý chọn lệnh đầu tiên.
+
+Đọc `/training-locks` hiện có (bao gồm lệnh đã mở để đối chiếu thời điểm tái khám); không đổi endpoint, backend hoặc phân quyền. Chạy `npm.cmd run test:training-status` cho các trường hợp ưu tiên/multiple/released/unknown/phê duyệt và tính bất biến dữ liệu. `node tests/herd.browser.mjs` dùng Chrome và fixture SQLite riêng theo cách khởi chạy bên dưới; kiểm tra bảng, chi tiết badge, bộ lọc, lỗi API và responsive. Ảnh lưu ở `artifacts/herd/` nếu đặt `BROWSER_ARTIFACT_DIR` tương ứng.
+
+Đã qua typecheck, build, 10 bài kiểm thử trạng thái, 26 bài API, 5 bài injury và hai bộ Chrome `herd.browser.mjs`/`vet.browser.mjs`. Bảng được kiểm tra ở 1440/1024/834/390 px; không có uncaught exception hoặc API ghi từ thao tác bảng. Lint các file thay đổi không có cảnh báo; lint toàn repository vẫn có cảnh báo ngoài phạm vi và build còn cảnh báo bundle lớn. Test thú y hiện có được sửa chờ nút kê thuốc thực sự khả dụng trước khi click để tránh chạy trước khi kết thúc lưu nháp.
+
+Tệp của thay đổi danh sách: `src/pages/vet/VetWorkspace.jsx`, `VetHorseTable.jsx`, `VetHorseTable.css`; `src/components/horse/effectiveTraining.js`, `EffectiveTrainingBadge.jsx`, `EffectiveTrainingBadge.css`; `tests/effectiveTraining.test.mjs`, `tests/herd.browser.mjs`, `tests/vet.browser.mjs`; `package.json`, `README.md` và ảnh `artifacts/herd/*.png`.
+
+Cập nhật 26/10/2026: tab **Chấn thương và phục hồi** có layout bản đồ 3D, panel và danh sách dùng thử tách biệt, alert khóa tập theo API thật. Viewer sẵn sàng tải GLB/GLTF khi có cấu hình; hiện chưa có asset ngựa và API lưu marker, nên mặc định hiển thị trạng thái chờ và giữ vị trí bằng chữ trong bệnh án. Xem [tích hợp, contract asset/backend và kiểm thử](docs/HORSE_INJURY_MAPPING.md).
+
 Đã hoàn thiện màn hình khám theo nhóm, đơn thuốc trong đúng lần khám, kiểm tra trước chốt, bệnh án chỉ đọc và đính chính; khôi phục các route/sidebar thú y, bổ sung hàng chờ khám sau tiếp nhận, công việc cần xử lý và bộ lọc. Dùng API/JWT hiện tại, không sửa backend hoặc SQL Server. Chi tiết nguồn, endpoint, yêu cầu backend/asset và bằng chứng kiểm thử mới nhất: [bàn giao 22/10/2026](../backend/docs/VET_WORKSPACE_20261022.md).
 
 Các luồng ghi được kiểm tra bằng Chrome thật và Django trên fixture SQLite riêng; 16 API đọc đã được kiểm tra trên SQL Server local. Không dùng kết quả SQLite để khẳng định trigger hoặc đồng thời SQL Server. Lịch hiện hỗ trợ tạo/sửa/hủy; nút hoàn thành đã được bỏ vì contract chưa lưu đủ thông tin thực hiện. Dữ liệu khám không lưu vào localStorage. Ảnh desktop/mobile nằm trong `artifacts/vet/`.
