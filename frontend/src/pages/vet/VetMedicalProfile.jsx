@@ -1,11 +1,12 @@
-import { examLabels, recordHealthLabels, trainingLabels, vetDate, vetDateTime } from './vetDomain.js'
+import { examLabels, vetDateTime } from './vetDomain.js'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import RecordDetails from './VetRecordDetails.jsx'
 import HorseAvatar from '../../components/horse/HorseAvatar.jsx'
 import { formatHorseCode } from '../../components/horse/horseDisplay.js'
-import { HealthBadge, TrainingBadge, Unavailable } from './VetWorkspace.jsx'
+import { HealthBadge, TrainingBadge } from './VetWorkspace.jsx'
 import { latestSigned } from './vetDomain.js'
+import HorseInjuryMapping from '../../components/injury/HorseInjuryMapping.jsx'
 
 import { TrainingLocks, VetCalendar, VetTreatments } from './VetOperations.jsx'
 
@@ -23,21 +24,22 @@ export default function VetMedicalProfile({ horse, records, currentUser, onRefre
 
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState('')
+  const [lockRevision, setLockRevision] = useState(0)
   const latest = latestSigned(records, horse.id)
   const currentExam = records.find(r => r.registrationRequestId === activeRequestId && r.examType === 'Initial Exam')
   const selectedRecord = records.find(r => r.id === selected)
   const canManage = currentUser.permissions.includes('MEDICAL_MANAGE')
-  const injuries = records.filter(r => r.injuryLocation)
   async function refresh() {
     if (refreshing) return
     setRefreshing(true); setRefreshError('')
+    setLockRevision(value => value + 1)
     try { await onRefresh(horse.id) } catch { setRefreshError('Không thể tải lại hồ sơ. Vui lòng thử lại.') }
     finally { setRefreshing(false) }
   }
   return <main className="page-content vet-workspace">
     <Link className="breadcrumb-back-button" to="/vet/herd">← Sức khỏe toàn đàn</Link>
-    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div>{horse.profileStatus === 'APPROVED' && currentUser.permissions.includes('TRAINING_LOCK_MANAGE') && <div className="profile-actions"><a className="button button-secondary vet-danger-outline" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div>}</header>
-    <div id="vet-emergency-lock"><TrainingLocks key={horse.id} horse={horse} currentUser={currentUser} compact={tab !== 'training'} onChanged={() => { void refresh() }} /></div>
+    <header className="page-heading vet-profile-heading"><div className="vet-profile-identity"><HorseAvatar horseId={horse.id} documents={horse.documents} name={horse.name} size="small" /><div><p className="eyebrow">HỒ SƠ Y TẾ</p><h1>{horse.name}</h1><p>{formatHorseCode(horse.code)} · Microchip: {horse.microchipNumber || 'Chưa cập nhật'}</p><small>Ô chuồng: {horse.currentStall?.StallNumber || 'Chưa xếp chuồng'}</small></div></div>{horse.profileStatus === 'APPROVED' && currentUser.permissions.includes('TRAINING_LOCK_MANAGE') && <div className="profile-actions"><a className="button button-secondary vet-danger-outline" href="#vet-emergency-lock">Khóa tập khẩn cấp</a></div>}</header>
+    {tab !== 'injuries' && <div id="vet-emergency-lock"><TrainingLocks key={horse.id} horse={horse} currentUser={currentUser} compact={tab !== 'training'} onChanged={() => { void refresh() }} /></div>}
     {refreshError && <p className="error-message" role="alert">{refreshError}</p>}
     <div className="vet-profile-badges"><HealthBadge status={horse.healthStatus} /><TrainingBadge record={latest} /></div>
     {horse.profileStatus === 'APPROVED' && canManage && <Link className="button vet-new-exam" to={`/vet/horses/${horse.id}/examination?new=1`}>Lập phiếu khám mới</Link>}
@@ -52,7 +54,7 @@ export default function VetMedicalProfile({ horse, records, currentUser, onRefre
       <label className="form-field"><span>Đến ngày</span><input type="date" value={params.get('to') || ''} min={params.get('from') || undefined} onChange={e => filter('to', e.target.value)} /></label>
     </div>{records.length > 0 && !filtered.length && <p className="vet-empty">Không có bệnh án phù hợp bộ lọc.</p>}{selected && !selectedRecord && <p className="error-message" role="alert">Không tìm thấy bệnh án đã chọn trong hồ sơ ngựa này.</p>}{!records.length && <p>Chưa có phiếu khám.</p>}<div className="vet-record-list">{filtered.map(record => <button key={record.id} className={`vet-record-button${selected === record.id ? ' selected' : ''}`} onClick={() => setSelected(record.id)}><strong>Phiếu #{record.id} · {examLabels[record.examType] || 'Lần khám'}</strong><span>{vetDateTime(record.examDate)} · {record.vetName}</span><span className="vet-pill">{record.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'}</span></button>)}</div>{selectedRecord?.recordStatus === 'Draft' && selectedRecord.vetId === currentUser.id && <Link className="button" to={`/vet/horses/${horse.id}/examination?record=${selectedRecord.id}`}>Tiếp tục phiếu nháp</Link>}{selectedRecord && <RecordDetails key={selectedRecord.id} record={selectedRecord} canAmend={canManage} />}</section>}
     {tab === 'treatments' && <><section className="panel"><h2>Hướng điều trị ghi trong bệnh án</h2>{records.filter(r => r.treatmentPlan).map(r => <article className="vet-amendment" key={r.id}><strong>Phiếu #{r.id} · {r.recordStatus === 'Signed' ? 'Đã chốt' : 'Nháp'} · {vetDateTime(r.examDate)}</strong><p>{r.treatmentPlan}</p></article>)}{!records.some(r => r.treatmentPlan) && <p>Chưa ghi hướng điều trị.</p>}</section><VetTreatments key={horse.id} horse={horse} records={records} currentUser={currentUser} /></>}
-    {tab === 'injuries' && <><section className="panel"><h2>Vị trí chấn thương đã ghi nhận</h2>{injuries.map(r => <article className="vet-amendment" key={r.id}><strong>{examLabels[r.examType]} · {r.recordStatus === 'Signed' ? 'Đã chốt' : 'Đang khám'} · {vetDateTime(r.examDate)}</strong><p>Bác sĩ: {r.vetName}</p><dl className="vet-details"><div><dt>Vị trí</dt><dd>{r.injuryLocation}</dd></div><div><dt>Chẩn đoán</dt><dd>{r.diagnosis || 'Chưa ghi nhận'}</dd></div><div><dt>Hướng điều trị</dt><dd>{r.treatmentPlan || 'Chưa ghi nhận'}</dd></div><div><dt>Sức khỏe / điều kiện tập</dt><dd>{recordHealthLabels[r.healthStatus] || 'Chưa đánh giá'} · {trainingLabels[r.trainingEligibility] || 'Chưa kết luận'}</dd></div>{r.followUpDate && <div><dt>Chỉ định tái khám</dt><dd>{vetDate(r.followUpDate)}</dd></div>}</dl><Link to={'?tab=history&record=' + r.id}>Xem bệnh án #{r.id}</Link></article>)}{!injuries.length && <p>Chưa ghi vị trí chấn thương trong bệnh án.</p>}</section><Unavailable title="Theo dõi chấn thương và phục hồi">Chức năng đánh dấu 3D chưa khả dụng. Vị trí chấn thương được ghi bằng chữ trong phiếu khám.</Unavailable></>}
+    {tab === 'injuries' && <><HorseInjuryMapping key={horse.id} horse={horse} records={records} currentUser={currentUser} lockRevision={lockRevision} /><div id="vet-emergency-lock"><TrainingLocks key={horse.id} horse={horse} currentUser={currentUser} compact onChanged={() => { void refresh() }} /></div></>}
     {tab === 'training' && <><section className="panel"><h2>Điều kiện tập theo kết luận gần nhất</h2><TrainingBadge record={latest} /><p>{latest?.restrictionNote || 'Chưa ghi hạn chế cụ thể.'}</p>{latest && <p>{latest.vetName} · {vetDateTime(latest.signedAt)} · Phiếu #{latest.id}</p>}<p>Sức khỏe và điều kiện tập được kết luận riêng. Không tự mở hạn chế theo ngày dự kiến.</p></section><a href="#vet-emergency-lock">Xem và điều chỉnh khóa tập ở đầu hồ sơ ↑</a></>}
     {tab === 'calendar' && <><section className="panel"><h2>Ngày tái khám theo kết luận gần nhất</h2><p>{latest?.followUpDate || 'Chưa có chỉ định ngày tái khám.'}</p><p>Đây là ngày chỉ định trên bệnh án, chưa phải lịch đã đặt; chưa xác nhận đã hoàn thành tái khám.</p><Link to="/vet/calendar">Xem các mốc tái khám của đàn →</Link></section><VetCalendar key={horse.id} horses={[horse]} horseId={horse.id} currentUser={currentUser} /></>}
   </main>
