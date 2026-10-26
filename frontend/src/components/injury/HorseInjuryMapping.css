@@ -1,7 +1,6 @@
 .horse-injury-mapping {
-  --injury-olive: #4b5342;
-  --injury-muted: #707a60;
-  --injury-cream: var(--app-bg, #f5f3ed);
+  --injury-olive: var(--green-primary);
+  --injury-muted: var(--text-secondary);
   --injury-red: #c75b58;
   --injury-orange: #d9a34a;
   --injury-green: #438b67;
@@ -43,7 +42,6 @@
 .injury-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--injury-line); }
 .horse-injury-mapping .injury-card-heading h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 15px; font-weight: 650; }
 .injury-card-heading p:not(.injury-eyebrow) { margin-top: 5px; color: var(--text-secondary); font-size: 11px; }
-.injury-card-heading > svg { flex-shrink: 0; color: var(--injury-muted); }
 .injury-count { display: inline-grid; min-width: 23px; height: 23px; place-items: center; padding-inline: 4px; border-radius: 7px; background: #f0f1ea; color: var(--injury-olive); font-size: 11px; }
 .injury-horse-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px; }
 .horse-injury-mapping .injury-horse-heading h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 5px 0 12px; font-size: 21px; font-weight: 650; letter-spacing: -.025em; overflow-wrap: anywhere; }
@@ -54,27 +52,6 @@
 .injury-marked-total { display: grid; gap: 4px; min-width: 80px; text-align: right; }
 .injury-marked-total strong { color: var(--injury-olive); font-size: 28px; font-weight: 500; line-height: 1.1; }
 .injury-marked-total span { color: var(--text-secondary); font-size: 10px; }
-.injury-viewer { margin: 0 12px 12px; border: 1px solid var(--injury-line); border-radius: 10px; overflow: hidden; background: #f7f6f1; }
-.injury-view-toolbar { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px; border-bottom: 1px solid #e6e8df99; }
-.injury-view-toolbar > div { display: flex; flex-wrap: wrap; gap: 4px; }
-.injury-view-toolbar button { min-height: 34px; padding: 6px 10px; border: 1px solid transparent; border-radius: 6px; color: var(--injury-muted); background: transparent; font-size: 11px; }
-.injury-view-toolbar button[aria-pressed="true"] { color: var(--injury-olive); background: white; border-color: var(--injury-line); box-shadow: 0 1px 4px #293b3008; font-weight: 650; }
-.injury-view-toolbar button:hover:enabled { background: #eaece3; }
-.injury-view-toolbar .injury-reset { display: flex; align-items: center; gap: 6px; }
-.injury-reset svg { width: 15px; height: 15px; }
-.injury-canvas { position: relative; isolation: isolate; height: clamp(330px, 29vw, 470px); background: radial-gradient(ellipse at 50% 42%, #fdfcf9, #f0efe7); }
-.injury-canvas > canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
-.injury-canvas > canvas:active { cursor: grabbing; }
-.injury-asset-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 28px; text-align: center; }
-.injury-asset-icon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 8px; border: 1px solid #dfe2d4; border-radius: 24px; background: #fafaf5; color: #8a927b; box-shadow: 0 7px 22px #4b534207; }
-.injury-asset-icon svg { width: 35px; height: 35px; }
-.injury-asset-icon.is-loading { animation: injury-loading 1.4s ease-in-out infinite alternate; }
-@keyframes injury-loading { to { opacity: .45; } }
-.horse-injury-mapping .injury-asset-state h4 { color: var(--injury-olive); font-size: 18px; font-weight: 550; letter-spacing: -.025em; }
-.injury-asset-state p { max-width: 340px; font-size: 12px; color: var(--text-secondary); }
-.injury-asset-tag { padding: 6px 11px; border: 1px solid var(--injury-line); border-radius: 20px; color: var(--injury-muted); font-size: 10px; }
-.injury-view-caption { position: absolute; bottom: 15px; left: 18px; right: 18px; display: flex; justify-content: space-between; color: var(--injury-muted); font-size: 10px; pointer-events: none; }
-.injury-view-caption > span { letter-spacing: .08em; }
 .injury-view-footer { display: grid; gap: 11px; padding: 17px 15px; border-top: 1px solid var(--injury-line); background: #fcfcf9; text-align: center; }
 .injury-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px 18px; }
 .injury-status { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; }
@@ -83,16 +60,6 @@
 .status-recovered { --marker-color: var(--injury-green); }
 .injury-status i { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--marker-color); }
 .injury-view-footer p { color: var(--text-secondary); font-size: 10px; }
-.injury-marker-layer { position: absolute; inset: 0; pointer-events: none; }
-.injury-marker { position: absolute; z-index: 1; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; transform: translate(-50%, -50%); border: 0; border-radius: 50%; background: transparent; pointer-events: auto; }
-.injury-marker[hidden] { display: none; }
-.injury-marker-dot { display: grid; width: 20px; height: 20px; place-items: center; border: 2px solid white; border-radius: 50%; background: var(--marker-color); color: white; font-size: 9px; font-weight: 700; box-shadow: 0 1px 5px #0003; }
-.injury-marker.is-selected .injury-marker-dot { outline: 2px solid var(--marker-color); outline-offset: 4px; }
-.injury-marker:hover, .injury-marker:focus-visible { z-index: 3; }
-.injury-marker-tooltip { display: none; position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); width: 190px; padding: 10px 12px; border: 1px solid var(--injury-line); border-radius: 8px; background: white; text-align: left; box-shadow: 0 4px 15px #293b3014; color: var(--text-primary); pointer-events: none; }
-.injury-marker-tooltip span { font-size: 11px; }
-.injury-marker-tooltip small { color: var(--text-secondary); font-size: 10px; }
-.injury-marker:is(:hover, :focus-visible) .injury-marker-tooltip { display: grid; gap: 4px; }
 .injury-marker-list ul, .injury-records ul { margin: 0; padding: 0; list-style: none; }
 .injury-marker-list li + li { border-top: 1px solid var(--injury-line); }
 .injury-list-item { display: flex; align-items: flex-start; gap: 13px; width: 100%; padding: 18px 22px; border: 0; border-left: 3px solid transparent; background: white; color: inherit; text-align: left; }
@@ -107,16 +74,12 @@
 .injury-list-date { display: grid; gap: 12px; flex-shrink: 0; font-size: 10px; color: var(--text-secondary); text-align: right; }
 .injury-list-date > span { font-size: 17px; color: var(--injury-muted); }
 .injury-list-empty { display: flex; align-items: center; gap: 12px; padding: 25px 22px; color: var(--text-secondary); font-size: 12px; }
-.injury-list-empty > svg { flex-shrink: 0; color: var(--injury-muted); }
 .injury-detail .injury-eyebrow { margin-bottom: 6px; }
 .injury-panel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; min-height: 345px; padding: 32px; text-align: center; }
-.injury-empty-icon { display: grid; place-items: center; width: 65px; height: 65px; border: 1px dashed #cdd2c1; border-radius: 50%; background: #f7f8f3; color: var(--injury-muted); }
-.injury-empty-icon svg { width: 26px; height: 26px; }
 .injury-panel-empty h4 { font-size: 15px; font-weight: 600; }
 .injury-panel-empty p { max-width: 240px; color: var(--text-secondary); font-size: 12px; }
 .injury-panel-empty small { color: var(--injury-muted); font-size: 10px; }
 .injury-read-only { display: flex; align-items: center; gap: 7px; padding: 10px 22px; background: #f6f7f2; color: var(--injury-muted); font-size: 11px; }
-.injury-read-only svg { width: 15px; height: 15px; }
 .injury-form { padding: 20px 22px; }
 .injury-form-state { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 20px; }
 .injury-soft-badge { padding: 4px 8px; border-radius: 5px; background: #f0f2e9; color: var(--injury-muted); font-size: 10px; }
@@ -126,19 +89,11 @@
 .horse-injury-mapping .injury-form :is(input, select, textarea) { border-color: #dfe3d8; border-radius: 7px; font-size: 12px; font-weight: 400; min-height: 40px; }
 .injury-form :is(input, textarea)::placeholder { color: #8e978a; }
 .injury-form fieldset:disabled :is(input, textarea, select) { background: #f8f9f5; color: var(--text-secondary); opacity: 1; }
-.injury-severity > span { display: block; margin-bottom: 8px; font-size: 12px; }
-.injury-severity > div { display: flex; gap: 7px; }
-.injury-severity button { flex: 1; min-height: 36px; padding: 5px; border: 1px solid var(--injury-line); border-radius: 6px; background: white; color: var(--text-secondary); font-size: 11px; }
-.injury-severity button.is-selected { border-color: #b5bca5; background: #f1f3e9; color: var(--injury-olive); font-weight: 650; }
-.injury-severity .is-selected.severity-severe { border-color: #dfb4b0; color: #984744; background: var(--danger-soft); }
-.injury-severity .is-selected.severity-moderate { border-color: #e2cda5; color: #82622f; background: var(--warning-bg); }
 .injury-form-actions { display: flex; gap: 8px; margin-top: 24px; }
 .horse-injury-mapping .injury-primary { display: flex; justify-content: center; align-items: center; gap: 8px; flex: 1; border: 1px solid var(--injury-olive); border-radius: 7px; background: var(--injury-olive); color: white; font-size: 12px; }
-.injury-primary svg { width: 15px; height: 15px; }
 .horse-injury-mapping .injury-primary:hover:enabled { background: #3e4735; }
 .injury-form-actions .button-secondary { min-width: 62px; font-size: 12px; border-radius: 7px; }
 .injury-delete { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 12px; padding: 9px; border: 0; border-radius: 6px; background: #fbf2f0; color: var(--danger); font-size: 11px; }
-.injury-delete svg { width: 14px; height: 14px; }
 .injury-form-footnote { margin-top: 16px !important; color: var(--text-secondary); font-size: 10px; text-align: center; }
 .injury-feedback { padding: 13px 16px; border: 1px solid #d6e5d9; border-radius: 8px; background: var(--success-bg); color: #356b50; font-size: 12px; }
 .injury-feedback.is-error { color: var(--danger); background: var(--danger-soft); border-color: #ebcfcb; }
@@ -156,32 +111,96 @@
   .injury-layout { grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 16px; }
   .injury-horse-heading, .injury-card-heading { padding: 18px; }
   .injury-form { padding: 18px; }
-  .injury-canvas { height: 350px; }
-  .injury-view-toolbar { padding: 8px; }
-  .injury-view-toolbar button { padding: 6px 8px; }
-  .injury-reset span { display: none; }
   .injury-marked-total { min-width: 58px; }
 }
 @media (max-width: 1000px) {
   .injury-layout { grid-template-columns: minmax(0, 1fr); }
   .injury-panel-empty { min-height: 230px; }
   .injury-detail-column { position: static; }
-  .injury-canvas { height: 390px; }
 }
 @media (max-width: 600px) {
   .injury-page-heading { align-items: flex-start; flex-direction: column; gap: 14px; }
   .injury-horse-heading { padding: 18px 14px; gap: 10px; }
   .injury-horse-heading h3 > span { flex-basis: 100%; }
-  .injury-viewer { margin: 0 8px 8px; }
-  .injury-canvas { height: 350px; }
-  .injury-view-toolbar { gap: 3px; }
-  .injury-view-toolbar > div { gap: 0; }
-  .injury-view-toolbar button { padding: 6px; font-size: 10px; }
-  .injury-asset-state { padding: 24px 15px; }
   .injury-list-item { padding: 16px 12px; gap: 9px; }
   .injury-list-date { font-size: 9px; }
   .injury-lock-details { display: grid; gap: 10px; }
   .injury-records li { align-items: flex-start; flex-direction: column; gap: 12px; padding: 18px; }
   .injury-mode-note { flex-direction: column; }
 }
-@media (prefers-reduced-motion: reduce) { .injury-asset-icon.is-loading { animation: none; } }
+
+/* Photo, hit regions and markers share one SVG coordinate system. */
+.injury-diagram-viewer { margin: 0 12px 12px; border: 1px solid var(--injury-line); border-radius: 10px; overflow: hidden; background: var(--surface-soft); }
+.injury-diagram-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: 1px solid var(--injury-line); }
+.injury-diagram-toolbar > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.injury-diagram-toolbar button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--injury-line); border-radius: 7px; background: var(--surface); color: var(--text-secondary); font-size: 12px; }
+.injury-diagram-toolbar button[aria-pressed="true"] { color: var(--green-dark); background: var(--nav-active); border-color: var(--green-primary); font-weight: 650; }
+.injury-diagram-instruction { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 16px 18px 0; color: var(--text-secondary); font-size: 12px; }
+.injury-diagram-instruction strong { color: var(--green-dark); }
+.injury-diagram-stage { position: relative; aspect-ratio: 1448 / 1086; width: 100%; background: #fff; }
+.injury-horse-svg { display: block; width: 100%; height: 100%; }
+.is-placing .injury-body-region { cursor: crosshair; }
+.injury-region-picker { padding: 0 18px 18px; }
+.injury-region-picker select, .injury-filters select { min-height: 44px; max-width: 100%; }
+.injury-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--injury-line); }
+.injury-filters .form-field { font-size: 11px; }
+.injury-filters select { width: 100%; font-size: 12px; }
+.injury-field-error { display: block; color: var(--danger); font-size: 12px; font-weight: 500; }
+.horse-injury-mapping [aria-invalid="true"] { border-color: var(--danger); }
+.injury-position-summary { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.injury-position-summary > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.injury-position-summary span { color: var(--text-secondary); }
+.horse-injury-mapping .injury-position-summary button { min-height: 44px; font-size: 12px; }
+.injury-current-horse { margin-bottom: 18px !important; font-size: 13px; overflow-wrap: anywhere; }
+.injury-current-horse small { display: block; margin-top: 6px; color: var(--text-secondary); font-size: 11px; }
+.injury-recovery { border-top: 1px solid var(--injury-line); padding: 20px 22px; }
+.injury-recovery h4 { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.injury-recovery ol { margin: 16px 0 0; padding-left: 22px; }
+.injury-recovery li { padding: 0 0 20px 8px; }
+.injury-recovery li > :is(strong, span, small) { display: block; font-size: 12px; margin-bottom: 5px; }
+.injury-recovery li > :is(span, small) { color: var(--text-secondary); font-size: 11px; }
+.injury-recovery li p { margin: 6px 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.injury-current-status, .injury-recovery-empty { margin-top: 12px !important; color: var(--text-secondary); font-size: 12px; }
+.injury-recovery-form { display: grid; gap: 12px; margin-top: 22px; }
+.injury-recovery-form > p { color: var(--text-secondary); font-size: 12px; }
+.injury-recovery-form fieldset { display: grid; gap: 16px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.injury-recovery-form .form-field { font-size: 12px; }
+.injury-recovery-form :is(select, input, textarea) { min-height: 44px; width: 100%; }
+.injury-recovery-form button, .injury-form-actions button, .injury-delete { min-height: 44px; }
+.injury-list-empty { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .injury-filters { grid-template-columns: 1fr; }
+  .injury-diagram-toolbar { padding: 10px; }
+  .injury-diagram-toolbar > div { width: 100%; }
+  .injury-diagram-toolbar button { flex: 1; font-size: 11px; padding-inline: 8px; }
+  .injury-diagram-instruction { padding-inline: 12px; font-size: 11px; }
+  .injury-diagram-viewer { margin-inline: 8px; }
+  .injury-recovery { padding: 18px; }
+  .injury-marked-total { max-width: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { .injury-body-region { transition: none; } }
+/* Photo, regions and SVG markers share the same viewBox. */
+.injury-body-region { fill: transparent; stroke: transparent; stroke-width: 1.2; stroke-linejoin: round; transition: fill .15s; pointer-events: all; vector-effect: non-scaling-stroke; }
+.injury-body-region:hover, .injury-body-region:focus-visible, .injury-body-region.is-selected,
+.is-placing .injury-body-region:hover { fill: rgb(23 136 114 / 11%); stroke: rgb(23 136 114 / 65%); stroke-width: 1.2; outline: none; }
+.injury-photo-note { padding: 8px 18px 0; color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
+.injury-region-caption { min-height: 34px; padding: 8px 18px; color: var(--green-dark); font-size: 12px; }
+.injury-photo-state { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 18px; text-align: center; background: var(--surface-soft); }
+.injury-photo-state strong { font-size: 15px; }
+.injury-photo-state p { max-width: 380px; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+.injury-svg-marker { cursor: pointer; outline: none; }
+.injury-marker-hit { fill: transparent; pointer-events: all; }
+.injury-svg-marker-dot { fill: var(--marker-color); stroke: white; pointer-events: none; }
+.injury-marker-ring { fill: none; stroke: var(--marker-color); pointer-events: none; }
+.injury-marker-number { fill: white; font-weight: 700; pointer-events: none; user-select: none; }
+.injury-svg-marker:focus-visible .injury-marker-ring { stroke: var(--green-dark); }
+.injury-svg-marker:focus-visible .injury-svg-marker-dot { stroke: var(--green-dark); }
+.injury-svg-tooltip { display: none; pointer-events: none; }
+.injury-svg-tooltip rect { fill: white; stroke: var(--border); }
+.injury-svg-tooltip text { fill: var(--text-primary); }
+.injury-svg-marker:is(:hover, :focus) .injury-svg-tooltip { display: block; }
+.injury-reposition-note { padding: 12px; margin-bottom: 16px !important; border-radius: 7px; background: var(--warning-bg); color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+@media (hover: none), (max-width: 600px) {
+  .injury-svg-marker:is(:hover, :focus) .injury-svg-tooltip { display: none; }
+  .injury-photo-note, .injury-region-caption { padding-inline: 12px; }
+}

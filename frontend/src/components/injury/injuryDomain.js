@@ -3,21 +3,6 @@ export const injuryStatuses = {
 }
 export const injurySeverities = { mild: 'Nhẹ', moderate: 'Trung bình', severe: 'Nặng' }
 
-export function validModelPoint(point) {
-  return !!point && ['x', 'y', 'z'].every(axis => typeof point[axis] === 'number' && Number.isFinite(point[axis]))
-}
-
-// A camera preset is a viewing aid, never an anatomical diagnosis or a region label.
-export function viewForPoint(point) {
-  if (Math.abs(point.x) > Math.abs(point.z)) return point.x >= 0 ? 'front' : 'back'
-  return point.z >= 0 ? 'left' : 'right'
-}
-
-export function isSurfaceClick(start, end) {
-  return !!start && start.pointerId === end.pointerId && !start.dragged &&
-    Math.hypot(end.clientX - start.clientX, end.clientY - start.clientY) <= 5
-}
-
 export function trainingRestriction({ loading, error, rows }, latest, approved) {
   if (!approved) return { tone: 'neutral', title: 'CHƯA TIẾP NHẬN', message: 'Điều kiện tập được ghi trong kết luận khám. Lệnh khóa áp dụng sau khi tiếp nhận.' }
   if (loading) return { tone: 'neutral', title: 'ĐANG TẢI ĐIỀU KIỆN TẬP', message: 'Đang đối chiếu lệnh khóa huấn luyện.' }

@@ -1,12 +1,11 @@
 import { vetDate, vetDateTime } from '../../pages/vet/vetDomain.js'
-import InjuryIcon from './InjuryIcon.jsx'
 import { trainingRestriction } from './injuryDomain.js'
 
 export default function TrainingRestrictionAlert({ data, latest, horse }) {
   const state = trainingRestriction(data, latest, horse.profileStatus === 'APPROVED')
   const lock = state.lock
   return <section className={`injury-restriction tone-${state.tone}`} aria-label="Điều kiện huấn luyện" aria-live="polite">
-    <InjuryIcon kind="shield" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z M12 8v5 M12 16h.01" /></svg>
     <div><span className="injury-restriction-title">{state.title}</span><p>{state.message}</p>
       {lock && <dl className="injury-lock-details">
         {lock.Reason && <div><dt>Lý do</dt><dd>{lock.Reason}</dd></div>}
