@@ -2,6 +2,27 @@
 
 Frontend React + Vite cho dự án Equi. Vite chạy mặc định tại `http://localhost:5173` và proxy request `/api` sang Django REST backend tại `http://127.0.0.1:8000`.
 
+## Bổ sung từ ZIP — 27/10/2026
+
+Điều chỉnh form đăng ký: bỏ chọn câu lạc bộ, đặt mật khẩu và xác nhận mật khẩu thành hai hàng rộng toàn form. Đăng ký email không tải danh sách CLB và không gửi `ClubID`; API tạo tài khoản Owner chưa gắn CLB. Người dùng chọn CLB khi đăng ký hồ sơ ngựa. Luồng hoàn tất đăng ký Google giữ lựa chọn CLB như trước.
+
+Đã đối chiếu `Equine_Project-main 2.zip` với source hiện tại: 249 file giống nhau được giữ nguyên. Backend và SQL trong ZIP đã có trong project nên không chép thêm. Các bản thú y cũ trong ZIP không thay thế bảng trạng thái huấn luyện hiệu lực, sơ đồ chấn thương 2D hoặc các bài kiểm thử hiện tại.
+
+Phần mới gồm:
+
+- Groom: `/care/today` xem và hoàn thành/bỏ qua việc được giao; `/care/diets` xem khẩu phần; `/care/supplies` gửi, theo dõi và hủy yêu cầu vật tư.
+- Head Trainer: `/care/diet-plans` lập/sửa khẩu phần; `/care/tasks` theo dõi, giao thêm và sinh việc; `/care/grooms` phân công Groom; `/care/rules` sửa chỉ tiêu; `/care/supplies` xin vật tư.
+- Vet: `/care/diet-approvals` duyệt, trả về hoặc điều chỉnh khẩu phần.
+- Trang giới thiệu Việt/Anh, video nền, giao diện đăng nhập/đăng ký mới và nút Trang chủ giữ phiên đăng nhập.
+
+Menu và route kiểm tra vai trò cùng quyền tương ứng; backend tiếp tục kiểm tra quyền và phạm vi câu lạc bộ. Dùng lại `apiClient.ts` cho JWT, refresh token và lỗi; các danh sách chăm sóc dùng lại bộ tải đầy đủ các trang trong `vetApi.ts`. `apiGetNullable` xử lý đúng API trả body rỗng khi chưa phân công Groom hoặc chưa có khẩu phần, đồng thời giữ lỗi máy chủ. Đổi ngựa/bộ lọc sẽ ẩn dữ liệu cũ trong lúc tải; lỗi API không bị đổi thành “chưa phân công/chưa có khẩu phần”.
+
+Google Sign-In dùng `/auth/google` đã có ở backend và cùng bộ lưu phiên. Để bật, cấu hình `VITE_GOOGLE_CLIENT_ID` ở frontend và `GOOGLE_CLIENT_ID` ở backend cùng giá trị, rồi khởi động lại. Khi chưa cấu hình, nút Google được ẩn. Chưa xác minh đăng nhập với tài khoản Google thật.
+
+Không nhập `.env`, môi trường `.venv`, log chạy hoặc dependency từ ZIP. Giữ các cấu hình sơ đồ chấn thương và script test đã có. Chạy `npm.cmd run test:api`, `npm.cmd run test:injury`, `npm.cmd run test:training-status`, `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` để kiểm tra.
+
+Kiểm chứng lần tích hợp: typecheck/build đạt; 30 test API, 15 test injury và 10 test trạng thái huấn luyện đạt; 181 test backend đạt trên SQLite tạm. Lint phần mới không có cảnh báo; lint toàn project còn cảnh báo ở code cũ và build còn cảnh báo bundle lớn. Chrome với API thật trên fixture SQLite tạm đã kiểm tra phân công Groom → gửi khẩu phần → Vet duyệt → Groom hoàn thành việc, xem khẩu phần, gửi/hủy phiếu vật tư, chặn route sai vai trò; đăng ký Owner, xác nhận mật khẩu, đăng nhập và về Trang chủ giữ phiên. Trang công khai và màn hình vật tư được kiểm tra ở 1440/834/390 px. Bộ `vet.browser.mjs` hiện tại cũng đạt, gồm khám, thuốc, khóa tập, lỗi mạng và responsive. Không thay đổi database SQL Server đang dùng.
+
 ## Không gian Veterinarian — cập nhật 22/10/2026
 
 ### Danh sách ngựa — trạng thái huấn luyện hiệu lực (26/10/2026)

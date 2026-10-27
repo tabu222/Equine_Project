@@ -187,6 +187,11 @@ async function request<T>(
 }
 
 export const apiGet = <T>(path: string) => request<T>(path);
+// Some optional DRF resources return an empty 200 response when no record exists.
+export const apiGetNullable = <T>(path: string) => request<T | null>(path, {}, true, async (response) => {
+  const text = await response.text();
+  return text.trim() ? JSON.parse(text) as T | null : null;
+});
 export const apiGetBlob = (path: string) => request<Blob>(path, {}, true, (response) => response.blob());
 export const apiGetPublic = <T>(path: string, init: RequestInit = {}) => request<T>(path, init, false);
 export const apiPost = <T>(path: string, payload: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(payload) });

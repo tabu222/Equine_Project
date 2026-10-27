@@ -1,34 +1,104 @@
 import { useEffect, useRef, useState } from 'react'
 import { registerOwner } from '../../api/registrationApi.js'
 import { getClubs } from '../../api/horseApi.ts'
+import { googleClientId, loadGoogleIdentity, signInWithGoogle } from '../../api/googleAuthApi.ts'
 import { Link } from 'react-router-dom'
 import './LoginScreen.css'
 
-function Field({ label, name, type = 'text', value, onChange, autoComplete, minLength, maxLength, children }) {
-  return <label className="auth-field">
-    <span>{label}</span>
-    <span className="auth-input-wrap">
-      <input name={name} type={type} value={value} onChange={onChange} autoComplete={autoComplete} minLength={minLength} maxLength={maxLength} required />
-      {children}
-    </span>
+// Biểu tượng nét mảnh đặt đầu mỗi ô nhập.
+const ICONS = {
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
+  lock: <><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v2" /></>,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
+  phone: <path d="M6.5 3h3l1.5 4.5-2 1.5a12 12 0 0 0 6 6l1.5-2L21 14.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 5a2 2 0 0 1 2-2Z" />,
+  pin: <><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></>,
+  club: <><path d="M3 21h18M5 21V10l7-5 7 5v11" /><path d="M10 21v-5h4v5" /></>,
+}
+
+function FieldIcon({ name }) {
+  return <svg className="auth-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[name]}</svg>
+}
+
+// Ô nhập tối giản: nhãn ẩn cho trình đọc màn hình, chữ gợi ý hiện trong ô, biểu tượng ở đầu ô.
+function Field({ label, name, type = 'text', value, onChange, autoComplete, minLength, maxLength, icon = 'user', className = '', children }) {
+  return <label className={`auth-field ${className}`}>
+    <span className="auth-sr">{label}</span>
+    <FieldIcon name={icon} />
+    <input name={name} type={type} value={value} onChange={onChange} autoComplete={autoComplete} minLength={minLength}
+      maxLength={maxLength} placeholder={label} required />
+    {children}
   </label>
 }
 
 function PasswordField(props) {
   const [visible, setVisible] = useState(false)
-  return <Field {...props} type={visible ? 'text' : 'password'}>
+  return <Field {...props} icon="lock" type={visible ? 'text' : 'password'}>
     <button type="button" className="auth-reveal" aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} aria-pressed={visible} onClick={() => setVisible(!visible)}>
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{visible && <path d="m3 3 18 18" />}</svg>
     </button>
   </Field>
 }
 
+function ClubSelect({ value, onChange, clubs, loading, error }) {
+  return <label className="auth-field">
+    <span className="auth-sr">Câu lạc bộ</span>
+    <FieldIcon name="club" />
+    <select required name="clubId" value={value} onChange={onChange} disabled={loading || Boolean(error)}>
+      <option value="">{loading ? 'Đang tải câu lạc bộ…' : 'Chọn câu lạc bộ'}</option>
+      {clubs.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+    </select>
+  </label>
+}
+
+const GOOGLE_G = <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+  <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5Z" />
+  <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7Z" />
+  <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44Z" />
+  <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5Z" />
+</svg>
+
+// Chỉ hiện đăng nhập Google khi đã cấu hình client ID.
+function GoogleButton({ onCredential, onUnavailable, disabled }) {
+  const box = useRef(null)
+  const callback = useRef(onCredential)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { callback.current = onCredential }, [onCredential])
+  useEffect(() => {
+    if (!googleClientId) return undefined
+    let active = true
+    loadGoogleIdentity().then((google) => {
+      if (!active || !box.current) return
+      google.accounts.id.initialize({ client_id: googleClientId, callback: (answer) => callback.current(answer.credential) })
+      google.accounts.id.renderButton(box.current, {
+        theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with', locale: 'vi', logo_alignment: 'center',
+        width: Math.min(400, box.current.offsetWidth || 400),
+      })
+    }).catch(() => { if (active) setFailed(true) })
+    return () => { active = false }
+  }, [])
+  if (!googleClientId) return null
+  const official = googleClientId && !failed
+  return <>
+    <div className="auth-or"><span>hoặc</span></div>
+    {official
+      ? <div className={`auth-google${disabled ? ' is-disabled' : ''}`} ref={box} />
+      : <button type="button" className="auth-google-fallback" disabled={disabled}
+        onClick={() => onUnavailable(failed ? 'Không tải được Google Sign-In. Kiểm tra kết nối mạng rồi thử lại.'
+          : 'Đăng nhập bằng Google chưa được bật trên hệ thống này. Vui lòng đăng nhập bằng email.')}>
+        {GOOGLE_G}<span>Đăng nhập với Google</span>
+      </button>}
+  </>
+}
+
 export default function LoginScreen({ onLogin, error = '', busy = false, onRegister = registerOwner }) {
-  const [mode, setMode] = useState('login')
+  // /login?mode=register mở thẳng form đăng ký (nút "Đăng ký" ở trang giới thiệu)
+  const [mode, setMode] = useState(() => (new URLSearchParams(window.location.search).get('mode') === 'register' ? 'register' : 'login'))
   const [changed, setChanged] = useState(false)
   const [login, setLogin] = useState({ email: '', password: '' })
-  const emptyRegistration = { fullName: '', email: '', phone: '', address: '', clubId: '', password: '', confirmPassword: '' }
+  const emptyRegistration = { fullName: '', email: '', phone: '', address: '', password: '', confirmPassword: '' }
   const [registration, setRegistration] = useState(emptyRegistration)
+  const [google, setGoogle] = useState({ credential: '', email: '', fullName: '', phone: '', address: '', clubId: '' })
   const [clubs, setClubs] = useState([])
   const [clubsLoading, setClubsLoading] = useState(false)
   const [clubsError, setClubsError] = useState('')
@@ -36,14 +106,12 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const loginRef = useRef(null)
-  const registerRef = useRef(null)
-  const firstRender = useRef(true)
-  const registering = mode === 'register'
+  const formRef = useRef(null)
+  const needsClubs = mode === 'google'
   const pending = busy || submitting
 
   useEffect(() => {
-    if (!registering) return
+    if (!needsClubs) return
     let active = true
     getClubs().then((rows) => {
       if (active) { setClubs(rows); setClubsError('') }
@@ -51,24 +119,18 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
       if (active) setClubsError(cause instanceof Error ? cause.message : 'Không thể tải câu lạc bộ.')
     }).finally(() => { if (active) setClubsLoading(false) })
     return () => { active = false }
-  }, [registering, clubRetry])
+  }, [needsClubs, clubRetry])
 
   useEffect(() => {
-    if (firstRender.current) { firstRender.current = false; return }
-    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1550
-    const timer = window.setTimeout(() => {
-      const form = registering ? registerRef.current : loginRef.current
-      form?.querySelector('input')?.focus({ preventScroll: true })
-    }, delay)
-    return () => window.clearTimeout(timer)
-  }, [registering])
+    if (changed) formRef.current?.querySelector('input:not([disabled])')?.focus({ preventScroll: true })
+  }, [mode, changed])
 
   function switchMode(next) {
     if (pending) return
     setChanged(true)
     setFormError('')
     setNotice('')
-    if (next === 'register') setClubsLoading(true)
+    if (next === 'google' && !clubs.length) setClubsLoading(true)
     setMode(next)
   }
 
@@ -77,7 +139,7 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
     setter((previous) => ({ ...previous, [name]: value }))
     setFormError('')
     if (name === 'confirmPassword' || name === 'password') {
-      registerRef.current?.elements.confirmPassword.setCustomValidity('')
+      formRef.current?.elements.confirmPassword?.setCustomValidity('')
     }
   }
 
@@ -97,7 +159,7 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
     if (pending) return
     if (!registration.fullName.trim()) { setFormError('Vui lòng nhập họ và tên.'); return }
     if (registration.password !== registration.confirmPassword) {
-      const confirm = registerRef.current.elements.confirmPassword
+      const confirm = formRef.current.elements.confirmPassword
       confirm.setCustomValidity('Mật khẩu xác nhận chưa khớp.')
       confirm.reportValidity()
       return
@@ -105,7 +167,7 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
     setFormError('')
     setSubmitting(true)
     try {
-      await onRegister({ fullName: registration.fullName.trim(), email: registration.email.trim(), phone: registration.phone.trim(), address: registration.address.trim(), clubId: registration.clubId, password: registration.password })
+      await onRegister({ fullName: registration.fullName.trim(), email: registration.email.trim(), phone: registration.phone.trim(), address: registration.address.trim(), password: registration.password })
       setLogin({ email: registration.email.trim(), password: '' })
       setRegistration(emptyRegistration)
       setChanged(true)
@@ -115,41 +177,96 @@ export default function LoginScreen({ onLogin, error = '', busy = false, onRegis
     finally { setSubmitting(false) }
   }
 
-  return <main className="auth-page">
-    <Link to="/" className="auth-brand"><span className="brand-mark" aria-hidden="true"><img src="/equitrack-mark.jpg" alt="" /></span><span><strong>EQUITRACK</strong><small>Racehorse performance</small></span></Link>
-    <section className={`auth-card ${registering ? 'is-register' : 'is-login'} ${changed ? 'has-switched' : ''}`} aria-label="Tài khoản EquiTrack">
-      <div className="auth-diagonal" aria-hidden="true" />
-      <aside className="auth-welcome auth-welcome-login" aria-hidden={registering}>
-        <span className="auth-step">EQUITRACK · CÂU LẠC BỘ</span><h2>CHÀO MỪNG<br />{' '}TRỞ LẠI!</h2><p>Đồng hành cùng bạn<br />{' '}trên mỗi chặng đường<br />{' '}phát triển của ngựa.</p><span className="auth-rule" />
-      </aside>
-      <aside className="auth-welcome auth-welcome-register" aria-hidden={!registering}>
-        <span className="auth-step">EQUITRACK · KHỞI ĐẦU MỚI</span><h2>BẮT ĐẦU<br />{' '}CÙNG EQUITRACK.</h2><p>Kết nối câu lạc bộ.<br />{' '}Theo dõi sức khỏe.<br />{' '}Chinh phục mục tiêu.</p><span className="auth-rule" />
-      </aside>
-      <form ref={loginRef} className="auth-form auth-login" onSubmit={submitLogin} inert={registering} aria-hidden={registering} aria-labelledby="login-title" aria-busy={pending && !registering}>
-        <div className="auth-item" style={{ '--i': 0 }}><p className="auth-kicker">TÀI KHOẢN EQUITRACK</p><h1 id="login-title">Đăng nhập</h1></div>
-        <div className="auth-item" style={{ '--i': 1 }}><Field label="Email" name="email" type="email" autoComplete="username" value={login.email} onChange={update(setLogin)} maxLength={254} /></div>
-        <div className="auth-item" style={{ '--i': 2 }}><PasswordField label="Mật khẩu" name="password" autoComplete="current-password" value={login.password} onChange={update(setLogin)} /></div>
-        {!registering && (formError || (!changed && error)) && <p className="auth-feedback auth-error" role="alert">{formError || error}</p>}
-        {!registering && notice && <p className="auth-feedback auth-success" role="status">{notice}</p>}
-        <button className="auth-submit auth-item" style={{ '--i': 3 }} type="submit" disabled={pending}>{pending && !registering ? 'Đang đăng nhập…' : 'Đăng nhập'}<span aria-hidden="true">→</span></button>
-        <p className="auth-switch auth-item" style={{ '--i': 4 }}>Chưa có tài khoản? <button type="button" onClick={() => switchMode('register')} disabled={pending}>Đăng ký</button></p>
-      </form>
-      <form ref={registerRef} className="auth-form auth-register" onSubmit={submitRegistration} inert={!registering} aria-hidden={!registering} aria-labelledby="register-title" aria-busy={pending && registering}>
-        <div className="auth-item" style={{ '--i': 0 }}><p className="auth-kicker">GIA NHẬP EQUITRACK</p><h1 id="register-title">Đăng ký</h1></div>
-        <div className="auth-item" style={{ '--i': 1 }}><Field label="Họ và tên" name="fullName" autoComplete="name" value={registration.fullName} onChange={update(setRegistration)} maxLength={150} /></div>
-        <div className="auth-item" style={{ '--i': 2 }}><Field label="Email" name="email" type="email" autoComplete="email" value={registration.email} onChange={update(setRegistration)} maxLength={254} /></div>
-        <div className="auth-item" style={{ '--i': 3 }}><Field label="Số điện thoại" name="phone" type="tel" autoComplete="tel" value={registration.phone} onChange={update(setRegistration)} maxLength={20} /></div>
-        <div className="auth-item" style={{ '--i': 4 }}><Field label="Địa chỉ" name="address" autoComplete="street-address" value={registration.address} onChange={update(setRegistration)} maxLength={255} /></div>
-        <div className="auth-item" style={{ '--i': 5 }}><label className="auth-field"><span>Câu lạc bộ</span><select required name="clubId" value={registration.clubId} onChange={update(setRegistration)} disabled={clubsLoading || Boolean(clubsError)}><option value="">{clubsLoading ? 'Đang tải…' : 'Chọn câu lạc bộ'}</option>{clubs.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}</select></label></div>
-        {registering && clubsError && <p className="auth-feedback auth-error" role="alert">{clubsError} <></></p>}
-        {registering && !clubsLoading && !clubsError && clubs.length === 0 && <p className="auth-feedback" role="status">Chưa có CLB đang hoạt động để đăng ký.</p>}
-        <div className="auth-item" style={{ '--i': 6 }}><PasswordField label="Mật khẩu (ít nhất 6 ký tự)" name="password" autoComplete="new-password" value={registration.password} onChange={update(setRegistration)} minLength={6} /></div>
-        <div className="auth-item" style={{ '--i': 7 }}><PasswordField label="Xác nhận mật khẩu" name="confirmPassword" autoComplete="new-password" value={registration.confirmPassword} onChange={update(setRegistration)} minLength={6} /></div>
-        {registering && formError && <p className="auth-feedback auth-error" role="alert">{formError}</p>}
-        <button className="auth-submit auth-item" style={{ '--i': 8 }} type="submit" disabled={pending || clubsLoading || Boolean(clubsError) || clubs.length === 0}>{pending && registering ? 'Đang đăng ký…' : 'Tạo tài khoản'}<span aria-hidden="true">→</span></button>
-        <p className="auth-switch auth-item" style={{ '--i': 9 }}>Đã có tài khoản? <button type="button" onClick={() => switchMode('login')} disabled={pending}>Đăng nhập</button></p>
-      </form>
+  // Sau khi có phiên đăng nhập, tải lại ứng dụng để App đọc tài khoản (GET /auth/me) và chuyển về trang chủ của vai trò.
+  function enterApp() { window.location.replace('/login') }
+
+  async function handleGoogle(credential) {
+    if (pending || !credential) return
+    setFormError('')
+    setNotice('')
+    setSubmitting(true)
+    try {
+      const result = await signInWithGoogle(credential)
+      if (result.status === 'signed-in') { enterApp(); return }
+      setGoogle({ credential, email: result.email, fullName: result.fullName, phone: '', address: '', clubId: '' })
+      setChanged(true)
+      if (!clubs.length) setClubsLoading(true)
+      setMode('google')
+    } catch (cause) { setFormError(cause instanceof Error ? cause.message : 'Không thể đăng nhập bằng Google.') }
+    finally { setSubmitting(false) }
+  }
+
+  async function submitGoogleSignup(event) {
+    event.preventDefault()
+    if (pending) return
+    setFormError('')
+    setSubmitting(true)
+    try {
+      const result = await signInWithGoogle(google.credential, google)
+      if (result.status === 'signed-in') enterApp()
+    } catch (cause) { setFormError(cause instanceof Error ? cause.message : 'Không thể tạo tài khoản. Vui lòng thử lại.') }
+    finally { setSubmitting(false) }
+  }
+
+  const feedback = <>
+    {(formError || (!changed && mode === 'login' && error)) && <p className="auth-feedback auth-error" role="alert">{formError || error}</p>}
+    {notice && <p className="auth-feedback auth-success" role="status">{notice}</p>}
+  </>
+  const clubProblem = <>
+    {clubsError && <p className="auth-feedback auth-error" role="alert">{clubsError}{' '}
+      <button type="button" className="auth-retry" disabled={pending} onClick={() => { setClubsLoading(true); setClubsError(''); setClubRetry(v => v + 1) }}>Thử lại</button></p>}
+    {!clubsLoading && !clubsError && clubs.length === 0 && <p className="auth-feedback" role="status">Chưa có câu lạc bộ đang hoạt động để đăng ký.</p>}
+  </>
+  const noClub = clubsLoading || Boolean(clubsError) || clubs.length === 0
+
+  return <main className={`auth-page auth-mode-${mode}`}>
+
+    <Link to="/" className="auth-home">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+      Trang chủ
+    </Link>
+
+    <section className="auth-center">
+      <Link to="/" className="auth-logo" aria-label="EquiTrack – trang chủ"><img src="/auth/equitrack-mark.png" alt="" /></Link>
+      <h1 className="auth-title">EquiTrack</h1>
+      <p className="auth-subtitle">Racehorse Training &amp; Management System</p>
+      <span className="auth-rule" aria-hidden="true" />
+
+      {mode === 'login' && <form ref={formRef} key="login" className="auth-form auth-login" onSubmit={submitLogin} aria-label="Đăng nhập" aria-busy={pending}>
+        <Field label="Email" icon="mail" name="email" type="email" autoComplete="username" value={login.email} onChange={update(setLogin)} maxLength={254} />
+        <PasswordField label="Mật khẩu" name="password" autoComplete="current-password" value={login.password} onChange={update(setLogin)} />
+        {feedback}
+        <button className="auth-submit" type="submit" disabled={pending}>{pending ? 'Đang đăng nhập…' : <>Đăng nhập <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6" /></svg></>}</button>
+        <GoogleButton onCredential={handleGoogle} onUnavailable={(message) => { setNotice(''); setFormError(message) }} disabled={pending} />
+        <p className="auth-switch">Chưa có tài khoản? <button type="button" onClick={() => switchMode('register')} disabled={pending}>Đăng ký chủ ngựa</button></p>
+      </form>}
+
+      {mode === 'register' && <form ref={formRef} key="register" className="auth-form auth-form-wide auth-register" onSubmit={submitRegistration} aria-label="Đăng ký chủ ngựa" aria-busy={pending}>
+        <p className="auth-heading">Đăng ký tài khoản chủ ngựa</p>
+        <div className="auth-grid">
+          <Field label="Họ và tên" name="fullName" autoComplete="name" value={registration.fullName} onChange={update(setRegistration)} maxLength={150} />
+          <Field label="Email" icon="mail" name="email" type="email" autoComplete="email" value={registration.email} onChange={update(setRegistration)} maxLength={254} />
+          <Field label="Số điện thoại" icon="phone" name="phone" type="tel" autoComplete="tel" value={registration.phone} onChange={update(setRegistration)} maxLength={20} />
+          <Field label="Địa chỉ" icon="pin" name="address" autoComplete="street-address" value={registration.address} onChange={update(setRegistration)} maxLength={255} />
+          <PasswordField className="auth-field-wide" label="Mật khẩu (ít nhất 6 ký tự)" name="password" autoComplete="new-password" value={registration.password} onChange={update(setRegistration)} minLength={6} />
+          <PasswordField className="auth-field-wide" label="Xác nhận mật khẩu" name="confirmPassword" autoComplete="new-password" value={registration.confirmPassword} onChange={update(setRegistration)} minLength={6} />
+        </div>
+        {feedback}
+        <button className="auth-submit" type="submit" disabled={pending}>{pending ? 'Đang đăng ký…' : 'Tạo tài khoản'}</button>
+        <p className="auth-switch">Đã có tài khoản? <button type="button" onClick={() => switchMode('login')} disabled={pending}>Đăng nhập</button></p>
+      </form>}
+
+      {mode === 'google' && <form ref={formRef} key="google" className="auth-form" onSubmit={submitGoogleSignup} aria-label="Hoàn tất đăng ký bằng Google" aria-busy={pending}>
+        <p className="auth-heading">Hoàn tất tài khoản chủ ngựa cho <b>{google.email}</b></p>
+        <Field label="Họ và tên" name="fullName" autoComplete="name" value={google.fullName} onChange={update(setGoogle)} maxLength={150} />
+        <Field label="Số điện thoại" icon="phone" name="phone" type="tel" autoComplete="tel" value={google.phone} onChange={update(setGoogle)} maxLength={20} />
+        <Field label="Địa chỉ" icon="pin" name="address" autoComplete="street-address" value={google.address} onChange={update(setGoogle)} maxLength={255} />
+        <ClubSelect value={google.clubId} onChange={update(setGoogle)} clubs={clubs} loading={clubsLoading} error={clubsError} />
+        {clubProblem}
+        {feedback}
+        <button className="auth-submit" type="submit" disabled={pending || noClub}>{pending ? 'Đang tạo…' : 'Tạo tài khoản'}</button>
+        <p className="auth-switch"><button type="button" onClick={() => switchMode('login')} disabled={pending}>Quay lại đăng nhập</button></p>
+      </form>}
     </section>
-    <footer className="auth-footer">EQUITRACK<span aria-hidden="true"> / </span>Chăm sóc hôm nay. Vững bước ngày mai.</footer>
   </main>
 }

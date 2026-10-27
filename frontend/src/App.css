@@ -11129,34 +11129,39 @@ button {
   /* Ghi de cac khai bao 'repeat' va '920px auto' o phia tren. */
   inset: 76px 0 auto 0;
   width: 100%;
-  height: clamp(200px, 18vw, 285px);
+  height: clamp(240px, 22vw, 340px);
   opacity: 1;
-  background-color: transparent;
+  background-color: #f4f2eb;
   background-image:
-    linear-gradient(90deg,
-      rgba(248,247,242,.80) 0%,
-      rgba(248,247,242,.56) 34%,
-      rgba(248,247,242,.14) 75%,
-      rgba(248,247,242,.28) 100%),
-    url('/dashboard-horse.png');
-  background-repeat: no-repeat, no-repeat;
-  background-size: 100% 100%, cover;
-  background-position: center, center 47%;
-  background-attachment: scroll, scroll;
+    linear-gradient(180deg, rgba(244, 242, 235, 0) 70%, #f4f2eb 100%),
+    linear-gradient(90deg, #f4f2eb 0%, #f4f2eb 38%, rgba(244, 242, 235, .55) 50%, rgba(244, 242, 235, 0) 62%),
+    url('/app-header-horse.jpg');
+  background-repeat: no-repeat;
+  background-size: 100% 100%, 100% 100%, auto 100%;
+  background-position: center, center, right top;
+  background-attachment: scroll;
 }
 @media (max-width: 920px) {
   .app-main::before {
     inset: 76px 0 auto 0;
-    height: 220px;
-    background-size: 100% 100%, cover;
-    background-position: center, 62% center;
-    background-repeat: no-repeat, no-repeat;
+    height: 230px;
+    background-position: center, center, 70% top;
   }
 }
 @media (max-width: 680px) {
   .app-main::before {
     inset: 68px 0 auto 0;
-    height: 175px;
-    background-position: center, 68% center;
+    height: 190px;
+    opacity: .45;
+    background-position: center, center, 62% top;
   }
+}
+
+.topbar-home svg { flex: none; }
+@media (max-width: 560px) {
+  .topbar-home { flex: none; width: 36px; padding: 0; }
+  .topbar-home .topbar-home-text { display: none; }
+}
+@media (max-width: 420px) {
+  .topbar > .topbar-account .topbar-date { display: none; }
 }
