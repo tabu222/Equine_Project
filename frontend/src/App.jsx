@@ -103,6 +103,7 @@ import HorseAssessmentHistoryPage from './pages/training/HorseAssessmentHistoryP
 import TrainingSchedulePage from './pages/training/TrainingSchedulePage.jsx'
 import TrainingSessionCreatePage from './pages/training/TrainingSessionCreatePage.jsx'
 import TrainingSessionEditPage from './pages/training/TrainingSessionEditPage.jsx'
+import { careHome, careNavItems, careRoutes } from './pages/care/careRoutes.jsx'
 
 import HorseProfile from './components/horse/HorseProfile.jsx'
 import {
@@ -122,6 +123,7 @@ const roleLabels = {
   headTrainer: 'Huấn luyện viên trưởng',
   trainer: 'Huấn luyện viên',
   workRider: 'Work Rider',
+  groom: 'Groom (chăm sóc ngựa)',
 }
 
 function userRole(user) {
@@ -153,6 +155,10 @@ function userRole(user) {
 
   if (user?.role === 'WORK_RIDER') {
     return 'workRider'
+  }
+
+  if (user?.role === 'GROOM') {
+    return 'groom'
   }
 
   return ''
@@ -1681,7 +1687,9 @@ function AppContent() {
             ? '/training/my-plans'
             : role === 'workRider'
               ? '/training/work-rider-sessions'
-              : currentUser?.permissions.includes('HORSE_VIEW') ? '/manager/horses' : '/manager/staff'
+              : role === 'groom'
+                ? careHome
+                : currentUser?.permissions.includes('HORSE_VIEW') ? '/manager/horses' : '/manager/staff'
 
   const ownerList =
     useMemo(
@@ -1983,6 +1991,17 @@ function AppContent() {
               </span>
             </NavLink>
           )}
+
+          {/* Flow 4 – chăm sóc, dinh dưỡng (menu khai báo trong pages/care/careRoutes.jsx) */}
+          {careNavItems(role, currentUser.permissions).length > 0 && role !== 'groom' && (
+            <p className="sidebar-label">CHĂM SÓC &amp; DINH DƯỠNG</p>
+          )}
+          {careNavItems(role, currentUser.permissions).map((item) => (
+            <NavLink key={item.to} to={item.to} title={item.label}>
+              <NavIcon kind={item.icon} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-support">
@@ -2051,6 +2070,12 @@ function AppContent() {
                 </span>
               </div>
             </div>
+
+            {/* Về trang giới thiệu (/) mà không đăng xuất */}
+            <Link className="button button-secondary topbar-home" to="/" title="Về trang chủ EquiTrack" style={{ gap: 6 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5" /><path d="M5.5 10v10h13V10" /><path d="M10 20v-5h4v5" /></svg>
+              <span className="topbar-home-text">Trang chủ</span>
+            </Link>
 
             <button
               className="button button-secondary"
@@ -2853,6 +2878,8 @@ function AppContent() {
     )
   }
 />
+
+            {careRoutes({ role, currentUser, home })}
 
             <Route
               path="*"

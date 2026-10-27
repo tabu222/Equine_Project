@@ -1,494 +1,340 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { getAccessToken } from '../../api/apiClient.ts'
 import './LandingPage.css'
 
-const roles = [
-  {
-    number: '01',
-    title: 'Club Manager',
-    subtitle: 'Quản lý câu lạc bộ',
-    description:
-      'Quản lý hồ sơ ngựa, chủ sở hữu, tiếp nhận và toàn bộ hoạt động vận hành của câu lạc bộ.',
+// Chữ của trang giới thiệu theo 2 ngôn ngữ. Lựa chọn được nhớ ở trình duyệt (equi.lang).
+const TEXT = {
+  vi: {
+    nav: ['Giới thiệu', 'Quy trình', 'Vai trò', 'Liên hệ'],
+    login: 'ĐĂNG NHẬP', register: 'ĐĂNG KÝ', enter: 'VÀO HỆ THỐNG', enterLower: 'Vào hệ thống', loginLower: 'Đăng nhập', registerOwner: 'Đăng ký chủ ngựa',
+    menuOpen: 'Mở menu', menuClose: 'Đóng menu', language: 'Ngôn ngữ', scroll: 'CUỘN',
+    aboutEyebrow: 'MỘT NỀN TẢNG · MỘT HỆ THỐNG',
+    aboutTitle: ['Được thiết kế cho toàn bộ vòng đời', 'vận hành ngựa đua.'],
+    aboutLead: 'Hồ sơ, sức khỏe và huấn luyện nằm trên cùng một nguồn dữ liệu. Mỗi vai trò thấy đúng phần việc của mình.',
+    ringCaption: 'MỘT NGUỒN DỮ LIỆU', lifecycle: ['Tiếp nhận', 'Sức khỏe', 'Huấn luyện', 'Chăm sóc'],
+    rolesEyebrow: 'VAI TRÒ', rolesTitle: ['5 vai trò chính.', 'Một hệ thống thống nhất.'],
+    rolesLead: 'Mỗi vai trò có khu vực làm việc riêng, nhưng cùng chạy trên một nguồn dữ liệu.', rolesTasks: 'VIỆC CHÍNH',
+    roles: [
+      ['Quản lý câu lạc bộ', 'Điều hành toàn bộ hoạt động của câu lạc bộ.', ['Tiếp nhận và xác minh hồ sơ ngựa', 'Cấp tài khoản cho nhân viên', 'Quản lý kho vật tư và báo cáo']],
+      ['Huấn luyện viên trưởng', 'Định hướng chương trình huấn luyện của cả đội.', ['Phân công huấn luyện viên cho từng ngựa', 'Duyệt giáo án huấn luyện', 'Lập khẩu phần ăn gửi bác sĩ thú y duyệt']],
+      ['Bác sĩ thú y', 'Bảo đảm ngựa đủ sức khỏe để tập luyện.', ['Khám sức khỏe đầu vào', 'Điều trị và theo dõi sức khỏe', 'Khóa hoặc mở lại việc tập luyện']],
+      ['Nhân viên chăm sóc', 'Chăm sóc ngựa mỗi ngày.', ['Thực hiện công việc chăm sóc hằng ngày', 'Cho ăn theo khẩu phần đã duyệt', 'Gửi yêu cầu vật tư']],
+      ['Chủ ngựa', 'Theo dõi những chú ngựa của mình.', ['Gửi hồ sơ ngựa cho câu lạc bộ', 'Xem tình trạng sức khỏe và huấn luyện', 'Nhận thông báo kết quả']],
+    ],
+    syncEyebrow: 'QUY TRÌNH LIÊN THÔNG', syncTitle: ['Dữ liệu thay đổi.', 'Giao diện cập nhật.'],
+    syncLead: 'Từ lúc ngựa được tiếp nhận, khám sức khỏe đến khi vào chương trình huấn luyện, trạng thái luôn được cập nhật giữa các vai trò.',
+    syncSteps: ['Quản lý câu lạc bộ tiếp nhận và xác minh hồ sơ.', 'Bác sĩ thú y khám và cập nhật sức khỏe.', 'Kết quả được gửi đến Quản lý và Chủ ngựa.'],
+    ctaEyebrow: 'SẴN SÀNG BẮT ĐẦU?', ctaTitle: ['Một nền tảng tốt hơn cho', 'những chiến mã tốt hơn.'],
+    ctaText: 'Quản lý câu lạc bộ, hồ sơ ngựa và hoạt động chuyên môn trên một hệ thống.',
+    ctaLogin: 'ĐĂNG NHẬP HỆ THỐNG', ctaRegister: 'ĐĂNG KÝ CHỦ NGỰA',
+    foot: { explore: 'KHÁM PHÁ EQUITRACK', features: 'CHỨC NĂNG', account: 'TÀI KHOẢN', contact: 'LIÊN HỆ',
+      featureLinks: ['Hồ sơ ngựa', 'Huấn luyện', 'Sức khỏe', 'Chăm sóc'],
+      help: 'Cần cấp tài khoản nhân viên? Hãy liên hệ Quản lý câu lạc bộ của bạn.',
+      copy: 'Bản quyền © 2026 EquiTrack. Bảo lưu mọi quyền.', top: 'LÊN ĐẦU TRANG' },
   },
-  {
-    number: '02',
-    title: 'Head Trainer',
-    subtitle: 'Huấn luyện viên trưởng',
-    description:
-      'Xây dựng giáo án, theo dõi tiến độ và điều phối chương trình huấn luyện.',
+  en: {
+    nav: ['About', 'Workflow', 'Roles', 'Contact'],
+    login: 'SIGN IN', register: 'SIGN UP', enter: 'OPEN EQUITRACK', enterLower: 'Open EquiTrack', loginLower: 'Sign in', registerOwner: 'Owner sign-up',
+    menuOpen: 'Open menu', menuClose: 'Close menu', language: 'Language', scroll: 'SCROLL',
+    aboutEyebrow: 'ONE PLATFORM · ONE SYSTEM',
+    aboutTitle: ['Built for every stage of', 'racehorse operations.'],
+    aboutLead: 'Records, health and training share one source of data. Every role sees exactly the work that is theirs.',
+    ringCaption: 'ONE SOURCE OF DATA', lifecycle: ['Intake', 'Health', 'Training', 'Care'],
+    rolesEyebrow: 'ROLES', rolesTitle: ['5 core roles.', 'One unified system.'],
+    rolesLead: 'Every role has its own workspace, all running on one source of data.', rolesTasks: 'KEY TASKS',
+    roles: [
+      ['Club manager', 'Runs the day-to-day operations of the club.', ['Receives and verifies horse records', 'Creates staff accounts', 'Manages inventory and reports']],
+      ['Head trainer', 'Sets the direction of the training programme.', ['Assigns trainers to each horse', 'Approves training plans', 'Prepares diet plans for veterinarian approval']],
+      ['Veterinarian', 'Keeps every horse fit to train.', ['Performs intake health checks', 'Treats and monitors health', 'Locks or reopens training']],
+      ['Groom', 'Looks after the horses every day.', ['Carries out daily care tasks', 'Feeds according to approved diets', 'Requests supplies']],
+      ['Horse owner', 'Follows their own horses.', ['Submits horse records to the club', 'Views health and training status', 'Gets notified of results']],
+    ],
+    syncEyebrow: 'CONNECTED WORKFLOW', syncTitle: ['Data changes.', 'Every screen follows.'],
+    syncLead: 'From intake and health checks to the training programme, a horse’s status stays in sync across every role.',
+    syncSteps: ['The club manager receives and verifies the record.', 'The veterinarian examines the horse and updates its health.', 'The result reaches the manager and the owner.'],
+    ctaEyebrow: 'READY TO START?', ctaTitle: ['A better platform for', 'better racehorses.'],
+    ctaText: 'Club operations, horse records and specialist work on one system.',
+    ctaLogin: 'SIGN IN', ctaRegister: 'OWNER SIGN-UP',
+    foot: { explore: 'EXPLORE EQUITRACK', features: 'FEATURES', account: 'ACCOUNT', contact: 'CONTACT',
+      featureLinks: ['Horse records', 'Training', 'Health', 'Care'],
+      help: 'Need a staff account? Please contact your club manager.',
+      copy: 'Copyright © 2026 EquiTrack. All rights reserved.', top: 'BACK TO TOP' },
   },
-  {
-    number: '03',
-    title: 'Veterinarian',
-    subtitle: 'Bác sĩ thú y',
-    description:
-      'Theo dõi sức khỏe, khám đầu vào và cập nhật tình trạng y tế của ngựa.',
-  },
-  {
-    number: '04',
-    title: 'Groom',
-    subtitle: 'Nhân viên chăm sóc',
-    description:
-      'Theo dõi tình trạng hằng ngày và phối hợp cùng đội ngũ chuyên môn.',
-  },
-  {
-    number: '05',
-    title: 'Horse Owner',
-    subtitle: 'Chủ sở hữu',
-    description:
-      'Theo dõi hồ sơ, trạng thái sức khỏe và tiến trình của ngựa trong câu lạc bộ.',
-  },
-]
+}
+const LANGS = [['vi', 'VI', 'Tiếng Việt'], ['en', 'EN', 'English']]
 
-const features = [
-  {
-    tag: 'HORSE PROFILE',
-    title: 'Hồ sơ ngựa tập trung',
-    description:
-      'Tất cả thông tin nhận diện, dòng dõi, chủ sở hữu, tài liệu và trạng thái hồ sơ được quản lý tại một nơi.',
-    icon: 'H',
-  },
-  {
-    tag: 'TRAINING',
-    title: 'Quản lý huấn luyện',
-    description:
-      'Lập kế hoạch, theo dõi tiến độ và đồng bộ thông tin giữa đội ngũ huấn luyện.',
-    icon: 'T',
-  },
-  {
-    tag: 'HEALTH',
-    title: 'Theo dõi sức khỏe',
-    description:
-      'Hỗ trợ bác sĩ theo dõi hồ sơ khám, kết luận sức khỏe và điều kiện tập luyện.',
-    icon: 'V',
-  },
-  {
-    tag: 'WORKFLOW',
-    title: 'Vận hành đồng bộ',
-    description:
-      'Mỗi vai trò nhìn thấy đúng dữ liệu cần thiết và phối hợp trên cùng một hệ thống.',
-    icon: 'W',
-  },
-]
-
-function ArrowIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="landing-arrow-icon"
-    >
-      <path
-        d="M5 12h14M13 6l6 6-6 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
+function readLang() {
+  try { return localStorage.getItem('equi.lang') === 'en' ? 'en' : 'vi' } catch { return 'vi' }
 }
 
-function LandingPage() {
-  return (
-    <div className="landing-page">
-      <header className="landing-nav">
-        <Link className="landing-brand" to="/">
-           <span className="landing-brand-mark">
-    <img
-      src="/equitrack-mark.jpg"
-      alt="EquiTrack"
-    />
-  </span>
+const STEP_ICONS = ['intake', 'health', 'training', 'care']
 
-          <span>
-            <strong>EQUITRACK</strong>
-            <small>Racehorse performance</small>
-          </span>
-        </Link>
+// Biểu tượng nét mảnh cho 4 bước của vòng đời ngựa trong câu lạc bộ.
+function StepIcon({ name }) {
+  const paths = {
+    intake: <><rect x="10" y="8" width="28" height="34" rx="2" /><path d="M18 8V5h12v3M16 20h16M16 27h16M16 34h10" /></>,
+    health: <><circle cx="24" cy="24" r="18" /><path d="M10 25h8l3-7 5 14 3-7h9" /></>,
+    training: <><circle cx="24" cy="27" r="16" /><path d="M24 27V18M20 5h8M24 5v6M36 13l3-3" /></>,
+    care: <><path d="M12 40V24a12 12 0 0 1 24 0v16M8 40h8M32 40h8" /><circle cx="15" cy="30" r="1" /><circle cx="33" cy="30" r="1" /><circle cx="17" cy="20" r="1" /><circle cx="31" cy="20" r="1" /></>,
+  }
+  return <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
 
-        <nav className="landing-nav-links">
-          <a href="#about">Giới thiệu</a>
-          <a href="#roles">Vai trò</a>
-          <a href="#features">Tính năng</a>
-          <a href="#workflow">Vận hành</a>
-        </nav>
-
-        <Link className="landing-login-button" to="/login">
-          Đăng nhập
-          <ArrowIcon />
-        </Link>
-      </header>
-
-      <main>
-        <section className="landing-hero">
-          <div className="hero-background-orb hero-orb-one" />
-          <div className="hero-background-orb hero-orb-two" />
-
-          <div className="landing-hero-copy">
-            <div className="landing-eyebrow">
-              <span />
-              RACEHORSE MANAGEMENT PLATFORM
-            </div>
-
-            <h1>
-              Nền tảng <span className="landing-hero-phrase">quản lý</span>{' '}
-              <span className="landing-hero-highlight">
-                <span className="landing-hero-phrase">ngựa đua</span>{' '}
-                <span className="landing-hero-phrase">toàn diện.</span>
-              </span>
-            </h1>
-
-            <p className="landing-hero-description">
-              Một không gian vận hành tập trung dành cho câu lạc bộ
-              ngựa đua — từ hồ sơ, sức khỏe đến quá trình huấn luyện
-              và phối hợp đội ngũ.
-            </p>
-
-            <div className="landing-hero-actions">
-              <Link className="landing-primary-button" to="/login">
-                Trải nghiệm hệ thống
-                <ArrowIcon />
-              </Link>
-
-              <a className="landing-text-button" href="#features">
-                Khám phá nền tảng
-              </a>
-            </div>
-
-            <div className="landing-trust-row">
-              <div>
-                <strong>500+</strong>
-                <span>Hồ sơ ngựa</span>
-              </div>
-
-              <div>
-                <strong>50+</strong>
-                <span>Câu lạc bộ</span>
-              </div>
-
-              <div>
-                <strong>99.9%</strong>
-                <span>Khả dụng hệ thống</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="landing-hero-visual">
-            <div className="hero-image-shell">
-              <img
-                src="/landing-horse.jpg"
-                alt="Ngựa đua trong chuồng"
-              />
-
-              <div className="hero-image-overlay" />
-
-
-            </div>
-
-            <div className="floating-card floating-card-top">
-              <span className="floating-card-icon">✓</span>
-
-              <div>
-                <small>Trạng thái sức khỏe</small>
-                <strong>Sẵn sàng tập luyện</strong>
-              </div>
-            </div>
-
-            <div className="floating-card floating-card-bottom">
-              <div className="mini-chart">
-                <span style={{ height: '38%' }} />
-                <span style={{ height: '55%' }} />
-                <span style={{ height: '46%' }} />
-                <span style={{ height: '78%' }} />
-                <span style={{ height: '66%' }} />
-                <span style={{ height: '92%' }} />
-              </div>
-
-              <div>
-                <small>Training Performance</small>
-                <strong>+18.4%</strong>
-              </div>
-            </div>
-          </div>
-
-
-        </section>
-
-        <section className="landing-marquee">
-          <div>
-            <span>HORSE PROFILE</span>
-            <i />
-            <span>TRAINING MANAGEMENT</span>
-            <i />
-            <span>HEALTH MONITORING</span>
-            <i />
-            <span>OWNER EXPERIENCE</span>
-            <i />
-            <span>CLUB OPERATIONS</span>
-          </div>
-        </section>
-
-        <section id="about" className="landing-about">
-          <div className="landing-section-number"></div>
-
-          <div className="landing-about-heading">
-            <p className="landing-section-label">
-              MỘT NỀN TẢNG. MỘT HỆ THỐNG.
-            </p>
-
-            <h2>
-              Được thiết kế cho toàn bộ
-              <span>vòng đời vận hành ngựa đua.</span>
-            </h2>
-          </div>
-
-          <div className="landing-about-description">
-            <p>
-              EquiTrack kết nối dữ liệu hồ sơ, sức khỏe và huấn luyện
-              để mỗi thành viên trong câu lạc bộ có thể làm việc trên
-              cùng một nguồn thông tin.
-            </p>
-
-            <p>
-              Không còn dữ liệu rời rạc giữa nhiều bộ phận. Thông tin
-              quan trọng được cập nhật xuyên suốt và hiển thị theo đúng
-              quyền của từng vai trò.
-            </p>
-          </div>
-        </section>
-
-        <section id="roles" className="landing-roles">
-          <header className="landing-section-header">
-            <div>
-              <p className="landing-section-label">
-                ROLE-BASED EXPERIENCE
-              </p>
-
-              <h2>
-                5 vai trò.
-                <span>Một hệ thống thống nhất.</span>
-              </h2>
-            </div>
-
-            <p>
-              Mỗi vai trò có khu vực làm việc riêng nhưng tất cả đều
-              vận hành trên cùng một nền tảng dữ liệu.
-            </p>
-          </header>
-
-          <div className="roles-grid">
-            {roles.map((role) => (
-              <article className="role-card" key={role.number}>
-                <div className="role-card-top">
-  <span>{role.number}</span>
-</div>
-
-                <div>
-                  <p>{role.subtitle}</p>
-                  <h3>{role.title}</h3>
-                </div>
-
-                <p className="role-description">
-                  {role.description}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="features" className="landing-features">
-          <div className="features-intro">
-            <p className="landing-section-label">
-              BUILT FOR PERFORMANCE
-            </p>
-
-            <h2>
-              Tập trung vào
-              <span>những điều thực sự quan trọng.</span>
-            </h2>
-
-            <p>
-              Một giao diện rõ ràng giúp đội ngũ tập trung vào quyết
-              định chuyên môn thay vì mất thời gian tìm kiếm dữ liệu.
-            </p>
-          </div>
-
-          <div className="feature-list">
-            {features.map((feature, index) => (
-             <article className="feature-row" key={feature.title}>
-  <div className="feature-number-box">
-    <span>0{index + 1}</span>
+function LanguageSwitch({ lang, setLang, label }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (event) => { if (!box.current?.contains(event.target)) setOpen(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+  return <div className="lp-lang" ref={box}>
+    <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={() => setOpen(!open)}>
+      {lang.toUpperCase()}
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+    </button>
+    {open && <ul role="listbox" aria-label={label}>
+      {LANGS.map(([code, short, name]) => <li key={code} role="option" aria-selected={lang === code}>
+        <button type="button" onClick={() => { setLang(code); setOpen(false) }}><b>{short}</b>{name}</button>
+      </li>)}
+    </ul>}
   </div>
+}
 
-  <div className="feature-copy">
-    <small>{feature.tag}</small>
+export default function LandingPage() {
+  const [scrolled, setScrolled] = useState(false)
+  const [navHidden, setNavHidden] = useState(false)
+  const [role, setRole] = useState(0)
+  const teamRef = useRef(null)
+  const [teamIn, setTeamIn] = useState(false)
+  const [teamPaused, setTeamPaused] = useState(false)
 
-    <h3>
-      {feature.title}
-    </h3>
+  // Phần Vai trò: hiện dần khi cuộn tới; chỉ tự chuyển vai trò khi phần này đang nằm trên màn hình.
+  useEffect(() => {
+    const node = teamRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') { setTeamIn(true); return undefined }
+    const observer = new IntersectionObserver(([entry]) => setTeamIn(entry.isIntersecting), { threshold: 0.25 })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [lang, setLangState] = useState(readLang)
+  const t = TEXT[lang]
+  // Đã đăng nhập (còn phiên trong trình duyệt): thay Đăng nhập / Đăng ký bằng nút quay lại hệ thống.
+  const [signedIn] = useState(() => { try { return Boolean(getAccessToken()) } catch { return false } })
+  const dashRef = useRef(null)
+  const [dashOn, setDashOn] = useState(false)
 
-    <p>
-      {feature.description}
-    </p>
-  </div>
-</article>
-            ))}
-          </div>
-        </section>
+  // Cột biểu đồ trong khung minh họa mọc lên khi người xem cuộn tới.
+  useEffect(() => {
+    const node = dashRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') { setDashOn(true); return undefined }
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setDashOn(true); observer.disconnect() } }, { threshold: 0.3 })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
-        <section id="workflow" className="landing-workflow">
-          <div className="workflow-visual">
-            <div className="workflow-dashboard">
-              <div className="workflow-dashboard-bar">
-                <span />
-                <span />
-                <span />
-              </div>
+  function setLang(code) {
+    setLangState(code)
+    try { localStorage.setItem('equi.lang', code) } catch { /* trình duyệt chặn lưu: vẫn đổi ngay trên trang */ }
+  }
 
-              <div className="workflow-dashboard-content">
-                <aside>
-                  <div className="mock-logo">
-  <img
-    src="/equitrack-mark.jpg"
-    alt="EquiTrack"
-  />
-</div>
-                  <div className="mock-menu active" />
-                  <div className="mock-menu" />
-                  <div className="mock-menu" />
-                  <div className="mock-menu short" />
-                </aside>
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
 
-                <div className="mock-main">
-                  <div className="mock-title" />
+  useEffect(() => {
+    // Thanh menu: cuộn xuống thì ẩn, cuộn lên thì hiện lại (luôn hiện khi ở đầu trang).
+    let lastY = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      setScrolled(y > 40)
+      if (Math.abs(y - lastY) > 6) {
+        setNavHidden(y > lastY && y > 160)
+        lastY = y
+      }
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-                  <div className="mock-stat-grid">
-                    <div />
-                    <div />
-                    <div />
-                  </div>
+  const anchors = ['#top', '#quy-trinh', '#vai-tro', '#lien-he']
+  const links = <>{anchors.map((href, i) => <a key={href} href={href} onClick={() => setMenuOpen(false)}>{t.nav[i]}</a>)}</>
 
-                  <div className="mock-chart">
-                    <span style={{ height: '34%' }} />
-                    <span style={{ height: '48%' }} />
-                    <span style={{ height: '42%' }} />
-                    <span style={{ height: '65%' }} />
-                    <span style={{ height: '57%' }} />
-                    <span style={{ height: '80%' }} />
-                    <span style={{ height: '71%' }} />
-                    <span style={{ height: '92%' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+  return <div className="landing-page">
+    <header className={`lp-nav${scrolled || menuOpen ? ' is-solid' : ''}${navHidden && !menuOpen ? ' is-hidden' : ''}`}>
+      <Link className="lp-brand" to="/" aria-label="EquiTrack">
+        <span className="lp-mark"><img src="/equitrack-mark.jpg" alt="" /></span>
+        <span className="lp-brand-name">EQUITRACK</span>
+      </Link>
+      <nav className="lp-links" aria-label="Menu">{links}</nav>
+      <div className="lp-nav-actions">
+        {signedIn
+          ? <Link className="lp-nav-login" to="/login">{t.enter}</Link>
+          : <>
+            <Link className="lp-nav-register" to="/login?mode=register">{t.register}</Link>
+            <Link className="lp-nav-login" to="/login">{t.login}</Link>
+          </>}
+      </div>
+      <LanguageSwitch lang={lang} setLang={setLang} label={t.language} />
+      <button className="lp-burger" type="button" aria-expanded={menuOpen} aria-label={menuOpen ? t.menuClose : t.menuOpen}
+        onClick={() => setMenuOpen(!menuOpen)}><span /><span /></button>
+      {menuOpen && <nav className="lp-drawer" aria-label="Menu">{links}{signedIn ? <Link to="/login">{t.enterLower}</Link> : <><Link to="/login">{t.loginLower}</Link><Link to="/login?mode=register">{t.registerOwner}</Link></>}</nav>}
+    </header>
 
-          <div className="workflow-copy">
-            <p className="landing-section-label">
-              CONNECTED WORKFLOW
-            </p>
+    <section className="lp-hero" id="top">
+      <video className="lp-video" autoPlay muted loop playsInline preload="auto" poster="/login-hero.jpg" aria-hidden="true" tabIndex={-1}>
+        <source src="/login-hero.mp4" type="video/mp4" />
+      </video>
+      <div className="lp-hero-shade" aria-hidden="true" />
+      <div className="lp-hero-content">
+        <h1>EquiTrack</h1>
+        <p className="lp-hero-sub">Racehorse Performance.</p>
+      </div>
+      <a className="lp-scroll" href="#quy-trinh"><i aria-hidden="true" /><span>{t.scroll}</span></a>
+    </section>
 
-            <h2>
-              Dữ liệu thay đổi.
-              <span>Giao diện cập nhật.</span>
-            </h2>
+    <section className="lp-about" id="quy-trinh">
+      <div>
+        <p className="lp-about-eyebrow">{t.aboutEyebrow}</p>
+        <h2>{t.aboutTitle[0]} <span>{t.aboutTitle[1]}</span></h2>
+        <p className="lp-about-lead">{t.aboutLead}</p>
+      </div>
+      <div className="lp-ring">
+        <svg className="lp-ring-track" viewBox="0 0 100 100" aria-hidden="true">
+          <circle className="outer" cx="50" cy="50" r="49.6" fill="none" stroke="rgba(80,86,69,.5)" strokeWidth=".25" strokeDasharray=".8 1.2" />
+          <circle cx="50" cy="50" r="34" fill="#505645" />
+        </svg>
+        <div className="lp-ring-center" aria-hidden="true">
+          <img src="/equitrack-mark.jpg" alt="" />
+          <b>EquiTrack</b>
+          <small>{t.ringCaption}</small>
+        </div>
+        <ol>
+          {t.lifecycle.map((name, i) => <li key={STEP_ICONS[i]}>
+            <i aria-hidden="true"><StepIcon name={STEP_ICONS[i]} /></i>
+            <div><span>{String(i + 1).padStart(2, '0')}</span><strong>{name}</strong></div>
+          </li>)}
+        </ol>
+      </div>
+    </section>
 
-            <p>
-              Từ lúc ngựa được tiếp nhận, khám sức khỏe cho đến khi
-              bước vào chương trình huấn luyện, trạng thái được cập
-              nhật xuyên suốt giữa các vai trò.
-            </p>
-
-            <div className="workflow-points">
-              <div>
-                <span>01</span>
-                <p>
-                  Hồ sơ được tiếp nhận và xác minh bởi Club Manager.
-                </p>
-              </div>
-
-              <div>
-                <span>02</span>
-                <p>
-                  Veterinarian thực hiện khám và cập nhật sức khỏe.
-                </p>
-              </div>
-
-              <div>
-                <span>03</span>
-                <p>
-                  Kết quả được phản ánh đến Manager và Horse Owner.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="landing-cta">
-          <div className="cta-glow" />
-
-          <p className="landing-section-label">
-            READY TO START?
-          </p>
-
-          <h2>
-            Một nền tảng tốt hơn cho
-            <span>những chiến mã tốt hơn.</span>
-          </h2>
-
-          <p>
-            Quản lý câu lạc bộ, hồ sơ ngựa và hoạt động chuyên môn
-            trên một hệ thống thống nhất.
-          </p>
-
-<Link
-  className="landing-primary-button"
-  to="/login"
-  onClick={() => {
-    window.location.href = '/login'
-  }}
->
-  Đăng nhập hệ thống
-  <ArrowIcon />
-</Link>
-        </section>
-      </main>
-
-      <footer className="landing-footer">
+    <section className={`lp-team${teamIn ? ' is-in' : ''}${teamPaused ? ' is-paused' : ''}`} id="vai-tro" ref={teamRef}>
+      <div className="lp-team-head">
         <div>
-          <Link className="landing-brand" to="/">
-            <span className="landing-brand-mark">
-    <img
-      src="/equitrack-mark.jpg"
-      alt="EquiTrack logo"
-    />
-  </span>
-
-            <span>
-              <strong>EQUITRACK</strong>
-              <small>Racehorse performance</small>
-            </span>
-          </Link>
-
-          <p>
-            Racehorse Training & Management System.
-          </p>
+          <p className="lp-kicker">{t.rolesEyebrow}</p>
+          <h2>{t.rolesTitle[0]} <span>{t.rolesTitle[1]}</span></h2>
         </div>
-
-        <div className="footer-links">
-          <a href="#about">Giới thiệu</a>
-          <a href="#roles">Vai trò</a>
-          <a href="#features">Tính năng</a>
-          <Link to="/login">Đăng nhập</Link>
+        <p>{t.rolesLead}</p>
+      </div>
+      <div className="lp-team-body" onMouseEnter={() => setTeamPaused(true)} onMouseLeave={() => setTeamPaused(false)}
+        onFocus={() => setTeamPaused(true)} onBlur={() => setTeamPaused(false)}>
+        <div className="lp-team-list" role="tablist" aria-label={t.rolesEyebrow}>
+          {t.roles.map(([name], i) => <button key={i} type="button" role="tab" id={`role-tab-${i}`} aria-selected={role === i} aria-controls="role-panel"
+            tabIndex={role === i ? 0 : -1} className={role === i ? 'is-active' : ''} style={{ '--i': i }} onClick={() => setRole(i)} onMouseEnter={() => setRole(i)}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+              event.preventDefault()
+              const next = (i + (event.key === 'ArrowDown' ? 1 : t.roles.length - 1)) % t.roles.length
+              setRole(next)
+              document.getElementById(`role-tab-${next}`)?.focus()
+            }}>
+            <span>{String(i + 1).padStart(2, '0')}</span>{name}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            {role === i && <i className="lp-team-progress" aria-hidden="true" onAnimationEnd={() => setRole((role + 1) % t.roles.length)} />}
+          </button>)}
         </div>
-
-        <div className="footer-bottom">
-          <span>© 2026 EQUITRACK</span>
+        <div className="lp-team-panel" role="tabpanel" id="role-panel" aria-labelledby={`role-tab-${role}`} key={`${lang}-${role}`}>
+          <b className="lp-team-num" aria-hidden="true">{String(role + 1).padStart(2, '0')}</b>
+          <h3>{t.roles[role][0]}</h3>
+          <p>{t.roles[role][1]}</p>
+          <small>{t.rolesTasks}</small>
+          <ul>
+            {t.roles[role][2].map((task, i) => <li key={task} style={{ '--i': i }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>{task}
+            </li>)}
+          </ul>
         </div>
-      </footer>
-    </div>
-  )
+      </div>
+    </section>
+
+    <section className="lp-sync">
+      <div className="lp-sync-copy">
+        <p className="lp-kicker">{t.syncEyebrow}</p>
+        <h2>{t.syncTitle[0]} <span>{t.syncTitle[1]}</span></h2>
+        <p className="lp-sync-lead">{t.syncLead}</p>
+        <ol className="lp-sync-steps">
+          {t.syncSteps.map((text, i) => <li key={i}><span>{String(i + 1).padStart(2, '0')}</span><p>{text}</p></li>)}
+        </ol>
+      </div>
+      <div className="lp-dash-stage" ref={dashRef}>
+        <div className={`lp-dash${dashOn ? ' is-on' : ''}`} aria-hidden="true">
+          <div className="lp-dash-top"><i /><i /><i /></div>
+          <div className="lp-dash-body">
+            <aside>
+              <span className="lp-dash-logo"><img src="/equitrack-mark.jpg" alt="" /></span>
+              <b className="on" /><b /><b /><b className="short" />
+            </aside>
+            <div className="lp-dash-main">
+              <span className="lp-dash-title" />
+              <div className="lp-dash-stats">{[0, 1, 2].map((i) => <div key={i}><span /><strong /></div>)}</div>
+              <div className="lp-dash-chart">
+                {[34, 48, 42, 65, 57, 80, 71, 92].map((h, i) => <span key={i} style={{ height: `${h}%`, transitionDelay: `${i * 70}ms` }} />)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section className="lp-cta">
+      <svg className="lp-cta-rings" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="49.5" fill="none" stroke="rgba(224,214,176,.35)" strokeWidth=".18" strokeDasharray=".7 1.1" />
+        <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(244,241,234,.14)" strokeWidth=".18" />
+        <circle cx="50" cy="50" r="22" fill="none" stroke="rgba(244,241,234,.1)" strokeWidth=".18" />
+      </svg>
+      <div className="lp-cta-content">
+        <p className="lp-kicker">{t.ctaEyebrow}</p>
+        <h2>{t.ctaTitle[0]} <span>{t.ctaTitle[1]}</span></h2>
+        <p>{t.ctaText}</p>
+        <div className="lp-cta-actions">
+          <Link className="lp-cta-primary" to="/login">{signedIn ? t.enter : t.ctaLogin}</Link>
+          {!signedIn && <Link className="lp-cta-secondary" to="/login?mode=register">{t.ctaRegister}</Link>}
+        </div>
+      </div>
+    </section>
+
+    <footer className="lp-footer" id="lien-he">
+      <div className="lp-footer-main">
+        <Link className="lp-footer-logo" to="/" aria-label="EquiTrack"><img src="/equitrack-mark.jpg" alt="" /></Link>
+        <nav aria-label={t.foot.explore}>
+          <strong>{t.foot.explore}</strong>
+          {anchors.slice(0, 3).map((href, i) => <a key={href} href={href}>{t.nav[i]}</a>)}
+        </nav>
+        <nav aria-label={t.foot.features}>
+          <strong>{t.foot.features}</strong>
+          {t.foot.featureLinks.map((name) => <a key={name} href="#quy-trinh">{name}</a>)}
+        </nav>
+        <nav aria-label={t.foot.account}>
+          <strong>{t.foot.account}</strong>
+          <Link to="/login">{t.loginLower}</Link>
+          <Link to="/login?mode=register">{t.registerOwner}</Link>
+        </nav>
+        <div className="lp-footer-contact">
+          <strong>{t.foot.contact}</strong>
+          <p>EquiTrack · Racehorse Training &amp; Management System</p>
+          <p>E: <a href="mailto:tranbaonguyen0209@gmail.com">tranbaonguyen0209@gmail.com</a></p>
+          <p className="lp-footer-help">{t.foot.help}</p>
+        </div>
+      </div>
+      <div className="lp-footer-bar">
+        <p>{t.foot.copy}</p>
+        <a className="lp-totop" href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+          {t.foot.top}
+          <span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 19V5M6 11l6-6 6 6" /></svg></span>
+        </a>
+      </div>
+    </footer>
+  </div>
 }
-
-export default LandingPage

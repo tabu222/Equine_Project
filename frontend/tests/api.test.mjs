@@ -9,10 +9,10 @@ import { transformWithOxc } from 'vite'
 
 // Exercise the actual FE adapters with controlled HTTP responses. No business data is mocked in the app.
 const temp = await mkdtemp(join(tmpdir(), 'equi-api-tests-'))
-for (const name of ['apiClient.ts', 'userApi.ts', 'horseApi.ts', 'vetApi.ts', 'registrationApi.js']) {
+for (const name of ['apiClient.ts', 'userApi.ts', 'horseApi.ts', 'vetApi.ts', 'careApi.ts', 'googleAuthApi.ts', 'registrationApi.js']) {
   const source = await readFile(new URL(`../src/api/${name}`, import.meta.url), 'utf8')
   const compiled = (await transformWithOxc(source, name, { lang: name.endsWith('.ts') ? 'ts' : 'js' }))
-    .code.replaceAll('import.meta.env', '({})').replaceAll('./apiClient.ts', './apiClient.mjs').replaceAll('./horseApi.ts', './horseApi.mjs')
+    .code.replaceAll('import.meta.env', '({})').replaceAll('./apiClient.ts', './apiClient.mjs').replaceAll('./horseApi.ts', './horseApi.mjs').replaceAll('./vetApi.ts', './vetApi.mjs')
   await writeFile(join(temp, name.replace(/\.(ts|js)$/, '.mjs')), compiled)
 }
 const client = await import(pathToFileURL(join(temp, 'apiClient.mjs')))
@@ -20,6 +20,8 @@ const users = await import(pathToFileURL(join(temp, 'userApi.mjs')))
 const horses = await import(pathToFileURL(join(temp, 'horseApi.mjs')))
 const registration = await import(pathToFileURL(join(temp, 'registrationApi.mjs')))
 const vet = await import(pathToFileURL(join(temp, 'vetApi.mjs')))
+const care = await import(pathToFileURL(join(temp, 'careApi.mjs')))
+const google = await import(pathToFileURL(join(temp, 'googleAuthApi.mjs')))
 await writeFile(join(temp, 'vetDomain.mjs'), await readFile(new URL('../src/pages/vet/vetDomain.js', import.meta.url), 'utf8'))
 const domain = await import(pathToFileURL(join(temp, 'vetDomain.mjs')))
 const store = new Map()
@@ -36,6 +38,72 @@ const rawUser = { UserID: 1, ClubID: 2, Email: 'owner@example.test', Roles: ['HO
 const rawHorse = { HorseID: 3, HorseName: 'Thunder', RegistrationStatus: 'Draft' }
 beforeEach(() => { store.clear(); events.length = 0 })
 after(async () => { globalThis.fetch = originalFetch; await rm(temp, { recursive: true, force: true }) })
+
+test('Care lists include all pages and surface malformed responses instead of empty results', async () => {
+  client.saveSession('access', 'refresh')
+  const calls = []
+  globalThis.fetch = async url => {
+    calls.push(url)
+    return json(url.includes('page=2')
+      ? { count: 2, next: null, results: [{ CareTaskID: 2 }] }
+      : { count: 2, next: '/api/care-tasks?Date=2026-10-27&mine=1&page=2', results: [{ CareTaskID: 1 }] })
+  }
+  assert.deepEqual((await care.getCareTasks({ Date: '2026-10-27', mine: true })).map(t => t.CareTaskID), [1, 2])
+  assert.equal(calls[0], '/api/care-tasks?Date=2026-10-27&mine=1')
+  globalThis.fetch = async () => json({ detail: 'Unexpected response' })
+  await assert.rejects(care.getApprovedHorses(), /đầy đủ/)
+})
+
+test('Optional care resources accept empty 200 or JSON null while server failures remain errors', async () => {
+  client.saveSession('access', 'refresh')
+  globalThis.fetch = async () => new Response(null, { status: 200 })
+  assert.equal(await care.getHorseGroom(3), null)
+  assert.equal(await care.getCurrentDiet(3), null)
+  globalThis.fetch = async () => json(null)
+  assert.equal(await care.getCurrentDiet(3), null)
+  globalThis.fetch = async () => json({ detail: 'Unavailable' }, 500)
+  await assert.rejects(care.getHorseGroom(3), error => error.status === 500)
+})
+
+test('Care mutations use the shared session and preserve validation errors without claiming success', async () => {
+  client.saveSession('access', 'refresh')
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.headers.get('Authorization'), 'Bearer access')
+    calls.push({ url, method: options.method, body: options.body && JSON.parse(options.body) })
+    if (url.endsWith('/reject')) return json({ VetNote: ['Cần ghi lý do.'] }, 400)
+    if (options.method === 'DELETE') return new Response(null, { status: 204 })
+    return json({ CareTaskID: 4, Status: 'Completed' })
+  }
+  await care.completeCareTask(4, 'Đã cho ăn')
+  await assert.rejects(care.rejectDietPlan(5, ''), error => error.status === 400 && error.fieldErrors.VetNote[0] === 'Cần ghi lý do.')
+  await care.clearHorseGroom(3)
+  assert.deepEqual(calls, [
+    { url: '/api/care-tasks/4/complete', method: 'POST', body: { Note: 'Đã cho ăn' } },
+    { url: '/api/diet-plans/5/reject', method: 'POST', body: { VetNote: '' } },
+    { url: '/api/horses/3/groom', method: 'DELETE', body: undefined },
+  ])
+})
+
+test('Google signup waits for complete owner details and saves only a complete session', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.headers.has('Authorization'), false)
+    calls.push({ url, body: JSON.parse(options.body) })
+    return json(calls.length === 1
+      ? { SignupRequired: true, Email: 'owner@example.test', FullName: 'Owner' }
+      : { access: 'google-access', refresh: 'google-refresh' })
+  }
+  assert.deepEqual(await google.signInWithGoogle('id-token'), { status: 'signup-required', email: 'owner@example.test', fullName: 'Owner' })
+  assert.equal(client.getAccessToken(), null)
+  assert.deepEqual(await google.signInWithGoogle('id-token', { fullName: ' Owner ', phone: ' 0901234567 ', address: ' Club road ', clubId: '2' }), { status: 'signed-in' })
+  assert.deepEqual(calls[1], { url: '/api/auth/google', body: { Credential: 'id-token', FullName: 'Owner', Phone: '0901234567', Address: 'Club road', ClubID: 2 } })
+  assert.equal(client.getAccessToken(), 'google-access')
+  store.clear()
+  globalThis.fetch = async () => json({ access: 'incomplete' })
+  await assert.rejects(google.signInWithGoogle('id-token'), /chưa trả đủ/)
+  assert.equal(client.getAccessToken(), null)
+})
 
 test('Vet herd counts require every page and reject incomplete or foreign-club data', async () => {
   client.saveSession('access', 'refresh')
@@ -324,17 +392,22 @@ test('Manager horse creation maps owner, pedigree and enums to backend columns',
 })
 
 test('registration sends required fields, ignores caller role and stores no credentials', async () => {
+  let expectedClubId
   globalThis.fetch = async (url, init) => {
     assert.equal(url, '/api/auth/register')
     assert.equal(init.headers.has('Authorization'), false)
     const body = JSON.parse(init.body)
-    assert.equal(body.ClubID, 2)
+    assert.equal(body.ClubID, expectedClubId)
+    if (expectedClubId === undefined) assert.equal('ClubID' in body, false)
     assert.equal(body.Address, 'Address')
     assert.equal('RoleCode' in body, false)
     return json({ User: rawUser, access: 'access', refresh: 'refresh' }, 201)
   }
-  await registration.registerOwner({ fullName: 'Owner', email: 'owner@example.test', phone: '0901234567',
-    address: 'Address', clubId: '2', password: 'test-input', RoleCode: 'CLUB_MANAGER' })
+  for (const clubId of [undefined, '2']) {
+    expectedClubId = clubId === undefined ? undefined : 2
+    await registration.registerOwner({ fullName: 'Owner', email: 'owner@example.test', phone: '0901234567',
+      address: 'Address', clubId, password: 'test-input', RoleCode: 'CLUB_MANAGER' })
+  }
   assert.equal(store.size, 0)
 })
 
