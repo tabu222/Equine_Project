@@ -183,6 +183,52 @@
 .injury-body-region { fill: transparent; stroke: transparent; stroke-width: 1.2; stroke-linejoin: round; transition: fill .15s; pointer-events: all; vector-effect: non-scaling-stroke; }
 .injury-body-region:hover, .injury-body-region:focus-visible, .injury-body-region.is-selected,
 .is-placing .injury-body-region:hover { fill: rgb(23 136 114 / 11%); stroke: rgb(23 136 114 / 65%); stroke-width: 1.2; outline: none; }
+.injury-region-editor .injury-body-region:hover,
+.injury-region-editor .injury-body-region:focus-visible { fill: rgb(250 204 88 / 30%); stroke: #f6d991; stroke-width: 2; }
+.injury-region-editor .injury-body-region.is-selected { fill: rgb(34 211 238 / 66%); stroke: #c9faff; stroke-width: 2.5; }
+.injury-region-editor .injury-body-region.is-selected:hover { fill: rgb(34 211 238 / 76%); }
+.injury-region-editor .injury-body-region:focus-visible { stroke: #fff4c0; stroke-width: 3.5; }
+.injury-region-editor { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 20px; align-items: start; margin-block: 16px; }
+.injury-region-controls { min-width: 0; }
+.injury-region-editor .injury-diagram-viewer { margin-inline: 0; background: #243b33; border-color: #3c5349; color: #eaf1eb; }
+.injury-region-editor .injury-diagram-toolbar { background: #20362e; border-color: #3c5349; }
+.injury-region-editor .injury-diagram-toolbar button { background: #304b40; border-color: #577264; color: #e0ebe3; }
+.injury-region-editor .injury-diagram-toolbar button[aria-pressed="true"] { background: #d7e5ce; border-color: #d7e5ce; color: #243b2d; }
+.injury-region-editor .injury-diagram-instruction,
+.injury-region-editor .injury-diagram-viewer .injury-photo-note { color: #bfd0c4; }
+.injury-region-editor .injury-diagram-instruction strong { color: #f1f5e9; }
+.injury-region-editor .injury-diagram-stage { background: radial-gradient(ellipse at 52% 42%, #4a6152 0%, #2d4639 60%, #243b30 100%); }
+.injury-region-editor .injury-region-caption { color: #d3f7f8; }
+.injury-region-editor .injury-view-footer { background: #20362e; border-color: #3c5349; }
+.injury-region-editor .injury-view-footer p { color: #bfd0c4; }
+.injury-region-editor .injury-photo-state { background: #243b33; color: #f1f5e9; }
+.injury-region-editor .injury-photo-state p { color: #bfd0c4; }
+.injury-region-key { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; font-size: 12px; color: #e0ebe3; }
+.injury-region-key span { display: inline-flex; align-items: center; gap: 8px; }
+.injury-region-key i { width: 16px; height: 12px; border: 1px solid #c9faff; border-radius: 3px; background: #22d3ee; }
+.injury-region-key .injury-region-key-hover { background: #b8a356; border-color: #f6d991; }
+.injury-region-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; padding: 14px; border: 1px solid var(--injury-line); border-radius: 8px; min-width: 0; }
+.injury-region-options legend { font-size: 13px; font-weight: 600; padding-inline: 6px; }
+.injury-region-options label { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.injury-region-options label:has(input:checked) { background: #e1f4f4; border-color: #7fc5cc; color: #174e56; font-weight: 600; }
+.injury-region-options input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; flex-shrink: 0; accent-color: #167d8d; }
+.injury-selected-regions { display: grid; gap: 10px; margin-block: 16px; }
+.injury-selected-regions ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.injury-selected-regions li { display: flex; align-items: center; gap: 8px; padding-left: 12px; border: 1px solid #7fc5cc; border-radius: 8px; background: #e1f4f4; color: #174e56; font-size: 12px; min-height: 44px; }
+.injury-selected-regions li > span:last-child { padding-right: 12px; }
+.injury-selected-regions li button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--danger); font-size: 20px; }
+.injury-clear-regions { justify-self: start; min-height: 44px; }
+.injury-region-editor textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.injury-record-editor { padding: 16px 22px 22px; }
+.injury-record-selector { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 22px; }
+.injury-record-selector [aria-pressed="true"] { background: var(--nav-active); border-color: var(--green-primary); }
+.injury-record-selector button, .injury-save-location { min-height: 44px; }
+.injury-records h4 { white-space: pre-wrap; }
+@media (max-width: 1100px) { .injury-region-editor { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .injury-region-options { grid-template-columns: 1fr 1fr; padding: 8px; }
+  .injury-record-editor { padding: 12px; }
+}
 .injury-photo-note { padding: 8px 18px 0; color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
 .injury-region-caption { min-height: 34px; padding: 8px 18px; color: var(--green-dark); font-size: 12px; }
 .injury-photo-state { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 18px; text-align: center; background: var(--surface-soft); }
