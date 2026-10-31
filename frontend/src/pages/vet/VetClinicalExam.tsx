@@ -15,6 +15,7 @@ import VetPrescription, { PrescriptionSummary } from './VetPrescription.jsx';
 import VetRecordDetails from './VetRecordDetails.jsx';
 import VetLoading from './VetLoading.jsx';
 import useClinicalWarning from './useClinicalWarning.js';
+import HorseInjuryRegionPicker from '../../components/injury/HorseInjuryRegionPicker.jsx';
 import './VetWorkspace.css';
 
 interface Props {
@@ -76,6 +77,7 @@ export default function VetClinicalExam({ horse, currentUser, records = [], draf
   function validate(final = false) {
     const invalid: Partial<Record<Key, string>> = {};
     if (!form.examType) invalid.examType = 'Chọn loại khám trước khi lưu.';
+    if ((form.injuryLocation || '').length > 500) invalid.injuryLocation = 'Vị trí chấn thương tối đa 500 ký tự.';
     if (!form.examDate || !Number.isFinite(Date.parse(form.examDate))) invalid.examDate = 'Nhập ngày giờ khám hợp lệ.';
     if (form.weightKg != null && (!(form.weightKg > 0) || form.weightKg > 99999.9)) invalid.weightKg = 'Cân nặng phải lớn hơn 0 và không vượt 99.999,9 kg.';
     if (form.heightCm != null && (!(form.heightCm > 0) || form.heightCm > 9999.9)) invalid.heightCm = 'Chiều cao phải lớn hơn 0 và không vượt 9.999,9 cm.';
@@ -192,7 +194,7 @@ export default function VetClinicalExam({ horse, currentUser, records = [], draf
             {control('examDate', 'datetime-local')}<small>Ngày giờ tại câu lạc bộ (UTC+07:00).</small>
           </section>
           <section className="panel" id="exam-findings"><p className="eyebrow">02 · KIỂM TRA</p><h2>Triệu chứng và kết quả kiểm tra</h2>{control('symptoms', 'textarea', 1500)}<div className="horse-form-grid">{control('weightKg', 'number')}{control('heightCm', 'number')}</div>{control('note', 'textarea', 1500)}</section>
-          <section className="panel" id="exam-diagnosis"><p className="eyebrow">03 · CHẨN ĐOÁN</p><h2>Chẩn đoán và chấn thương</h2>{control('diagnosis', 'textarea', 1500)}{control('injuryLocation', 'text', 500)}<p className="vet-caption">Ghi rõ vùng và bên bị ảnh hưởng khi có chấn thương.</p></section>
+          <section className="panel" id="exam-diagnosis"><p className="eyebrow">03 · CHẨN ĐOÁN</p><h2>Chẩn đoán và chấn thương</h2>{control('diagnosis', 'textarea', 1500)}<HorseInjuryRegionPicker value={form.injuryLocation || ''} onChange={(value: string) => change('injuryLocation', value)} disabled={busy || uncertain} inputId="clinical-injuryLocation" error={fieldErrors.injuryLocation || ''} /><p className="vet-caption">Ghi rõ vùng và bên bị ảnh hưởng. Vùng chọn được lưu cùng phiếu khám dưới dạng mô tả vị trí.</p></section>
           <section className="panel" id="exam-prescription"><p className="eyebrow">04 · ĐIỀU TRỊ</p><h2>Phác đồ và đơn thuốc</h2>{control('treatmentPlan', 'textarea', 3000)}<VetPrescription key={record?.id || 'unsaved'} recordId={record?.id} canEdit onDirtyChange={setDrugDirty} disabled={busy || uncertain} /></section>
           <section className="panel" id="exam-conclusion"><p className="eyebrow">05 · KẾT LUẬN</p><h2>Kết luận và tái khám</h2>{control('conclusion', 'textarea', 1500)}<div className="horse-form-grid">{control('healthStatus', 'text', undefined, recordHealthLabels)}{control('trainingEligibility', 'text', undefined, trainingLabels)}</div>{control('restrictionNote', 'textarea', 1000)}{control('followUpDate', 'date')}<p className="vet-caption">Đây là ngày chỉ định tái khám. Đặt lịch trong mục Lịch y tế để ghi nhận lịch hẹn trong hệ thống.</p></section>
         </> : <section className="panel vet-review" id="exam-review" tabIndex={-1}><p className="eyebrow">KIỂM TRA TRƯỚC KHI CHỐT</p><h2>Xác nhận bệnh án</h2><p>Đối chiếu nội dung khám và đơn thuốc. Bệnh án đã chốt được giữ nguyên; sửa nội dung bằng đính chính.</p><dl className="vet-details">{[

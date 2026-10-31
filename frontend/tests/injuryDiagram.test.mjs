@@ -21,7 +21,7 @@ test('Real mode makes no API calls, never opens demo storage, and refuses writes
   assert.throws(() => repo.remove('id'), /chưa được hỗ trợ/)
 })
 test('Stable regions, independent side coordinates and version checks', () => {
-  assert.equal(new Set(bodyRegions.map(region => region.id)).size, 8)
+  assert.equal(new Set(bodyRegions.map(region => region.id)).size, 9)
   for (const region of bodyRegions) for (const view of ['left', 'right']) {
     assert.equal(hasDiagramPosition({ ...regionAnchor(region.id, view), bodyRegion: region.id, bodySide: view, view, diagramVersion: DIAGRAM_VERSION }), true)
   }

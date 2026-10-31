@@ -618,3 +618,7 @@ export async function saveExaminationDraft(
 export async function signMedicalRecord(recordId: string): Promise<MedicalRecord> {
   return mapMedicalRecord(await apiPost<unknown>(`/medical-records/${encodeURIComponent(recordId)}/sign`, {}));
 }
+
+export async function updateInjuryLocation(recordId: string, injuryLocation: string): Promise<MedicalRecord> {
+  return mapMedicalRecord(await apiPatch<unknown>(`/medical-records/${encodeURIComponent(recordId)}`, { InjuryLocation: injuryLocation }));
+}

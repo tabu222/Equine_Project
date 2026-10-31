@@ -5,6 +5,7 @@ import { examLabels, recordHealthLabels, trainingLabels, vetDate, vetDateTime, v
 import VetPrescription from './VetPrescription.jsx'
 import VetLoading from './VetLoading.jsx'
 import useClinicalWarning from './useClinicalWarning.js'
+import HorseInjuryRegionPicker from '../../components/injury/HorseInjuryRegionPicker.jsx'
 
 function Details({ rows }) {
   return <dl className="vet-details">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Chưa ghi nhận'}</dd></div>)}</dl>
@@ -67,7 +68,7 @@ export default function VetRecordDetails({ record, canAmend = false }) {
     ]} /></section>
     <section className="vet-clinical-section"><h3>Chẩn đoán và chấn thương</h3><Details rows={[
       ['Chẩn đoán', record.diagnosis], ['Vị trí chấn thương', record.injuryLocation],
-    ]} /></section>
+    ]} />{record.injuryLocation && <HorseInjuryRegionPicker key={record.id} value={record.injuryLocation} onChange={() => {}} readOnly />}</section>
     <section className="vet-clinical-section"><h3>Điều trị và đơn thuốc</h3><p className="vet-preserve">{record.treatmentPlan || 'Chưa ghi hướng điều trị.'}</p><VetPrescription recordId={record.id} />{record.recordStatus === 'Signed' && <p className="vet-caption">Đơn thuốc hiển thị thông tin điều trị hiện tại. Ngày kết thúc và thời gian ngưng thuốc được theo dõi tại mục Điều trị và đơn thuốc.</p>}</section>
     <section className="vet-clinical-section"><h3>Kết luận và tái khám</h3><Details rows={[
       ['Kết luận', record.conclusion], ['Trạng thái sức khỏe', recordHealthLabels[record.healthStatus]], ['Điều kiện tập', trainingLabels[record.trainingEligibility]],
