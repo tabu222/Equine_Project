@@ -41,7 +41,7 @@ class SchemaMatchesSqlTests(SimpleTestCase):
         flow_tables = {
             "Flow 2": (flows.has_training, {
                 "Specialization", "TrainerSpecialization", "TrainerProfile", "TrainerCredential", "TrainerRaceResult",
-                "HorseAssessment", "TrainerHorseAssignment", "HorseWorkRiderPreference", "TrainingPlan",
+                "HorseAssessment", "TrainerHorseAssignment", "HorseWorkRiderPreference", "TrainingPlan", "WorkRiderSpecialization",
                 "TrainingPlanStage", "TrainingSession", "TrainingResult", "TrainingReview"}),
             "Flow 3": (flows.has_flow3, {
                 "TrainingLock", "Treatment", "Vaccination", "MedicalSchedule", "HealthReport", "HealthReportNote"}),

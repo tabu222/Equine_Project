@@ -64,6 +64,7 @@ class AssignTrainerSerializer(serializers.Serializer):
     AssessmentID = serializers.IntegerField(required=False, allow_null=True)
     StartDate = serializers.DateField(required=False, allow_null=True)
     AssignmentNote = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
+    WorkRiderID = serializers.IntegerField(required=False, allow_null=True)   # kỵ sĩ tập chính của ngựa
 
 
 class WorkRiderPreferenceSerializer(DBColumnModelSerializer):
@@ -76,9 +77,32 @@ class WorkRiderPreferenceSerializer(DBColumnModelSerializer):
         read_only_fields = fields
 
 
-class WorkRiderPreferenceCreateSerializer(serializers.Serializer):
+class MainWorkRiderSerializer(serializers.Serializer):
     WorkRiderID = serializers.IntegerField()
-    Priority = serializers.IntegerField(min_value=1, default=1)
+    Note = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
+
+
+class RiderSpecializationSerializer(serializers.Serializer):
+    SpecializationID = serializers.IntegerField()
+
+
+class SubstituteSerializer(serializers.Serializer):
+    """Head Trainer chọn người giám sát thay; null = bỏ, trainer phụ trách giám sát lại."""
+
+    SubstituteTrainerID = serializers.IntegerField(allow_null=True)
+    Reason = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
+
+
+class SubstituteDaySerializer(SubstituteSerializer):
+    TrainerID = serializers.IntegerField()
+    Date = serializers.DateField()
+
+
+class WorkRiderPreferenceCreateSerializer(serializers.Serializer):
+    """Kỵ sĩ dự phòng (Priority >= 2). Kỵ sĩ chính (Priority 1) đặt bằng PUT /horses/<id>/main-work-rider."""
+
+    WorkRiderID = serializers.IntegerField()
+    Priority = serializers.IntegerField(min_value=2, default=2)
     StartDate = serializers.DateField(required=False, allow_null=True)
     Note = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
 
@@ -256,19 +280,24 @@ class TrainingSessionSerializer(DBColumnModelSerializer):
 
 class TrainingSessionWriteSerializer(DBColumnModelSerializer):
     """
-    Head Trainer xếp / sửa buổi tập.
-    Body: {"TrainingPlanStageID": 3, "WorkRiderID": 9, "SubstituteTrainerID": null, "SessionDate": "2026-10-12",
+    Trainer phụ trách xếp / sửa buổi tập (người giám sát thay sửa được kỵ sĩ, giờ của buổi mình giám sát).
+    Body: {"TrainingPlanStageID": 3, "WorkRiderID": 9, "SessionDate": "2026-10-12",
            "StartTime": "06:00", "TrainingType": "Canter", "TrainingLoad": 40, ...}
     SequenceNo bỏ trống = tự lấy thứ tự tiếp theo trong ngày của Work Rider.
     """
 
     TrainingPlanStageID = serializers.PrimaryKeyRelatedField(source="stage", queryset=TrainingPlanStage.objects.all())
-    WorkRiderID = serializers.IntegerField(source="work_rider_id")
+    # Bỏ trống khi xếp buổi mới = kỵ sĩ chính của ngựa
+    WorkRiderID = serializers.IntegerField(source="work_rider_id", required=False)
+    # Chỉ Head Trainer chọn người giám sát thay (POST /training-sessions/<id>/substitute); ở đây chỉ chấp nhận null
     SubstituteTrainerID = serializers.IntegerField(source="substitute_trainer_id", required=False, allow_null=True)
+    # Lý do không dùng kỵ sĩ chính / đổi kỵ sĩ (hiện trong thông báo gửi Head Trainer)
+    RiderChangeReason = serializers.CharField(source="rider_change_reason", max_length=500, required=False,
+                                              allow_blank=True, allow_null=True, write_only=True)
 
     class Meta:
         model = TrainingSession
-        fields = ["TrainingPlanStageID", "WorkRiderID", "SubstituteTrainerID", *SESSION_FIELDS]
+        fields = ["TrainingPlanStageID", "WorkRiderID", "SubstituteTrainerID", "RiderChangeReason", *SESSION_FIELDS]
         extra_kwargs = {"sequence_no": {"required": False}}
 
     def validate(self, attrs):

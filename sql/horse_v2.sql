@@ -104,6 +104,7 @@ DROP TABLE IF EXISTS dbo.HorseAssessment;
 DROP TABLE IF EXISTS dbo.TrainerRaceResult;
 DROP TABLE IF EXISTS dbo.TrainerCredential;
 DROP TABLE IF EXISTS dbo.TrainerProfile;
+DROP TABLE IF EXISTS dbo.WorkRiderSpecialization;
 DROP TABLE IF EXISTS dbo.TrainerSpecialization;
 DROP TABLE IF EXISTS dbo.Specialization;
 DROP TABLE IF EXISTS dbo.StallAssignment;
@@ -500,6 +501,21 @@ CREATE TABLE dbo.TrainerSpecialization
     CONSTRAINT FK_TrainerSpecialization_Trainer FOREIGN KEY (TrainerID)
         REFERENCES dbo.[User](UserID),
     CONSTRAINT FK_TrainerSpecialization_Specialization FOREIGN KEY (SpecializationID)
+        REFERENCES dbo.Specialization(SpecializationID)
+);
+GO
+
+/* Chuyên môn của Work Rider: hệ thống ưu tiên kỵ sĩ đúng chuyên môn khi xếp buổi tập. */
+CREATE TABLE dbo.WorkRiderSpecialization
+(
+    WorkRiderID INT NOT NULL,
+    SpecializationID INT NOT NULL,
+    AssignedAt DATETIME2 NOT NULL CONSTRAINT DF_WorkRiderSpecialization_AssignedAt DEFAULT SYSDATETIME(),
+
+    CONSTRAINT PK_WorkRiderSpecialization PRIMARY KEY (WorkRiderID, SpecializationID),
+    CONSTRAINT FK_WorkRiderSpecialization_Rider FOREIGN KEY (WorkRiderID)
+        REFERENCES dbo.[User](UserID),
+    CONSTRAINT FK_WorkRiderSpecialization_Specialization FOREIGN KEY (SpecializationID)
         REFERENCES dbo.Specialization(SpecializationID)
 );
 GO
@@ -1948,7 +1964,7 @@ GO
 INSERT INTO dbo.Role (RoleCode, RoleName, Description)
 VALUES
 ('CLUB_MANAGER',  N'Club Manager',        N'Quản lý câu lạc bộ, duyệt hồ sơ ngựa và phân quyền.'),
-('HEAD_TRAINER',  N'Head Trainer',        N'Đánh giá ngựa, phân công Trainer, duyệt giáo án, xếp buổi tập, chỉ định Substitute Trainer.'),
+('HEAD_TRAINER',  N'Head Trainer',        N'Đánh giá ngựa, phân công Trainer và kỵ sĩ chính, duyệt giáo án, chọn người giám sát thay.'),
 ('TRAINER',       N'Trainer',             N'Phụ trách ngựa, xây dựng giáo án, giám sát và đánh giá buổi tập.'),
 ('WORK_RIDER',    N'Work Rider',          N'Trực tiếp cưỡi ngựa, thực hiện buổi tập và ghi kết quả.'),
 ('VETERINARIAN',  N'Veterinarian',        N'Khám theo ca trực, chẩn đoán, điều trị, quản lý Training Lock.'),
@@ -2014,7 +2030,6 @@ FROM
     ('HEAD_TRAINER', 'HORSE_ASSESS'),
     ('HEAD_TRAINER', 'TRAINER_ASSIGN'),
     ('HEAD_TRAINER', 'TRAINING_PLAN_APPROVE'),
-    ('HEAD_TRAINER', 'TRAINING_SESSION_ASSIGN'),
     ('HEAD_TRAINER', 'TRAINING_SESSION_SUPERVISE'),
     ('HEAD_TRAINER', 'HEALTH_REPORT'),
     ('HEAD_TRAINER', 'DIET_MANAGE'),

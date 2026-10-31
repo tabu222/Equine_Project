@@ -82,8 +82,10 @@ class AssignmentTests(TrainingTestCase):
     def test_work_rider_preferences(self):
         horse_id = self.approved_horse()
         head = self.client_for(self.head)
+        self.assertEqual(head.post(f"/api/horses/{horse_id}/work-rider-preferences",
+                                   {"WorkRiderID": self.rider.id, "Priority": 1}, format="json").status_code, 400)
         res = head.post(f"/api/horses/{horse_id}/work-rider-preferences",
-                        {"WorkRiderID": self.rider.id, "Priority": 1, "Note": "Quen ngựa"}, format="json")
+                        {"WorkRiderID": self.rider.id, "Priority": 2, "Note": "Quen ngựa"}, format="json")
         self.assertEqual(res.status_code, 201, res.data)
         self.assertEqual(head.post(f"/api/horses/{horse_id}/work-rider-preferences",
                                    {"WorkRiderID": self.rider.id}, format="json").data["code"], "ALREADY_EXISTS")
@@ -199,12 +201,18 @@ class SessionTests(TrainingTestCase):
         sid = s["TrainingSessionID"]
         self.assertTrue(s["IsSubstitute"])
         self.assertEqual(s["SupervisingTrainerID"], self.trainer2.id)
+        head = self.client_for(self.head)
         # Chọn chính trainer phụ trách thì không tính là Substitute
-        res = self.client_for(self.head).patch(f"/api/training-sessions/{sid}",
-                                               {"SubstituteTrainerID": self.trainer.id}, format="json")
+        res = head.post(f"/api/training-sessions/{sid}/substitute", {"SubstituteTrainerID": self.trainer.id},
+                        format="json")
         self.assertFalse(res.data["IsSubstitute"])
-        self.client_for(self.head).patch(f"/api/training-sessions/{sid}", {"SubstituteTrainerID": self.trainer2.id},
-                                         format="json")
+        head.post(f"/api/training-sessions/{sid}/substitute", {"SubstituteTrainerID": self.trainer2.id,
+                                                               "Reason": "Trainer nghỉ phép"}, format="json")
+        # Trainer không tự chọn người giám sát thay
+        self.assertEqual(self.client_for(self.trainer).patch(f"/api/training-sessions/{sid}", {
+            "SubstituteTrainerID": self.head.id}, format="json").status_code, 403)
+        self.assertEqual(self.client_for(self.trainer).post(f"/api/training-sessions/{sid}/substitute", {
+            "SubstituteTrainerID": None}, format="json").status_code, 403)
         sub = self.client_for(self.trainer2)
         self.assertEqual(sub.get("/api/training-sessions?mine=1").data[0]["TrainingSessionID"], sid)
         self.assertEqual(self.client_for(self.trainer).get("/api/training-sessions?mine=1").data, [])
@@ -225,13 +233,13 @@ class SessionTests(TrainingTestCase):
         self.session(stage_id)
         second = self.session(stage_id)                          # tự lấy SequenceNo = 2
         self.assertEqual(second["SequenceNo"], 2)
-        res = self.client_for(self.head).post("/api/training-sessions", {
+        res = self.client_for(self.trainer).post("/api/training-sessions", {
             "TrainingPlanStageID": stage_id, "WorkRiderID": self.rider.id, "SessionDate": TODAY.isoformat(),
             "StartTime": "09:00", "TrainingType": "Walk", "SequenceNo": 1}, format="json")
         self.assertEqual(res.data["code"], "RIDER_SLOT_TAKEN")
         self.session(stage_id, day=TODAY - timedelta(days=1), expect=400)            # ngày đã qua
         self.session(stage_id, day=TODAY + timedelta(days=25), expect=400)           # ngoài giai đoạn
-        res = self.client_for(self.head).post("/api/training-sessions", {
+        res = self.client_for(self.trainer).post("/api/training-sessions", {
             "TrainingPlanStageID": stage_id, "WorkRiderID": self.groom.id, "SessionDate": TODAY.isoformat(),
             "StartTime": "09:00", "TrainingType": "Walk"}, format="json")
         self.assertIn("WorkRiderID", res.data)
@@ -251,13 +259,18 @@ class SessionTests(TrainingTestCase):
         self.assertEqual(res.data["Status"], "Cancelled")
 
         other = self.session(stage_id)["TrainingSessionID"]
-        self.assertEqual(self.client_for(self.head).post(f"/api/training-sessions/{other}/missed").data["Status"],
-                         "Missed")
+        trainer, head = self.client_for(self.trainer), self.client_for(self.head)
+        self.assertEqual(head.post(f"/api/training-sessions/{other}/missed").status_code, 403)   # việc của Trainer
+        self.assertEqual(trainer.post(f"/api/training-sessions/{other}/missed").data["Status"], "Missed")
         third = self.session(stage_id, day=TODAY + timedelta(days=1))["TrainingSessionID"]
-        self.assertEqual(self.client_for(self.head).post(f"/api/training-sessions/{third}/missed").data["code"],
-                         "NOT_YET")
-        self.assertEqual(self.client_for(self.head).post(f"/api/training-sessions/{third}/cancel", {},
-                                                         format="json").data["Status"], "Cancelled")
+        self.assertEqual(trainer.post(f"/api/training-sessions/{third}/missed").data["code"], "NOT_YET")
+        self.assertEqual(trainer.post(f"/api/training-sessions/{third}/cancel", {},
+                                      format="json").data["Status"], "Cancelled")
+        # Head Trainer vẫn dừng được buổi đang diễn ra khi khẩn cấp
+        fourth = self.session(stage_id)["TrainingSessionID"]
+        self.client_for(self.rider).post(f"/api/training-sessions/{fourth}/start")
+        self.assertEqual(head.post(f"/api/training-sessions/{fourth}/stop", {"Reason": "Ngựa hoảng"},
+                                   format="json").data["Status"], "Cancelled")
 
     def test_end_assignment_cancels_open_work(self):
         horse_id, plan, stage_id = self.ready_horse()

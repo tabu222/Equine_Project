@@ -11,12 +11,9 @@ PlaceRate          tỉ lệ về top 3 trong 12 tháng gần nhất (cùng đi�
 CareerStarts/Wins  tổng cả sự nghiệp (mọi TrainerRaceResult); CareerWinRate = CareerWins / CareerStarts.
 
 Gợi ý theo phiếu đánh giá ngựa gần nhất (HorseAssessment, DecisionStatus = Recommended):
-    - chuyên môn của trainer phải khớp chuyên môn được đề xuất;
-    - cấp độ tối thiểu theo QualityScore (ngựa càng tốt, càng nhắm giải lớn thì cần trainer càng kỳ cựu):
-          QualityScore >= 85  -> Senior trở lên
-          QualityScore >= 70  -> Intermediate trở lên
-          còn lại / chưa chấm -> mọi cấp (Junior nhận để tích lũy kinh nghiệm)
-    - xếp hạng: đủ điều kiện trước, rồi cấp độ cao hơn, ít ngựa đang phụ trách hơn, TrainerRating cao hơn.
+    - đúng chuyên môn được đề xuất xếp trước;
+    - rồi điểm đánh giá (TrainerRating) cao hơn, kinh nghiệm (cấp độ, số năm) cao hơn;
+    - bằng nhau thì ai đang giữ ít ngựa hơn lên trước (chia việc đều).
 """
 from datetime import date, timedelta
 
@@ -106,41 +103,19 @@ def profile_body(trainer, profile, active_horse_count, credentials=(), results=(
     }
 
 
-def required_level(assessment):
-    """Cấp độ tối thiểu nên giao cho ngựa theo phiếu đánh giá (None = mọi cấp)."""
-    score = getattr(assessment, "quality_score", None)
-    if score is None:
-        return None
-    if score >= 85:
-        return "Senior"
-    if score >= 70:
-        return "Intermediate"
-    return None
-
-
 def suggestion(body, specialization_ids, assessment):
-    """Thêm IsSuggested / RequiredLevel / SuggestionReason cho một trainer theo phiếu đánh giá ngựa."""
-    need = required_level(assessment)
+    """
+    Gợi ý trainer cho ngựa: chỉ xét đúng chuyên môn với loại đua được đề xuất cho ngựa.
+    Thứ tự (sort_key): đúng chuyên môn -> điểm đánh giá cao -> kinh nghiệm cao -> đang giữ ít ngựa hơn.
+    """
     spec_ok = assessment is None or assessment.specialization_id in specialization_ids
-    level_ok = need is None or level_rank(body["ExperienceLevel"]) >= level_rank(need)
-    reasons = []
-    if assessment is not None:
-        reasons.append("Đúng chuyên môn được đề xuất" if spec_ok else "Không có chuyên môn được đề xuất")
-    if need is None:
-        reasons.append("Ngựa phù hợp mọi cấp trainer")
-    elif level_ok:
-        reasons.append(f"Đủ cấp độ cho ngựa này (cần {need} trở lên)")
+    if assessment is None:
+        reason = "Ngựa chưa có phiếu đánh giá đề xuất chuyên môn"
     else:
-        reasons.append(f"Ngựa này nên giao trainer {need} trở lên, trainer đang là {body['ExperienceLevel']}")
-    return {
-        "IsSuggested": spec_ok and level_ok,
-        "MatchesSpecialization": spec_ok,
-        "MatchesLevel": level_ok,
-        "RequiredLevel": need,
-        "SuggestionReason": "; ".join(reasons),
-    }
+        reason = "Đúng chuyên môn được đề xuất" if spec_ok else "Không có chuyên môn được đề xuất"
+    return {"IsSuggested": spec_ok, "MatchesSpecialization": spec_ok, "SuggestionReason": reason}
 
 
 def sort_key(row):
-    return (not row.get("IsSuggested", True), -level_rank(row["ExperienceLevel"]), row["ActiveHorseCount"],
-            -(row["TrainerRating"] or 0), row["FullName"])
+    return (not row.get("IsSuggested", True), -(row["TrainerRating"] or 0), -level_rank(row["ExperienceLevel"]),
+            -(row.get("YearsOfExperience") or 0), row["ActiveHorseCount"], row["FullName"])

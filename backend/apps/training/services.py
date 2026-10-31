@@ -10,9 +10,11 @@ Giáo án:   Draft ──submit──> Pending Approval ──approve──> Act
 Buổi tập:  Assigned ──start (Work Rider)──> In Progress ──result (Work Rider)──> Completed
            Assigned / In Progress ──stop (trainer đang giám sát) / cancel──> Cancelled
            Assigned / In Progress ──missed──> Missed
-           Xếp / sửa / hủy / đánh vắng: Head Trainer cho mọi ngựa, Trainer cho ngựa mình đang phụ trách.
+           Xếp / sửa / hủy / đánh vắng: Trainer cho ngựa mình đang phụ trách (Head Trainer không làm việc hằng ngày).
+           Không gửi WorkRiderID -> tự điền kỵ sĩ chính; kỵ sĩ bận trùng giờ -> báo lỗi; đổi khỏi kỵ sĩ chính -> báo
+           Head Trainer. Head Trainer chọn người giám sát thay; người giám sát thay đổi được kỵ sĩ / giờ buổi đó.
 
-Giai đoạn: trainer phụ trách (hoặc Head Trainer) "chốt" giai đoạn kèm nhận xét -> tổng kết gửi chủ ngựa.
+Giai đoạn: trainer phụ trách (hoặc Head Trainer) "chốt" giai đoạn kèm nhận xét -> tổng kết gửi chủ ngựa và Head Trainer.
 
 Training Lock (Flow 3) chặn buổi tập giống trigger SQL Server:
   Full -> không xếp / bắt đầu buổi tập; Restricted -> TrainingLoad phải có và <= MaxIntensity.
@@ -29,7 +31,7 @@ from apps.core.exceptions import TRIGGER_MESSAGES, BusinessRuleError
 from apps.core.permissions import require_club_user
 from apps.horses.models import Horse
 
-from . import owner_emails, plan_templates
+from . import owner_emails, plan_templates, riders, staff_emails
 from .models import (
     HorseAssessment, HorseWorkRiderPreference, TrainerCredential, TrainerHorseAssignment, TrainerProfile,
     TrainerRaceResult, TrainerSpecialization, TrainingPlan, TrainingPlanStage, TrainingResult, TrainingReview,
@@ -90,9 +92,7 @@ def check_plan_lock(plan):
 
 
 def can_manage_sessions(user, assignment) -> bool:
-    """Head Trainer (người duyệt giáo án) xếp buổi tập cho mọi ngựa; Trainer chỉ cho ngựa mình đang phụ trách."""
-    if user.has_perm("TRAINING_PLAN_APPROVE"):
-        return True
+    """Chỉ Trainer đang phụ trách ngựa xếp / sửa / hủy buổi tập (Head Trainer không làm việc hằng ngày)."""
     return (user.has_perm("TRAINING_SESSION_ASSIGN") and assignment.trainer_id == user.pk
             and assignment.status == TrainerHorseAssignment.Status.ACTIVE)
 
@@ -488,10 +488,15 @@ def _validate_session(stage, values, session=None):
     return horse, session_date
 
 
-def _resolve_people(horse, values):
+def _resolve_people(horse, values, session=None):
     rider_id = values.pop("work_rider_id", None)
     if rider_id is not None:
         values["work_rider"] = require_club_user(rider_id, horse.club_id, "WORK_RIDER", field="WorkRiderID")
+    elif session is None:  # xếp buổi mới không chọn kỵ sĩ -> tự điền kỵ sĩ chính
+        main = riders.main_rider(horse)
+        if main is None:
+            raise ValidationError({"WorkRiderID": ["Ngựa chưa có kỵ sĩ chính: cần chọn Work Rider."]})
+        values["work_rider"] = main
     if "substitute_trainer_id" in values:
         substitute_id = values.pop("substitute_trainer_id")
         if substitute_id is None:
@@ -517,30 +522,104 @@ def _check_rider_slot(values, session=None):
                                 "RIDER_SLOT_TAKEN")
 
 
+def _check_rider_free(horse, values, session=None):
+    """Kỵ sĩ đã có buổi khác trùng giờ -> báo để chọn người khác cho riêng buổi này."""
+    rider = values.get("work_rider") or getattr(session, "work_rider", None)
+    day = values.get("session_date") or getattr(session, "session_date", None)
+    start = values.get("start_time") or getattr(session, "start_time", None)
+    end = values["end_time"] if "end_time" in values else getattr(session, "end_time", None)
+    minutes = values.get("duration_planned_minutes") or getattr(session, "duration_planned_minutes", None)
+    conflict = riders.rider_conflict(rider, day, start, end, minutes, exclude_id=getattr(session, "pk", None))
+    if conflict is None:
+        return
+    main = riders.main_rider(horse)
+    who = "Kỵ sĩ chính" if main is not None and main.pk == rider.pk else "Work Rider"
+    raise BusinessRuleError(
+        f"{who} {rider.full_name} đã có buổi tập khác lúc {conflict.start_time:%H:%M} ngày {day:%d/%m/%Y}. "
+        "Hãy chọn Work Rider khác cho buổi này (ưu tiên người đúng chuyên môn).",
+        "MAIN_RIDER_BUSY" if who == "Kỵ sĩ chính" else "RIDER_BUSY")
+
+
+def _log_rider_change(user, session, horse, previous_id, reason):
+    """
+    Ghi lại khi buổi tập không do kỵ sĩ chính cưỡi (lúc xếp) hoặc khi đổi kỵ sĩ (lúc sửa)
+    -> thông báo Head Trainer (RIDER_CHANGED) và kỵ sĩ bị thay (RIDER_REMOVED).
+    """
+    main = riders.main_rider(horse)
+    if previous_id is None:                      # xếp buổi mới
+        if main is None or session.work_rider_id == main.pk:
+            return
+        previous_id = main.pk
+    elif session.work_rider_id == previous_id:   # sửa nhưng không đổi kỵ sĩ
+        return
+    log_action(user, "CHANGE_SESSION_RIDER", session, {
+        "FromWorkRiderID": previous_id, "ToWorkRiderID": session.work_rider_id,
+        "MainWorkRiderID": main.pk if main else None, "Reason": (reason or "").strip() or None,
+        "SessionDate": session.session_date,
+    })
+
+
 def create_session(stage, user, values):
+    reason = values.pop("rider_change_reason", None)
     horse, _ = _validate_session(stage, values)
     _resolve_people(horse, values)
+    _check_rider_free(horse, values)
     _check_rider_slot(values)
     session = TrainingSession.objects.create(stage=stage, assigned_by=user, status=S.ASSIGNED, **values)
     log_action(user, "ASSIGN_TRAINING_SESSION", session, {"HorseID": horse.pk})
+    _log_rider_change(user, session, horse, None, reason)
     return session
 
 
 def update_session(session, user, values):
     if session.status != S.ASSIGNED:
         raise BusinessRuleError("Chỉ sửa được buổi tập chưa bắt đầu (Assigned).", "INVALID_STATUS")
+    reason = values.pop("rider_change_reason", None)
     stage = values.pop("stage", None) or session.stage
     if stage.plan_id != session.stage.plan_id:
         raise ValidationError({"TrainingPlanStageID": ["Chỉ chuyển sang giai đoạn khác trong cùng giáo án."]})
     horse, _ = _validate_session(stage, values, session)
-    _resolve_people(horse, values)
+    _resolve_people(horse, values, session)
+    _check_rider_free(horse, values, session)
     _check_rider_slot(values, session)
+    previous_rider = session.work_rider_id
     session.stage = stage
     for attr, value in values.items():
         setattr(session, attr, value)
     session.save()
     log_action(user, "UPDATE_TRAINING_SESSION", session)
+    _log_rider_change(user, session, horse, previous_rider, reason)
     return session
+
+
+def set_substitute(session, user, substitute_id, reason=None):
+    """Head Trainer chọn (hoặc bỏ, substitute_id = None) người giám sát thay cho một buổi chưa diễn ra."""
+    if session.status != S.ASSIGNED:
+        raise BusinessRuleError("Chỉ chọn người giám sát thay cho buổi tập chưa bắt đầu (Assigned).", "INVALID_STATUS")
+    horse = session.horse
+    substitute = None
+    if substitute_id is not None:
+        substitute = require_club_user(substitute_id, horse.club_id, *SUPERVISOR_ROLES, field="SubstituteTrainerID")
+        if substitute.pk == session.assignment.trainer_id:
+            substitute = None
+    if session.substitute_trainer_id == (substitute.pk if substitute else None):
+        return session
+    session.substitute_trainer = substitute
+    session.save(update_fields=["substitute_trainer"])
+    log_action(user, "SET_SUBSTITUTE_TRAINER", session, {
+        "SubstituteTrainerID": substitute.pk if substitute else None, "TrainerID": session.assignment.trainer_id,
+        "Reason": (reason or "").strip() or None, "SessionDate": session.session_date})
+    return session
+
+
+def set_substitute_for_day(user, trainer_id, day, substitute_id, reason=None):
+    """Trainer nghỉ cả ngày: Head Trainer chọn một người giám sát thay mọi buổi Assigned của trainer đó trong ngày."""
+    trainer = require_club_user(trainer_id, user.club_id, "TRAINER", field="TrainerID")
+    sessions = TrainingSession.objects.filter(
+        session_date=day, status=S.ASSIGNED, stage__plan__assignment__trainer=trainer,
+        stage__plan__assignment__status=TrainerHorseAssignment.Status.ACTIVE,
+        stage__plan__assignment__horse__club_id=user.club_id).select_related("stage__plan__assignment__horse")
+    return [set_substitute(session, user, substitute_id, reason).pk for session in sessions]
 
 
 def start_session(session, user):
@@ -681,4 +760,5 @@ def close_stage(stage, user, summary_note=None):
     stage.save(update_fields=["closed_at", "closed_by", "summary_note"])
     log_action(user, "CLOSE_PLAN_STAGE", stage, {"TrainingPlanID": plan.id})
     owner_emails.stage_closed(stage)
+    staff_emails.stage_closed(stage)
     return stage

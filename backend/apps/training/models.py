@@ -48,6 +48,24 @@ class TrainerSpecialization(models.Model):
         db_table = "TrainerSpecialization"
 
 
+class WorkRiderSpecialization(models.Model):
+    """Chuyên môn của Work Rider (cưỡi đua bằng, vượt rào, điều khiển xe kéo, đường dài là kỹ năng khác nhau)."""
+
+    pk = models.CompositePrimaryKey("work_rider", "specialization")
+    work_rider = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, db_column="WorkRiderID",
+        related_name="rider_specialization_links"
+    )
+    specialization = models.ForeignKey(
+        Specialization, on_delete=models.DO_NOTHING, db_column="SpecializationID", related_name="rider_links"
+    )
+    assigned_at = models.DateTimeField(default=timezone.now, db_column="AssignedAt")
+
+    class Meta:
+        managed = False
+        db_table = "WorkRiderSpecialization"
+
+
 class TrainerProfile(models.Model):
     """
     Hồ sơ năng lực Trainer (1 dòng / trainer), Head Trainer / Manager cập nhật.

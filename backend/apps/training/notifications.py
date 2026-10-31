@@ -69,6 +69,7 @@ def training_items(user, make_item):
                                    stage.end_date or stage.plan.end_date))
     if "OWNER_VIEW" in perms:  # Chủ ngựa
         items += owner_items(user, make_item, today)
+    items += staff_event_items(user, make_item, today)
     if "TRAINING_RESULT_UPDATE" in perms:  # Work Rider
         for session in TrainingSession.objects.filter(work_rider=user, session_date=today,
                                                       status__in=("Assigned", "In Progress")).select_related(
@@ -77,6 +78,85 @@ def training_items(user, make_item):
                                    "TrainingSession", session.id, session.horse, session.session_date))
     return items
 
+
+
+def _details(log):
+    try:
+        return json.loads(log.details or "{}")
+    except (TypeError, ValueError):
+        return {}
+
+
+def staff_event_items(user, make_item, today):
+    """
+    Sự kiện Flow 2 cần báo nhân sự (tính từ AuditLog 7 ngày qua):
+      Head Trainer: buổi tập không do kỵ sĩ chính cưỡi / đổi kỵ sĩ (RIDER_CHANGED), tổng kết giai đoạn (STAGE_SUMMARY)
+      Work Rider:   buổi tập của mình đã giao cho người khác (RIDER_REMOVED)
+      Trainer:      được chọn giám sát thay (SUBSTITUTE_ASSIGNED); buổi của ngựa mình có người giám sát thay (SUBSTITUTE_SET)
+    """
+    from apps.accounts.models import User
+
+    perms, club = user.permission_codes, user.club_id
+    since = today - timedelta(days=OWNER_DAYS)
+    items = []
+    table = TrainingSession._meta.db_table
+    names = {}
+
+    def name(user_id):
+        if user_id and user_id not in names:
+            names[user_id] = User.objects.filter(pk=user_id).values_list("full_name", flat=True).first()
+        return names.get(user_id) or "—"
+
+    rider_logs = list(AuditLog.objects.filter(action_type="CHANGE_SESSION_RIDER", entity_name=table,
+                                              action_time__date__gte=since).order_by("action_time", "id"))
+    sessions = {s.id: s for s in TrainingSession.objects.filter(
+        id__in={log.entity_id for log in rider_logs}, stage__plan__assignment__horse__club_id=club).select_related(
+        "stage__plan__assignment__horse")}
+    for log in rider_logs:
+        session = sessions.get(log.entity_id)
+        if session is None:
+            continue
+        d = _details(log)
+        when = f"{session.start_time:%H:%M} ngày {session.session_date:%d/%m}"
+        if "TRAINING_PLAN_APPROVE" in perms:
+            items.append(make_item(
+                "RIDER_CHANGED", f"Đổi kỵ sĩ buổi {when}: {name(d.get('FromWorkRiderID'))} → "
+                f"{name(d.get('ToWorkRiderID'))}", "TrainingSession", session.id, session.horse, log.action_time,
+                message=d.get("Reason")))
+        if d.get("FromWorkRiderID") == user.pk and session.session_date >= today:
+            items.append(make_item("RIDER_REMOVED", f"Buổi tập {when} đã giao cho {name(d.get('ToWorkRiderID'))}",
+                                   "TrainingSession", session.id, session.horse, log.action_time,
+                                   message=d.get("Reason")))
+    if "TRAINING_PLAN_APPROVE" in perms:
+        stages = {st.id: st for st in TrainingPlanStage.objects.filter(
+            plan__assignment__horse__club_id=club, closed_at__date__gte=since).select_related(
+            "plan__assignment__horse", "plan__assignment__trainer")}
+        for log in AuditLog.objects.filter(action_type="CLOSE_PLAN_STAGE",
+                                           entity_name=TrainingPlanStage._meta.db_table, entity_id__in=list(stages)):
+            stage = stages[log.entity_id]
+            items.append(make_item("STAGE_SUMMARY", f"{stage.plan.assignment.trainer.full_name} đã tổng kết giai đoạn "
+                                   f"\"{stage.stage_name}\"", "TrainingPlanStage", stage.id,
+                                   stage.plan.assignment.horse, stage.closed_at, message=stage.summary_note))
+    if "TRAINING_SESSION_SUPERVISE" in perms:
+        upcoming = {s.id: s for s in TrainingSession.objects.filter(
+            session_date__gte=today, status="Assigned", substitute_trainer__isnull=False,
+            stage__plan__assignment__horse__club_id=club).select_related("stage__plan__assignment__horse")}
+        for log in AuditLog.objects.filter(action_type="SET_SUBSTITUTE_TRAINER", entity_name=table,
+                                           entity_id__in=list(upcoming), action_time__date__gte=since):
+            session = upcoming[log.entity_id]
+            d = _details(log)
+            if d.get("SubstituteTrainerID") != session.substitute_trainer_id:
+                continue   # đã đổi người khác sau đó
+            when = f"{session.start_time:%H:%M} ngày {session.session_date:%d/%m}"
+            if session.substitute_trainer_id == user.pk:
+                items.append(make_item("SUBSTITUTE_ASSIGNED", f"Bạn giám sát thay buổi tập {when}",
+                                       "TrainingSession", session.id, session.horse, log.action_time,
+                                       message=d.get("Reason")))
+            elif session.assignment.trainer_id == user.pk:
+                items.append(make_item("SUBSTITUTE_SET", f"{name(session.substitute_trainer_id)} giám sát thay buổi "
+                                       f"{when}", "TrainingSession", session.id, session.horse, log.action_time,
+                                       message=d.get("Reason")))
+    return items
 
 
 def owner_items(user, make_item, today):

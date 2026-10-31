@@ -64,6 +64,14 @@ def demo_results(plan, first_day, last_day):
     return rows
 
 
+# Chuyên môn của Work Rider mẫu (ưu tiên khi xếp buổi tập)
+DEMO_RIDER_SPECS = {
+    "rider@equi.local": ["FLAT_RACING"],
+    "rider2@equi.local": ["FLAT_RACING", "STEEPLECHASE_HURDLE"],
+    "rider3@equi.local": ["HARNESS_RACING", "ENDURANCE"],
+}
+
+
 def seed_demo(club):
     """Gọi từ `python manage.py seed_demo` khi đã có Flow 2. Chạy lại không tạo trùng, không ghi đè dữ liệu đã có."""
     from apps.accounts.models import User
@@ -97,6 +105,13 @@ def seed_demo(club):
                                   field_size=size, created_by=manager or trainer)
                 for i, (day, position, size) in enumerate(rows)
             ])
+    from .models import WorkRiderSpecialization
+
+    for email, codes in DEMO_RIDER_SPECS.items():   # chuyên môn của Work Rider mẫu
+        rider = User.objects.filter(email__iexact=email, club=club).first()
+        for code in codes if rider else []:
+            if not WorkRiderSpecialization.objects.filter(work_rider=rider, specialization=specializations[code]).exists():
+                WorkRiderSpecialization.objects.create(work_rider=rider, specialization=specializations[code])
     from .plan_templates import ensure_templates
 
     ensure_templates(club)          # giáo án mẫu mặc định cho mỗi chuyên môn
@@ -129,7 +144,8 @@ def seed_plan_demo(club):
     from apps.horses.models import Horse
 
     from .models import (
-        HorseAssessment, Specialization, TrainerHorseAssignment, TrainingPlan, TrainingPlanStage, TrainingResult,
+        HorseAssessment, HorseWorkRiderPreference, Specialization, TrainerHorseAssignment, TrainingPlan,
+        TrainingPlanStage, TrainingResult,
         TrainingReview, TrainingSession,
     )
 
@@ -153,6 +169,10 @@ def seed_plan_demo(club):
         assignment = TrainerHorseAssignment.objects.create(
             horse=horse, trainer=trainer, specialization=flat, assigned_by=head, assessment=assessment,
             start_date=today - timedelta(days=19), status="Active")
+    if not HorseWorkRiderPreference.objects.filter(horse=horse, end_date__isnull=True, priority=1).exists():
+        HorseWorkRiderPreference.objects.create(   # kỵ sĩ chính do Head Trainer chọn lúc phân công
+            horse=horse, work_rider=rider, assigned_by=head, start_date=today - timedelta(days=19), priority=1,
+            note="Kỵ sĩ chính")
     plan = TrainingPlan.objects.create(
         assignment=assignment, goal="Chuẩn bị Cúp Mùa Đông (đua đường bằng 1.600 m)", start_date=today - timedelta(days=14),
         end_date=today + timedelta(days=30), overall_intensity="Moderate", status="Active", created_at=at(-17, 10),

@@ -32,16 +32,20 @@ class TrainerSchedulingTests(TrainingTestCase):
                                        format="json").data["StartTime"], "07:00:00")
         self.assertEqual(trainer.post(f"/api/training-sessions/{sid}/cancel", {"Reason": "Trời mưa"},
                                       format="json").data["Status"], "Cancelled")
-        # Head Trainer vẫn xếp được cho mọi ngựa
+        # Head Trainer không xếp / sửa buổi tập hằng ngày
         self.assertEqual(head.post("/api/training-sessions", session_body(stage_id, self.rider2),
-                                   format="json").status_code, 201)
+                                   format="json").status_code, 403)
+        self.assertEqual(head.patch(f"/api/training-sessions/{sid}", {"StartTime": "08:00"},
+                                    format="json").status_code, 403)
 
-        # Work Rider ưu tiên: chỉ trainer phụ trách / Head Trainer
-        body = {"WorkRiderID": self.rider.id, "Priority": 1}
-        self.assertEqual(trainer2.post(f"/api/horses/{horse_id}/work-rider-preferences", body,
-                                       format="json").status_code, 403)
+        # Kỵ sĩ dự phòng / kỵ sĩ chính: chỉ Head Trainer
+        body = {"WorkRiderID": self.rider.id, "Priority": 2}
         self.assertEqual(trainer.post(f"/api/horses/{horse_id}/work-rider-preferences", body,
-                                      format="json").status_code, 201)
+                                      format="json").status_code, 403)
+        self.assertEqual(trainer.put(f"/api/horses/{horse_id}/main-work-rider", {"WorkRiderID": self.rider.id},
+                                     format="json").status_code, 403)
+        self.assertEqual(head.post(f"/api/horses/{horse_id}/work-rider-preferences", body,
+                                   format="json").status_code, 201)
 
     def test_trainer_user_list_is_limited(self):
         trainer = self.client_for(self.trainer)

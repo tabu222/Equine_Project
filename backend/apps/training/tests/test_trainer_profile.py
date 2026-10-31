@@ -148,7 +148,7 @@ class TrainerProfileApiTests(TrainingTestCase):
 
 
 class TrainerSuggestionTests(TrainingTestCase):
-    """Ngựa tốt (QualityScore cao) nên giao trainer kỳ cựu; ngựa bình thường thì trainer mới cũng được."""
+    """Gợi ý trainer: đúng chuyên môn trước, rồi điểm đánh giá cao, kinh nghiệm cao trước."""
 
     @classmethod
     def setUpTestData(cls):
@@ -161,35 +161,27 @@ class TrainerSuggestionTests(TrainingTestCase):
             "SpecializationID": self.flat.id, "QualityScore": score, "FitnessLevel": "Good"}, format="json")
         self.assertEqual(res.status_code, 201, res.data)
 
-    def test_top_horse_needs_senior_trainer(self):
+    def test_experienced_trainer_first_when_no_rating(self):
         horse_id = self.approved_horse()
         self.assess(horse_id, 92)
         rows = self.client_for(self.head).get(f"/api/trainers?HorseID={horse_id}").data
-        self.assertEqual([r["UserID"] for r in rows], [self.trainer.id, self.trainer2.id])  # phù hợp xếp trước
-        expert, junior = rows
-        self.assertTrue(expert["IsSuggested"])
-        self.assertEqual(expert["RequiredLevel"], "Senior")
-        self.assertFalse(junior["IsSuggested"])
-        self.assertTrue(junior["MatchesSpecialization"])
-        self.assertFalse(junior["MatchesLevel"])
-        self.assertIn("Senior", junior["SuggestionReason"])
-
-        # Head Trainer vẫn giao được cho trainer mới, nhưng có cảnh báo
+        self.assertEqual([r["UserID"] for r in rows], [self.trainer.id, self.trainer2.id])  # kinh nghiệm cao trước
+        self.assertTrue(all(r["IsSuggested"] and r["MatchesSpecialization"] for r in rows))
+        self.assertNotIn("RequiredLevel", rows[0])
+        # Head Trainer giao cho ai cũng được, không còn cảnh báo cấp độ
         res = self.client_for(self.head).post("/api/trainer-assignments", {
             "HorseID": horse_id, "TrainerID": self.trainer2.id, "SpecializationID": self.flat.id}, format="json")
         self.assertEqual(res.status_code, 201, res.data)
         self.assertEqual(res.data["TrainerExperienceLevel"], "Junior")
-        self.assertEqual(res.data["LevelWarning"], "Ngựa này nên giao trainer Senior trở lên, trainer đang là Junior.")
+        self.assertNotIn("LevelWarning", res.data)
 
-    def test_ordinary_horse_fits_every_level(self):
+    def test_higher_rating_comes_first(self):
+        TrainerProfile.objects.filter(trainer=self.trainer2).update(trainer_rating=4.8)
+        TrainerProfile.objects.filter(trainer=self.trainer).update(trainer_rating=3.5)
         horse_id = self.approved_horse()
         self.assess(horse_id, 60)
         rows = self.client_for(self.head).get(f"/api/trainers?HorseID={horse_id}").data
-        self.assertTrue(all(r["IsSuggested"] for r in rows))
-        self.assertTrue(all(r["RequiredLevel"] is None for r in rows))
-        res = self.client_for(self.head).post("/api/trainer-assignments", {
-            "HorseID": horse_id, "TrainerID": self.trainer2.id, "SpecializationID": self.flat.id}, format="json")
-        self.assertIsNone(res.data["LevelWarning"])
+        self.assertEqual([r["UserID"] for r in rows], [self.trainer2.id, self.trainer.id])
 
     def test_wrong_specialization_is_not_suggested(self):
         horse_id = self.approved_horse()

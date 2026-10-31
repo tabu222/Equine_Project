@@ -50,14 +50,23 @@ class TrainingTestCase(Flow1TestCase):
         self.assertEqual(res.status_code, 200, res.data)
         return res.data
 
-    def session(self, stage_id, day=None, load=30, rider=None, substitute=None, expect=201):
+    def session(self, stage_id, day=None, load=30, rider=None, substitute=None, expect=201, start=None):
+        """Trainer phụ trách xếp buổi tập; substitute -> Head Trainer chọn người giám sát thay sau đó."""
+        day = day or TODAY
+        if start is None:   # mỗi buổi cùng ngày một khung giờ riêng (kỵ sĩ không bị trùng giờ)
+            from apps.training.models import TrainingSession
+
+            count = TrainingSession.objects.filter(session_date=day).count()
+            start = f"{6 + count:02d}:00"
         body = {"TrainingPlanStageID": stage_id, "WorkRiderID": (rider or self.rider).id,
-                "SessionDate": (day or TODAY).isoformat(), "StartTime": "06:00", "TrainingType": "Canter",
+                "SessionDate": day.isoformat(), "StartTime": start, "TrainingType": "Canter",
                 "DurationPlannedMinutes": 45, "DistancePlannedKm": 3.5, "TrainingLoad": load}
-        if substitute:
-            body["SubstituteTrainerID"] = substitute.id
-        res = self.client_for(self.head).post("/api/training-sessions", body, format="json")
+        res = self.client_for(self.trainer).post("/api/training-sessions", body, format="json")
         self.assertEqual(res.status_code, expect, res.data)
+        if substitute and expect == 201:
+            res = self.client_for(self.head).post(f"/api/training-sessions/{res.data['TrainingSessionID']}/substitute",
+                                                  {"SubstituteTrainerID": substitute.id}, format="json")
+            self.assertEqual(res.status_code, 200, res.data)
         return res.data
 
     def ready_horse(self):
